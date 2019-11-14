@@ -1,0 +1,4 @@
+
+(executables
+  (names echo)
+  (libraries simplehttpserver))

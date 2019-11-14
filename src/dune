@@ -1,0 +1,6 @@
+
+(library
+  (name simplehttpserver)
+  (public_name simplehttpserver)
+  (libraries threads)
+  (wrapped false))
