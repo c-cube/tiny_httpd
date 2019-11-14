@@ -221,7 +221,7 @@ let run (self:t) : (unit,_) result =
     if self.masksigpipe then (
       ignore (Unix.sigprocmask Unix.SIG_BLOCK [Sys.sigpipe] : _ list);
     );
-    let sock = Unix.socket ~cloexec:true PF_INET Unix.SOCK_STREAM 0 in
+    let sock = Unix.socket PF_INET Unix.SOCK_STREAM 0 in
     let inet_addr = Unix.inet_addr_of_string self.addr in
     Unix.bind sock (Unix.ADDR_INET (inet_addr, self.port));
     Unix.listen sock 10;
