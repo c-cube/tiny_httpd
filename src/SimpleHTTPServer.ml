@@ -149,12 +149,16 @@ type t = {
   masksigpipe: bool;
   mutable handler: (Request.t -> Response.t);
   mutable path_handlers : (Request.t -> (unit -> Response.t) option) list;
+  mutable req_cbs: (Request.t -> Request.t option) list;
+  mutable res_cbs: (Request.t -> Response.t -> Response.t option) list;
   mutable running: bool;
 }
 
 let addr self = self.addr
 let port self = self.port
 
+let add_request_cb self f =  self.req_cbs <- f :: self.req_cbs
+let add_response_cb self f = self.res_cbs <- f :: self.res_cbs
 let set_top_handler self f = self.handler <- f
 
 let add_path_handler ?meth self fmt f =
@@ -173,7 +177,9 @@ let create
     ?(addr="127.0.0.1") ?(port=8080) () : t =
   let handler _req = Response.make_not_found "no top handler" in
   { fork; addr; port; masksigpipe; handler; running= true;
-    path_handlers=[]; }
+    path_handlers=[];
+    req_cbs=[]; res_cbs=[];
+  }
 
 let stop s = s.running <- false
 
@@ -200,12 +206,23 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
       Response.output_ oc res
     | Ok (Some req) ->
       let res =
-        let run_handler =
-          match find_map (fun ph -> ph req) ph_handlers with
-          | Some f -> f
-          | None -> (fun () -> handler req)
-        in
-        try run_handler()
+        try
+          (* request callbacks *)
+          let req =
+            List.fold_left
+              (fun req cb -> match cb req with None -> req | Some r' -> r')
+              req self.req_cbs
+          in
+          let run_handler =
+            match find_map (fun ph -> ph req) ph_handlers with
+            | Some f -> f
+            | None -> (fun () -> handler req)
+          in
+          let resp = run_handler() in
+          (* response callbacks *)
+          List.fold_left
+            (fun resp cb -> match cb req resp with None -> resp | Some r' -> r')
+            resp self.res_cbs
         with
         | e ->
           Response.make ~code:500 ("server error: " ^ Printexc.to_string e)

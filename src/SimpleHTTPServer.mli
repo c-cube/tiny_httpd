@@ -17,7 +17,12 @@ module Headers : sig
 end
 
 module Request : sig
-  type t
+  type t = {
+    meth: Meth.t;
+    headers: Headers.t;
+    path: string;
+    body: string
+  }
 
   val pp : Format.formatter -> t -> unit
 
@@ -62,6 +67,16 @@ val create :
 
 val addr : t -> string
 val port : t -> int
+
+val add_request_cb : t -> (Request.t -> Request.t option) -> unit
+(** Add a callback for every request.
+    The callback can modify the request by returning [Some r'] where [r']
+    is the new request, or just perform side effects (logging?) and return [None].
+*)
+
+val add_response_cb : t -> (Request.t -> Response.t -> Response.t option) -> unit
+(** Add a callback for every request/response pair.
+    Similarly to {!add_request_cb} the callback can modify the response. *)
   
 val set_top_handler : t -> (Request.t -> Response.t) -> unit
 (** Setup a handler called by default.
