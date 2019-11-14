@@ -3,6 +3,7 @@
 
 Minimal HTTP server using good old threads and `Scanf` for routing.
 
+Free from all forms of `ppx`, async monads, etc.
 
 The basic echo server from `src/examples/echo.ml`:
 
