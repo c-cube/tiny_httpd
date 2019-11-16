@@ -1,6 +1,32 @@
 
+(** An input stream. *)
+type input_stream = {
+  ic: in_channel;
+  mutable buf: bytes;
+}
+
 exception Bad_req of int * string
 let bad_reqf c fmt = Printf.ksprintf (fun s ->raise (Bad_req (c,s))) fmt
+
+module Response_code = struct
+  type t = int
+
+  let descr = function
+    | 100 -> "Continue"
+    | 200 -> "OK"
+    | 400 -> "Bad request"
+    | 403 -> "Forbidden"
+    | 404 -> "Not found"
+    | 417 -> "Expectation failed"
+    | 500 -> "Internal server error"
+    | 503 -> "Service unavailable"
+    | _ -> "Unknown response" (* TODO *)
+end
+
+type 'a resp_result = ('a, Response_code.t * string) result 
+let unwrap_resp_result = function
+  | Ok x -> x
+  | Error (c,s) -> raise (Bad_req (c,s))
 
 module Meth = struct
   type t = [
@@ -31,9 +57,9 @@ module Headers = struct
     let pp_pair out (k,v) = Format.fprintf out "@[<h>%s: %s@]" k v in
     Format.fprintf out "@[<v>%a@]" (Format.pp_print_list pp_pair) l
 
-  let parse_ (ic:in_channel) : t =
+  let parse_ (is:input_stream) : t =
     let rec loop acc =
-      let line = input_line ic in
+      let line = input_line is.ic in
       if line = "\r" then (
         List.rev acc
       ) else (
@@ -46,26 +72,6 @@ module Headers = struct
     in
     loop []
 end
-
-module Response_code = struct
-  type t = int
-
-  let descr = function
-    | 100 -> "Continue"
-    | 200 -> "OK"
-    | 400 -> "Bad request"
-    | 403 -> "Forbidden"
-    | 404 -> "Not found"
-    | 417 -> "Expectation failed"
-    | 500 -> "Internal server error"
-    | 503 -> "Service unavailable"
-    | _ -> "Unknown response" (* TODO *)
-end
-
-type 'a resp_result = ('a, Response_code.t * string) result 
-let unwrap_resp_result = function
-  | Ok x -> x
-  | Error (c,s) -> raise (Bad_req (c,s))
 
 module Request = struct
   type t = {
@@ -85,26 +91,28 @@ module Request = struct
       (Meth.to_string self.meth) Headers.pp self.headers
       self.path self.body
 
-  let read_body ic (n:int) : string =
-    let buf = Bytes.make n ' ' in
+  let read_body (is:input_stream) (n:int) : string =
+    if Bytes.length is.buf < n then (
+      is.buf <- Bytes.make n ' ';
+    );
     let i = ref 0 in
     while !i < n do
-      let read = input ic buf !i (n- !i) in
+      let read = input is.ic is.buf !i (n- !i) in
       if read=0 then bad_reqf 400 "body is too short";
       i := !i + read
     done;
-    Bytes.unsafe_to_string buf
+    Bytes.sub_string is.buf 0 n
 
   (* parse request, but not body (yet) *)
-  let parse_req_start (ic:in_channel) : t option resp_result =
+  let parse_req_start (is:input_stream) : t option resp_result =
     try
-      let line = input_line ic in
+      let line = input_line is.ic in
       let meth, path =
         try Scanf.sscanf line "%s %s HTTP/1.1\r" (fun x y->x,y)
         with _ -> raise (Bad_req (400, "Invalid request line"))
       in
       let meth = Meth.of_string meth in
-      let headers = Headers.parse_ ic in
+      let headers = Headers.parse_ is in
       Ok (Some {meth; path; headers; body=""})
     with
     | End_of_file -> Ok None
@@ -113,13 +121,13 @@ module Request = struct
       Error (400, Printexc.to_string e)
 
   (* parse body, given the headers *)
-  let parse_body_ (ic:in_channel) (req:t) : t resp_result =
+  let parse_body_ (is:input_stream) (req:t) : t resp_result =
     try
       let body = match List.assoc "Content-Length" req.headers |> int_of_string with
         | exception Not_found -> ""
         | exception _ -> bad_reqf 400 "invalid content-length"
         | 0 -> ""
-        | n -> read_body ic n
+        | n -> read_body is n
       in
       Ok {req with body}
     with
@@ -213,11 +221,13 @@ let find_map f l =
 let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
   let ic = Unix.in_channel_of_descr client_sock in
   let oc = Unix.out_channel_of_descr client_sock in
+  (* wrap [ic] in a stream with a reusable buffer *)
+  let is = {ic; buf=Bytes.make 1024 ' '} in
   let handler = self.handler in
   let ph_handlers = self.path_handlers in
   let continue = ref true in
   while !continue && self.running do
-    match Request.parse_req_start ic with
+    match Request.parse_req_start is with
     | Ok None -> continue := false
     | Error (c,s) ->
       let res = Response.make ~code:c s in
@@ -233,7 +243,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
             | exception Not_found -> ()
           end;
           (* modify request by reading body *)
-          let req = Request.parse_body_ ic req |> unwrap_resp_result in
+          let req = Request.parse_body_ is req |> unwrap_resp_result in
           (* request callbacks *)
           let req =
             List.fold_left
