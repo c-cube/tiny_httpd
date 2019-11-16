@@ -51,14 +51,21 @@ module Response_code = struct
   type t = int
 
   let descr = function
+    | 100 -> "Continue"
     | 200 -> "OK"
     | 400 -> "Bad request"
     | 403 -> "Forbidden"
     | 404 -> "Not found"
+    | 417 -> "Expectation failed"
     | 500 -> "Internal server error"
     | 503 -> "Service unavailable"
     | _ -> "Unknown response" (* TODO *)
 end
+
+type 'a resp_result = ('a, Response_code.t * string) result 
+let unwrap_resp_result = function
+  | Ok x -> x
+  | Error (c,s) -> raise (Bad_req (c,s))
 
 module Request = struct
   type t = {
@@ -88,7 +95,8 @@ module Request = struct
     done;
     Bytes.unsafe_to_string buf
 
-  let parse_ (ic:in_channel) : (t option, Response_code.t * string) result =
+  (* parse request, but not body (yet) *)
+  let parse_req_start (ic:in_channel) : t option resp_result =
     try
       let line = input_line ic in
       let meth, path =
@@ -97,15 +105,25 @@ module Request = struct
       in
       let meth = Meth.of_string meth in
       let headers = Headers.parse_ ic in
-      let body = match List.assoc "Content-Length" headers |> int_of_string with
+      Ok (Some {meth; path; headers; body=""})
+    with
+    | End_of_file -> Ok None
+    | Bad_req (c,s) -> Error (c,s)
+    | e ->
+      Error (400, Printexc.to_string e)
+
+  (* parse body, given the headers *)
+  let parse_body_ (ic:in_channel) (req:t) : t resp_result =
+    try
+      let body = match List.assoc "Content-Length" req.headers |> int_of_string with
         | exception Not_found -> ""
         | exception _ -> bad_reqf 400 "invalid content-length"
         | 0 -> ""
         | n -> read_body ic n
       in
-      Ok (Some {meth; path; body; headers})
+      Ok {req with body}
     with
-    | End_of_file -> Ok None
+    | End_of_file -> Error (400, "unexpected end of file")
     | Bad_req (c,s) -> Error (c,s)
     | e ->
       Error (400, Printexc.to_string e)
@@ -199,7 +217,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
   let ph_handlers = self.path_handlers in
   let continue = ref true in
   while !continue && self.running do
-    match Request.parse_ ic with
+    match Request.parse_req_start ic with
     | Ok None -> continue := false
     | Error (c,s) ->
       let res = Response.make ~code:c s in
@@ -207,6 +225,15 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
     | Ok (Some req) ->
       let res =
         try
+          (* handle expectations *)
+          begin match List.assoc "Expect" req.Request.headers with
+            | "100-continue" ->
+              Response.output_ oc (Response.make ~code:100 "");
+            | s -> bad_reqf 417 "unknown expectation %s" s
+            | exception Not_found -> ()
+          end;
+          (* modify request by reading body *)
+          let req = Request.parse_body_ ic req |> unwrap_resp_result in
           (* request callbacks *)
           let req =
             List.fold_left
@@ -228,6 +255,8 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
           Response.make ~code:500 ("server error: " ^ Printexc.to_string e)
       in
       Response.output_ oc res
+    | exception Bad_req (code,s) ->
+      Response.output_ oc (Response.make ~code s)
     | exception Sys_error _ ->
       continue := false; (* connection broken somehow *)
       Unix.close client_sock;
