@@ -9,11 +9,12 @@ exception Bad_req of int * string
 let bad_reqf c fmt = Printf.ksprintf (fun s ->raise (Bad_req (c,s))) fmt
 
 let debug_ k =
-  if None<>Sys.getenv_opt "HTTP_DBG" then (
-    k (fun fmt ->
-        Printf.fprintf stdout "[thread %d]: " Thread.(id @@ self());
-        Printf.kfprintf (fun oc -> Printf.fprintf oc "\n%!") stdout fmt)
-  )
+  match Sys.getenv "HTTP_DBG" with
+  | _ ->
+    k (fun fmt->
+       Printf.fprintf stdout "[thread %d]: " Thread.(id @@ self());
+       Printf.kfprintf (fun oc -> Printf.fprintf oc "\n%!") stdout fmt)
+  | exception _ -> ()
 
 module Response_code = struct
   type t = int
