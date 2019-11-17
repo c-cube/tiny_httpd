@@ -20,13 +20,13 @@ let html_list_dir ~parent d : string =
   begin match parent with
     | None -> ()
     | Some p -> 
-      Printf.bprintf body "  <li> <a href=\"/file/%s\"> (parent directory) </a> </li>\n" p;
+      Printf.bprintf body "  <li> <a href=\"/%s\"> (parent directory) </a> </li>\n" p;
   end;
   Array.iter
     (fun f ->
        let full = Filename.concat d f in
        if not @@ contains_dot_dot f then (
-         Printf.bprintf body "  <li> <a href=\"/file/%s\"> %s %s </a> </li>\n"
+         Printf.bprintf body "  <li> <a href=\"/%s\"> %s %s </a> </li>\n"
            full (if Sys.is_directory full then "[dir]" else "") f;
        )
     )
@@ -34,27 +34,30 @@ let html_list_dir ~parent d : string =
   Printf.bprintf body "</ul>\n";
   Buffer.contents body
 
+let same_path a b =
+  Filename.dirname a = Filename.dirname b &&
+  Filename.basename a = Filename.basename b
+
 let serve ~addr ~port (dir:string) : _ result = 
   let server = S.create ~addr ~port () in
-  S.add_path_handler server ~meth:`GET "/"
-    (fun _req () ->
-       let body = html_list_dir ~parent:None dir in
-       S.Response.make ~headers:[header_html] (Ok body)
-    );
-  S.add_path_handler server ~meth:`GET "/file/%s"
+  S.add_path_handler server ~meth:`GET "/%s"
     (fun _req path () ->
        let f = Filename.concat dir path in
        if contains_dot_dot f then (
-         S.Response.fail ~code:503 "Path is forbidden";
+         S.Response.fail ~code:403 "Path is forbidden";
+       ) else if not (Sys.file_exists f) then (
+         S.Response.fail ~code:404 "file not found";
        ) else if Sys.is_directory f then (
-         let body = html_list_dir ~parent:(Some dir) f in
+         S._debug (fun k->k "list dir %S (topdir %S)"  f dir);
+         let body =
+           html_list_dir f
+             ~parent:(if same_path f dir then None else Some dir)
+         in
          S.Response.make ~headers:[header_html] (Ok body)
        ) else (
          try
-           (* TODO: serve chunks *)
-           let _ic = open_in path in
-
-           assert false
+           let ic = open_in path in
+           S.Response.make_raw_chunked ~code:200 (input ic)
          with e ->
            S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e)
        ));
