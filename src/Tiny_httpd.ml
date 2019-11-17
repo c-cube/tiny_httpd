@@ -1,9 +1,14 @@
+type input_stream = (bytes -> int -> int -> int) * (unit -> unit)
+(** An input stream is a function to read bytes into a buffer,
+    and a function to close *)
 
-(** An input stream. *)
-type input_stream = {
-  ic: in_channel;
-  mutable buf: bytes;
-}
+type output_stream = (bytes -> int -> int -> unit) * (unit -> unit) * (unit -> unit)
+(** An output stream is a function to output bytes, a function to [flush],
+    and a function to close. *)
+
+module Input_stream = struct
+
+end
 
 exception Bad_req of int * string
 let bad_reqf c fmt = Printf.ksprintf (fun s ->raise (Bad_req (c,s))) fmt

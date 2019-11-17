@@ -1,3 +1,24 @@
+type input_stream = (bytes -> int -> int -> int) * (unit -> unit)
+(** An input stream is a function to read bytes into a buffer,
+    and a function to close *)
+
+type output_stream = (bytes -> int -> int -> unit) * (unit -> unit) * (unit -> unit)
+(** An output stream is a function to output bytes, a function to [flush],
+    and a function to close. *)
+
+module Input_stream : sig
+  type t = input_stream
+
+  val of_chan : in_channel -> t
+  val of_string : string -> t
+  val of_bytes : bytes -> t
+end
+
+module Output_stream : sig
+  type t = output_stream
+
+  val of_chan : out_channel -> t
+end
 
 module Meth : sig
   type t = [
