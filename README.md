@@ -15,10 +15,10 @@ let () =
   let server = S.create () in
   (* say hello *)
   S.add_path_handler ~meth:`GET server
-    "/hello/%s@/" (fun _req name () -> S.Response.make_ok ("hello " ^name ^"!\n"));
+    "/hello/%s@/" (fun name _req -> S.Response.make_ok ("hello " ^name ^"!\n"));
   (* echo request *)
   S.add_path_handler server
-    "/echo" (fun req () -> S.Response.make_ok (Format.asprintf "echo:@ %a@." S.Request.pp req));
+    "/echo" (fun req -> S.Response.make_ok (Format.asprintf "echo:@ %a@." S.Request.pp req));
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);
   match S.run server with
   | Ok () -> ()
@@ -34,7 +34,7 @@ $ curl -X GET http://localhost:8080/hello/quadrarotaphile
 hello quadrarotaphile!
 
 # the path "echo" just prints the request.
-$ curl -X GET http://localhost:8080/echo --data "coucou lol" 
+$ curl -X GET http://localhost:8080/echo --data "howdy y'all" 
 echo:
 {meth=GET;
  headers=Host: localhost:8080
@@ -42,7 +42,7 @@ echo:
          Accept: */*
          Content-Length: 10
          Content-Type: application/x-www-form-urlencoded;
- path="/echo"; body="coucou lol"}
+ path="/echo"; body="howdy y'all"}
 
 ```
 
@@ -55,7 +55,7 @@ It serves files from the current directory.
 $ http_of_dir . -p 8080 &
 $ curl -X GET http://localhost:8080
 ...
-some html
+<html list of current dir>
 ...
 
 ```

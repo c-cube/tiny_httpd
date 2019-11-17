@@ -8,13 +8,17 @@ type input_stream = {
 exception Bad_req of int * string
 let bad_reqf c fmt = Printf.ksprintf (fun s ->raise (Bad_req (c,s))) fmt
 
+let _debug_on = ref (
+  match String.trim @@ Sys.getenv "HTTP_DBG" with
+  | "" -> false | _ -> true | exception _ -> false
+)
+let _enable_debug b = _debug_on := b
 let _debug k =
-  match Sys.getenv "HTTP_DBG" with
-  | _ ->
+  if !_debug_on then (
     k (fun fmt->
        Printf.fprintf stdout "[thread %d]: " Thread.(id @@ self());
        Printf.kfprintf (fun oc -> Printf.fprintf oc "\n%!") stdout fmt)
-  | exception _ -> ()
+  )
 
 module Response_code = struct
   type t = int
@@ -85,17 +89,22 @@ module Headers = struct
 end
 
 module Request = struct
-  type t = {
+  type 'body t = {
     meth: Meth.t;
     headers: Headers.t;
     path: string;
-    body: string
+    body: 'body;
   }
 
   let headers self = self.headers
   let meth self = self.meth
   let path self = self.path
   let body self = self.body
+
+  let get_header self h = Headers.get h self.headers
+  let get_header_int self h = match get_header self h with
+    | Some x -> (try Some (int_of_string x) with _ -> None)
+    | None -> None
 
   let pp out self : unit =
     Format.fprintf out "{@[meth=%s;@ headers=%a;@ path=%S;@ body=%S@]}"
@@ -115,8 +124,8 @@ module Request = struct
     done;
     Bytes.sub_string is.buf 0 n
 
-  let read_body_chunked (is:input_stream) : string =
-    _debug (fun k->k "read body with chunked encoding");
+  let read_body_chunked ~size:max_size (is:input_stream) : string =
+    _debug (fun k->k "read body with chunked encoding (max-size: %d)" max_size);
     let n = ref 0 in
     let rec read_chunks () =
       let line = input_line is.ic in
@@ -132,6 +141,12 @@ module Request = struct
         Bytes.sub_string is.buf 0 !n (* done *)
       ) else (
         let new_size = chunk_size + !n in
+        (* is the body bigger than expected? *)
+        if max_size>0 && new_size > max_size then (
+          bad_reqf 400
+            "body size was supposed to be %d, but at least %d bytes received"
+            max_size new_size
+        );
         (* resize buffer if needed *)
         if Bytes.length is.buf < new_size then (
           let new_buf = Bytes.make (new_size + 10) ' ' in
@@ -150,7 +165,7 @@ module Request = struct
     read_chunks()
 
   (* parse request, but not body (yet) *)
-  let parse_req_start (is:input_stream) : t option resp_result =
+  let parse_req_start (is:input_stream) : unit t option resp_result =
     try
       let line = input_line is.ic in
       let meth, path =
@@ -160,7 +175,7 @@ module Request = struct
       let meth = Meth.of_string meth in
       let headers = Headers.parse_ is in
       _debug (fun k->k "got meth: %s, path %S" (Meth.to_string meth) path);
-      Ok (Some {meth; path; headers; body=""})
+      Ok (Some {meth; path; headers; body=()})
     with
     | End_of_file | Sys_error _ -> Ok None
     | Bad_req (c,s) -> Error (c,s)
@@ -168,18 +183,20 @@ module Request = struct
       Error (400, Printexc.to_string e)
 
   (* parse body, given the headers *)
-  let parse_body_ (is:input_stream) (req:t) : t resp_result =
+  let parse_body_ (is:input_stream) (req:_ t) : string t resp_result =
     try
-      let body = match List.assoc "Content-Length" req.headers |> int_of_string with
-        | 0 -> ""
-        | n -> read_body is n (* body of fixed size *)
-        | exception Not_found ->
-          begin match List.assoc "Transfer-Encoding" req.headers |> String.trim with
-            | "chunked" -> read_body_chunked is (* body sent by chunks *)
-            | s -> bad_reqf 500 "cannot handle transfer encoding: %s" s
-            | exception Not_found -> ""
-          end
+      let n =
+        match List.assoc "Content-Length" req.headers |> int_of_string with
+        | n -> n (* body of fixed size *)
+        | exception Not_found -> 0
         | exception _ -> bad_reqf 400 "invalid content-length"
+      in
+      let body =
+        match List.assoc "Transfer-Encoding" req.headers |> String.trim with
+        | "chunked" -> read_body_chunked ~size:n is (* body sent by chunks *)
+        | s -> bad_reqf 500 "cannot handle transfer encoding: %s" s
+        | exception Not_found ->
+          read_body is n
       in
       Ok {req with body}
     with
@@ -224,6 +241,8 @@ module Response = struct
 
   let fail ?headers ~code fmt =
     Printf.ksprintf (fun msg -> make_raw ?headers ~code msg) fmt
+  let fail_raise ~code fmt =
+    Printf.ksprintf (fun msg -> raise (Bad_req (code,msg))) fmt
 
   let pp out self : unit =
     let pp_body out = function
@@ -263,32 +282,44 @@ module Response = struct
     flush oc
 end
 
+type cb_path_handler = string Request.t -> Response.t
+
 type t = {
   addr: string;
   port: int;
   fork: (unit -> unit) -> unit;
   masksigpipe: bool;
-  mutable handler: (Request.t -> Response.t);
-  mutable path_handlers : (Request.t -> (unit -> Response.t) option) list;
-  mutable req_cbs: (Request.t -> Request.t option) list;
-  mutable res_cbs: (Request.t -> Response.t -> Response.t option) list;
+  mutable handler: (string Request.t -> Response.t);
+  mutable path_handlers : (unit Request.t -> cb_path_handler resp_result option) list;
+  mutable cb_decode_req: (string Request.t -> string Request.t option) list;
+  mutable cb_encode_resp: (string Request.t -> Response.t -> Response.t option) list;
   mutable running: bool;
 }
 
 let addr self = self.addr
 let port self = self.port
 
-let add_request_cb self f =  self.req_cbs <- f :: self.req_cbs
-let add_response_cb self f = self.res_cbs <- f :: self.res_cbs
+let add_decode_request_cb self f =  self.cb_decode_req <- f :: self.cb_decode_req
+let add_encode_response_cb self f = self.cb_encode_resp <- f :: self.cb_encode_resp
 let set_top_handler self f = self.handler <- f
 
-let add_path_handler ?meth self fmt f =
-  let ph req: (unit -> Response.t) option =
+let add_path_handler
+    ?(accept=fun _req -> Ok ())
+    ?meth self fmt f =
+  let ph req: cb_path_handler resp_result option =
     match meth with
     | Some m when m <> req.Request.meth -> None (* ignore *)
     | _ ->
-      try Some (Scanf.sscanf req.Request.path fmt (f req))
-      with _ -> None
+      begin match Scanf.sscanf req.Request.path fmt f with
+        | handler ->
+          (* we have a handler, do we accept the request based on its headers? *)
+          begin match accept req with
+            | Ok () -> Some (Ok handler)
+            | Error _ as e -> Some e
+          end
+        | exception _ ->
+          None (* path didn't match *)
+      end
   in
   self.path_handlers <- ph :: self.path_handlers
 
@@ -299,7 +330,7 @@ let create
   let handler _req = Response.fail ~code:404 "no top handler" in
   { fork; addr; port; masksigpipe; handler; running= true;
     path_handlers=[];
-    req_cbs=[]; res_cbs=[];
+    cb_encode_resp=[]; cb_decode_req=[];
   }
 
 let stop s = s.running <- false
@@ -318,8 +349,6 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
   let oc = Unix.out_channel_of_descr client_sock in
   (* wrap [ic] in a stream with a reusable buffer *)
   let is = {ic; buf=Bytes.make 1024 ' '} in
-  let handler = self.handler in
-  let ph_handlers = self.path_handlers in
   let continue = ref true in
   while !continue && self.running do
     _debug (fun k->k "read next request");
@@ -331,6 +360,12 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
     | Ok (Some req) ->
       let res =
         try
+          (* is there a handler for this path? *)
+          let handler =
+            match find_map (fun ph -> ph req) self.path_handlers with
+            | Some f -> unwrap_resp_result f
+            | None -> self.handler
+          in
           (* handle expectations *)
           begin match List.assoc "Expect" req.Request.headers with
             | "100-continue" ->
@@ -341,23 +376,19 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
           end;
           (* modify request by reading body *)
           let req = Request.parse_body_ is req |> unwrap_resp_result in
-          (* request callbacks *)
+          (* preprocess query *)
           let req =
             List.fold_left
               (fun req cb -> match cb req with None -> req | Some r' -> r')
-              req self.req_cbs
+              req self.cb_decode_req
           in
-          let run_handler =
-            match find_map (fun ph -> ph req) ph_handlers with
-            | Some f -> f
-            | None -> (fun () -> handler req)
-          in
-          let resp = run_handler() in
-          (* response callbacks *)
+          let resp = handler req in
+          (* post-process response *)
           List.fold_left
             (fun resp cb -> match cb req resp with None -> resp | Some r' -> r')
-            resp self.res_cbs
+            resp self.cb_encode_resp
         with
+        | Bad_req _ as e -> raise e
         | e ->
           Response.fail ~code:500 "server error: %s" (Printexc.to_string e)
       in

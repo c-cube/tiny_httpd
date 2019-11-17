@@ -10,12 +10,12 @@ let () =
   let server = S.create () in
   (* say hello *)
   S.add_path_handler ~meth:`GET server
-    "/hello/%s@/" (fun _req name () -> S.Response.make (Ok ("hello " ^name ^"!\n")));
+    "/hello/%s@/" (fun name _req -> S.Response.make (Ok ("hello " ^name ^"!\n")));
   (* echo request *)
   S.add_path_handler server
-    "/echo" (fun req () -> S.Response.make (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
+    "/echo" (fun req -> S.Response.make (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
   S.add_path_handler ~meth:`PUT server
-    "/upload/%s" (fun req path () -> 
+    "/upload/%s" (fun path req ->
         debug_ (fun k->k "start upload %S\n%!" path);
         try
           let oc = open_out @@ "/tmp/" ^ path in
