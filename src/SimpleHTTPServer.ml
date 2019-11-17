@@ -159,7 +159,7 @@ module Request = struct
       in
       let meth = Meth.of_string meth in
       let headers = Headers.parse_ is in
-      debug_ (fun k->k "got meth: %s" (Meth.to_string meth));
+      debug_ (fun k->k "got meth: %s, path %S" (Meth.to_string meth) path);
       Ok (Some {meth; path; headers; body=""})
     with
     | End_of_file | Sys_error _ -> Ok None
@@ -199,16 +199,20 @@ module Response = struct
   (* TODO: if query had ["Accept-Encoding", "chunked"], we cna reply with chunks,
      if [body] was a stream|string instead of just a string *)
 
-  let make ?(headers=[]) ~code body : t =
+  let make_raw ?(headers=[]) ~code body : t =
     (* add content length to response *)
     let headers =
       Headers.set "Content-Length" (string_of_int (String.length body)) headers
     in
     { code; headers; body; }
 
-  let make_ok ?headers body = make ~code:200 ?headers body
-  let make_not_found ?headers body = make ~code:404 ?headers body
-  let make_error ?headers body = make ~code:500 ?headers body
+  let make ?headers r : t = match r with
+    | Ok body -> make_raw ?headers ~code:200 body
+    | Error (code,msg) ->
+      make_raw ?headers ~code msg
+
+  let fail ?headers ~code fmt =
+    Printf.ksprintf (fun msg -> make_raw ?headers ~code msg) fmt
 
   let pp out self : unit =
     Format.fprintf out "{@[code=%d;@ headers=%a;@ body=%S@]}"
@@ -257,7 +261,7 @@ let create
     ?(masksigpipe=true)
     ?(fork=(fun f -> ignore (Thread.create f () : Thread.t)))
     ?(addr="127.0.0.1") ?(port=8080) () : t =
-  let handler _req = Response.make_not_found "no top handler" in
+  let handler _req = Response.fail ~code:404 "no top handler" in
   { fork; addr; port; masksigpipe; handler; running= true;
     path_handlers=[];
     req_cbs=[]; res_cbs=[];
@@ -287,7 +291,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
     match Request.parse_req_start is with
     | Ok None -> continue := false
     | Error (c,s) ->
-      let res = Response.make ~code:c s in
+      let res = Response.make_raw ~code:c s in
       Response.output_ oc res
     | Ok (Some req) ->
       let res =
@@ -296,7 +300,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
           begin match List.assoc "Expect" req.Request.headers with
             | "100-continue" ->
               debug_ (fun k->k "send back: 100 CONTINUE");
-              Response.output_ oc (Response.make ~code:100 "");
+              Response.output_ oc (Response.make_raw ~code:100 "");
             | s -> bad_reqf 417 "unknown expectation %s" s
             | exception Not_found -> ()
           end;
@@ -320,11 +324,11 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
             resp self.res_cbs
         with
         | e ->
-          Response.make ~code:500 ("server error: " ^ Printexc.to_string e)
+          Response.fail ~code:500 "server error: %s" (Printexc.to_string e)
       in
       Response.output_ oc res
     | exception Bad_req (code,s) ->
-      Response.output_ oc (Response.make ~code s);
+      Response.output_ oc (Response.make_raw ~code s);
       continue := false
     | exception Sys_error _ ->
       continue := false; (* connection broken somehow *)

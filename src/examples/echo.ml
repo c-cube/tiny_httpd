@@ -10,10 +10,10 @@ let () =
   let server = S.create () in
   (* say hello *)
   S.add_path_handler ~meth:`GET server
-    "/hello/%s@/" (fun _req name () -> S.Response.make_ok ("hello " ^name ^"!\n"));
+    "/hello/%s@/" (fun _req name () -> S.Response.make (Ok ("hello " ^name ^"!\n")));
   (* echo request *)
   S.add_path_handler server
-    "/echo" (fun req () -> S.Response.make_ok (Format.asprintf "echo:@ %a@." S.Request.pp req));
+    "/echo" (fun req () -> S.Response.make (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
   S.add_path_handler ~meth:`PUT server
     "/upload/%s" (fun req path () -> 
         debug_ (fun k->k "start upload %S\n%!" path);
@@ -21,9 +21,9 @@ let () =
           let oc = open_out @@ "/tmp/" ^ path in
           output_string oc req.S.Request.body;
           flush oc;
-          S.Response.make_ok "uploaded file"
+          S.Response.make (Ok "uploaded file")
         with e ->
-          S.Response.make_error @@ "couldn't upload file " ^ Printexc.to_string e
+          S.Response.fail ~code:500 "couldn't upload file: %s" (Printexc.to_string e)
       );
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);
   match S.run server with

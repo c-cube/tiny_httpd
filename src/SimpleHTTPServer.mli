@@ -44,15 +44,21 @@ end
 module Response : sig
   type t
 
-  val make :
+  val make_raw :
     ?headers:Headers.t ->
     code:Response_code.t ->
     string ->
     t
 
-  val make_ok : ?headers:Headers.t -> string -> t
-  val make_not_found : ?headers:Headers.t -> string -> t
-  val make_error : ?headers:Headers.t -> string -> t
+  val make :
+    ?headers:Headers.t ->
+    (string, Response_code.t * string) result -> t
+
+  val fail : ?headers:Headers.t -> code:int ->
+    ('a, unit, string, t) format4 -> 'a
+  (** Make the current request fail with the given code and message.
+      Example: [fail ~code:404 "oh noes, %s not found" "waldo"]
+  *)
 
   val pp : Format.formatter -> t -> unit
 end
