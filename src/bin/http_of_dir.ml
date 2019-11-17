@@ -33,12 +33,16 @@ let (//) = Filename.concat
 let html_list_dir ~top ~parent d : string =
   let entries = Sys.readdir @@ (top // d) in
   let body = Buffer.create 256 in
-  Printf.bprintf body "<ul>\n";
+  Printf.bprintf body {|<head><title> http_of_dir %S</title>
+  </head><body>
+    <h2> Index of %S</h2>
+  |} top d;
   begin match parent with
     | None -> ()
     | Some p -> 
-      Printf.bprintf body "  <li> <a href=\"/%s\"> (parent directory) </a> </li>\n" p;
+      Printf.bprintf body "<a href=\"/%s\"> (parent directory) </a>\n" p;
   end;
+  Printf.bprintf body "<ul>\n";
   Array.iter
     (fun f ->
        if not @@ contains_dot_dot (d // f) then (
@@ -47,12 +51,8 @@ let html_list_dir ~top ~parent d : string =
        )
     )
     entries;
-  Printf.bprintf body "</ul>\n";
+  Printf.bprintf body "</ul></body>\n";
   Buffer.contents body
-
-let same_path a b =
-  Filename.dirname a = Filename.dirname b &&
-  Filename.basename a = Filename.basename b
 
 let serve ~config (dir:string) : _ result = 
   Printf.printf "serve directory %s on http://%s:%d\n%!" dir config.addr config.port;
@@ -68,6 +68,9 @@ let serve ~config (dir:string) : _ result =
               Sys.remove (dir // path); Ok "file deleted successfully"
             with e -> Error (500, Printexc.to_string e))
       );
+  ) else (
+    S.add_path_handler server ~meth:`DELETE "/%s"
+      (fun _ _  -> S.Response.make_raw ~code:405 "delete not allowed");
   );
   if config.upload then (
     S.add_path_handler server ~meth:`PUT "/%s"
@@ -79,7 +82,7 @@ let serve ~config (dir:string) : _ result =
             Error (403, "invalid path (contains '..')")
           | Some _ -> Ok ()
           | None ->
-            Error (403, "must know size before hand: max upload size is " ^
+            Error (411, "must know size before hand: max upload size is " ^
                         string_of_int config.max_upload_size)
         )
       (fun path req ->
@@ -93,24 +96,24 @@ let serve ~config (dir:string) : _ result =
          output_string oc req.S.Request.body;
          flush oc;
          close_out oc;
-         S.Response.make (Ok "upload successful")
+         S.Response.make_raw ~code:201 "upload successful"
       )
+  ) else (
+    S.add_path_handler server ~meth:`PUT "/%s"
+      (fun _ _  -> S.Response.make_raw ~code:405 "upload not allowed");
   );
   S.add_path_handler server ~meth:`GET "/%s"
     (fun path _req ->
-       let path_dir = Filename.dirname path in
-       let path_f = Filename.basename path in
-       let full_path = dir // path_dir // path_f in
+       let full_path = dir // path in
        if contains_dot_dot full_path then (
          S.Response.fail ~code:403 "Path is forbidden";
        ) else if not (Sys.file_exists full_path) then (
-         S.Response.fail ~code:404 "file not found";
+         S.Response.fail ~code:404 "File not found";
        ) else if Sys.is_directory full_path then (
          S._debug (fun k->k "list dir %S (topdir %S)"  full_path dir);
-         let body =
-           html_list_dir ~top:dir path
-             ~parent:(if same_path full_path dir then None else Some dir)
-         in
+         let parent = Filename.(dirname path) in
+         let parent = if parent <> path then Some parent else None in
+         let body = html_list_dir ~top:dir path ~parent in
          S.Response.make ~headers:[header_html] (Ok body)
        ) else (
          try

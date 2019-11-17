@@ -26,11 +26,24 @@ module Response_code = struct
   let descr = function
     | 100 -> "Continue"
     | 200 -> "OK"
+    | 201 -> "Created"
+    | 202 -> "Accepted"
+    | 204 -> "No content"
+    | 300 -> "Multiple choices"
+    | 301 -> "Moved permanently"
+    | 302 -> "Found"
     | 400 -> "Bad request"
     | 403 -> "Forbidden"
     | 404 -> "Not found"
+    | 405 -> "Method not allowed"
+    | 408 -> "Request timeout"
+    | 409 -> "Conflict"
+    | 410 -> "Gone"
+    | 411 -> "Length required"
+    | 413 -> "Payload too large"
     | 417 -> "Expectation failed"
     | 500 -> "Internal server error"
+    | 501 -> "Not implemented"
     | 503 -> "Service unavailable"
     | _ -> "Unknown response" (* TODO *)
 end
@@ -146,7 +159,7 @@ module Request = struct
         let new_size = chunk_size + !n in
         (* is the body bigger than expected? *)
         if max_size>0 && new_size > max_size then (
-          bad_reqf 400
+          bad_reqf 413
             "body size was supposed to be %d, but at least %d bytes received"
             max_size new_size
         );
