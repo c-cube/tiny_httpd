@@ -42,12 +42,19 @@ module Response_code : sig
 end
 
 module Response : sig
+  type out_stream = bytes -> int -> int -> int
   type t
 
   val make_raw :
     ?headers:Headers.t ->
     code:Response_code.t ->
     string ->
+    t
+
+  val make_raw_chunked :
+    ?headers:Headers.t ->
+    code:Response_code.t ->
+    out_stream ->
     t
 
   val make :
@@ -86,7 +93,7 @@ val add_request_cb : t -> (Request.t -> Request.t option) -> unit
 val add_response_cb : t -> (Request.t -> Response.t -> Response.t option) -> unit
 (** Add a callback for every request/response pair.
     Similarly to {!add_request_cb} the callback can modify the response. *)
-  
+
 val set_top_handler : t -> (Request.t -> Response.t) -> unit
 (** Setup a handler called by default.
     If not installed, unhandled paths will return a 404 not found. *)
@@ -109,4 +116,10 @@ val add_path_handler :
 val stop : t -> unit
 val run : t -> (unit, exn) result
 
+
+(**/**)
+
+val _debug : ((('a, out_channel, unit, unit, unit, unit) format6 -> 'a) -> unit) -> unit
+
+(**/**)
 
