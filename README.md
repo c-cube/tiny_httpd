@@ -1,5 +1,5 @@
 
-# SimpleHTTPServer [![build status](https://travis-ci.org/c-cube/simplehttpserver.svg?branch=master)](https://travis-ci.org/c-cube/simplehttpserver) 
+# Tiny_httpd [![build status](https://travis-ci.org/c-cube/tiny_httpd.svg?branch=master)](https://travis-ci.org/c-cube/tiny_httpd) 
 
 Minimal HTTP server using good old threads and `Scanf` for routing.
 
@@ -9,7 +9,7 @@ The basic echo server from `src/examples/echo.ml`:
 
 ```ocaml
 
-module S = SimpleHTTPServer
+module S = Tiny_httpd
 
 let () =
   let server = S.create () in
@@ -46,6 +46,21 @@ echo:
 
 ```
 
+## `http_of_dir`
+
+Similar to `python -m http.server`, a simple program `http_of_dir` is provided.
+It serves files from the current directory.
+
+```sh
+$ http_of_dir . -p 8080 &
+$ curl -X GET http://localhost:8080
+...
+some html
+...
+
+```
+
+
 ## Why?
 
 Why not? If you just want a super basic local server (perhaps for exposing
@@ -54,7 +69,7 @@ dependencies or high scalability libraries.
 
 ## Documentation
 
-See https://c-cube.github.io/simplehttpserver/
+See https://c-cube.github.io/tiny_httpd
 
 ## License
 

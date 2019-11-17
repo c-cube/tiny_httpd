@@ -1,5 +1,5 @@
 
-module S = SimpleHTTPServer
+module S = Tiny_httpd
 module Pf = Printf
 
 let contains_dot_dot s =

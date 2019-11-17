@@ -1,6 +1,6 @@
 
 (library
-  (name simplehttpserver)
-  (public_name simplehttpserver)
+  (name tiny_httpd)
+  (public_name tiny_httpd)
   (libraries threads)
   (wrapped false))

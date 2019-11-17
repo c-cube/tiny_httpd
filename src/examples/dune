@@ -1,4 +1,4 @@
 
 (executables
   (names echo)
-  (libraries simplehttpserver))
+  (libraries tiny_httpd))

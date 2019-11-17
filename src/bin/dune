@@ -3,4 +3,4 @@
   (name http_of_dir)
   (public_name http_of_dir)
   (flags :standard -warn-error -3)
-  (libraries simplehttpserver str))
+  (libraries tiny_httpd str))

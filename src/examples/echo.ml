@@ -1,5 +1,5 @@
 
-module S = SimpleHTTPServer
+module S = Tiny_httpd
 
 let debug_ k =
   if None<>Sys.getenv_opt "HTTP_DBG" then (
