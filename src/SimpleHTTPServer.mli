@@ -13,6 +13,9 @@ end
 
 module Headers : sig
   type t = (string * string) list
+  val get : string -> t -> string option
+  val set : string -> string -> t -> t
+  val contains : string -> t -> bool
   val pp : Format.formatter -> t -> unit
 end
 

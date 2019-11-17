@@ -8,6 +8,13 @@ type input_stream = {
 exception Bad_req of int * string
 let bad_reqf c fmt = Printf.ksprintf (fun s ->raise (Bad_req (c,s))) fmt
 
+let debug_ k =
+  if None<>Sys.getenv_opt "HTTP_DBG" then (
+    k (fun fmt ->
+        Printf.fprintf stdout "[thread %d]: " Thread.(id @@ self());
+        Printf.kfprintf (fun oc -> Printf.fprintf oc "\n%!") stdout fmt)
+  )
+
 module Response_code = struct
   type t = int
 
@@ -53,6 +60,9 @@ end
 
 module Headers = struct
   type t = (string * string) list
+  let contains = List.mem_assoc
+  let get x h = try Some (List.assoc x h) with Not_found -> None
+  let set x y h = (x,y) :: List.filter (fun (k,_) -> k<>x) h
   let pp out l =
     let pp_pair out (k,v) = Format.fprintf out "@[<h>%s: %s@]" k v in
     Format.fprintf out "@[<v>%a@]" (Format.pp_print_list pp_pair) l
@@ -92,6 +102,7 @@ module Request = struct
       self.path self.body
 
   let read_body (is:input_stream) (n:int) : string =
+    debug_ (fun k->k "read body of size %d" n);
     if Bytes.length is.buf < n then (
       is.buf <- Bytes.make n ' ';
     );
@@ -103,6 +114,40 @@ module Request = struct
     done;
     Bytes.sub_string is.buf 0 n
 
+  let read_body_chunked (is:input_stream) : string =
+    debug_ (fun k->k "read body with chunked encoding");
+    let n = ref 0 in
+    let rec read_chunks () =
+      let line = input_line is.ic in
+      (* parse chunk length, ignore extensions *)
+      let chunk_size =
+        if String.trim line = "" then 0
+        else
+          try Scanf.sscanf line "%x %s@\r" (fun n _ext -> n)
+          with _ -> bad_reqf 400 "cannot read chunk size from line %S" line
+      in
+      debug_ (fun k->k "chunk size: %d" chunk_size);
+      if chunk_size = 0 then (
+        Bytes.sub_string is.buf 0 !n (* done *)
+      ) else (
+        let new_size = chunk_size + !n in
+        (* resize buffer if needed *)
+        if Bytes.length is.buf < new_size then (
+          let new_buf = Bytes.make (new_size + 10) ' ' in
+          Bytes.blit is.buf 0 new_buf 0 !n;
+          is.buf <- new_buf;
+        );
+        while !n < new_size do
+          let read = input is.ic is.buf !n (new_size - !n) in
+          if read=0 then bad_reqf 400 "body is too short";
+          n := !n + read
+        done;
+        debug_ (fun k->k "read a chunk");
+        read_chunks()
+      )
+    in
+    read_chunks()
+
   (* parse request, but not body (yet) *)
   let parse_req_start (is:input_stream) : t option resp_result =
     try
@@ -113,9 +158,10 @@ module Request = struct
       in
       let meth = Meth.of_string meth in
       let headers = Headers.parse_ is in
+      debug_ (fun k->k "got meth: %s" (Meth.to_string meth));
       Ok (Some {meth; path; headers; body=""})
     with
-    | End_of_file -> Ok None
+    | End_of_file | Sys_error _ -> Ok None
     | Bad_req (c,s) -> Error (c,s)
     | e ->
       Error (400, Printexc.to_string e)
@@ -124,10 +170,15 @@ module Request = struct
   let parse_body_ (is:input_stream) (req:t) : t resp_result =
     try
       let body = match List.assoc "Content-Length" req.headers |> int_of_string with
-        | exception Not_found -> ""
-        | exception _ -> bad_reqf 400 "invalid content-length"
         | 0 -> ""
-        | n -> read_body is n
+        | n -> read_body is n (* body of fixed size *)
+        | exception Not_found ->
+          begin match List.assoc "Transfer-Encoding" req.headers |> String.trim with
+            | "chunked" -> read_body_chunked is (* body sent by chunks *)
+            | s -> bad_reqf 500 "cannot handle transfer encoding: %s" s
+            | exception Not_found -> ""
+          end
+        | exception _ -> bad_reqf 400 "invalid content-length"
       in
       Ok {req with body}
     with
@@ -144,10 +195,14 @@ module Response = struct
     body: string;
   }
 
+  (* TODO: if query had ["Accept-Encoding", "chunked"], we cna reply with chunks,
+     if [body] was a stream|string instead of just a string *)
+
   let make ?(headers=[]) ~code body : t =
-    (* add 'content length' to response *)
-    let headers = List.filter (fun (k,_) -> k <> "Content-Length") headers in
-    let headers = ("Content-Length", string_of_int (String.length body)) :: headers in
+    (* add content length to response *)
+    let headers =
+      Headers.set "Content-Length" (string_of_int (String.length body)) headers
+    in
     { code; headers; body; }
 
   let make_ok ?headers body = make ~code:200 ?headers body
@@ -227,6 +282,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
   let ph_handlers = self.path_handlers in
   let continue = ref true in
   while !continue && self.running do
+    debug_ (fun k->k "read next request");
     match Request.parse_req_start is with
     | Ok None -> continue := false
     | Error (c,s) ->
@@ -238,6 +294,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
           (* handle expectations *)
           begin match List.assoc "Expect" req.Request.headers with
             | "100-continue" ->
+              debug_ (fun k->k "send back: 100 CONTINUE");
               Response.output_ oc (Response.make ~code:100 "");
             | s -> bad_reqf 417 "unknown expectation %s" s
             | exception Not_found -> ()
@@ -266,11 +323,14 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
       in
       Response.output_ oc res
     | exception Bad_req (code,s) ->
-      Response.output_ oc (Response.make ~code s)
+      Response.output_ oc (Response.make ~code s);
+      continue := false
     | exception Sys_error _ ->
       continue := false; (* connection broken somehow *)
       Unix.close client_sock;
-  done
+  done;
+  debug_ (fun k->k "done with client, exiting");
+  ()
 
 let run (self:t) : (unit,_) result =
   try
