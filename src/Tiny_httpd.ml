@@ -46,6 +46,7 @@ module Meth = struct
     | `PUT
     | `POST
     | `HEAD
+    | `DELETE
   ]
 
   let to_string = function
@@ -53,6 +54,7 @@ module Meth = struct
     | `PUT -> "PUT"
     | `HEAD -> "HEAD"
     | `POST -> "POST"
+    | `DELETE -> "DELETE"
   let pp out s = Format.pp_print_string out (to_string s)
 
   let of_string = function
@@ -60,6 +62,7 @@ module Meth = struct
     | "PUT" -> `PUT
     | "POST" -> `POST
     | "HEAD" -> `HEAD
+    | "DELETE" -> `DELETE
     | s -> bad_reqf 400 "unknown method %S" s
 end
 
@@ -388,7 +391,9 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
             (fun resp cb -> match cb req resp with None -> resp | Some r' -> r')
             resp self.cb_encode_resp
         with
-        | Bad_req _ as e -> raise e
+        | Bad_req (code,s) ->
+          continue := false;
+          Response.make_raw ~code s
         | e ->
           Response.fail ~code:500 "server error: %s" (Printexc.to_string e)
       in

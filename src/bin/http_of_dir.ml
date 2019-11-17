@@ -7,11 +7,13 @@ type config = {
   mutable port: int;
   mutable upload: bool;
   mutable max_upload_size: int;
+  mutable delete: bool;
 }
 
 let default_config () : config = {
   addr="127.0.0.1";
   port=8080;
+  delete=false;
   upload=true;
   max_upload_size = 10 * 1024 * 1024;
 }
@@ -26,9 +28,10 @@ let contains_dot_dot s =
   with Exit -> true
 
 let header_html = "Content-Type", "text/html"
+let (//) = Filename.concat
 
-let html_list_dir ~parent d : string =
-  let entries = Sys.readdir d in
+let html_list_dir ~top ~parent d : string =
+  let entries = Sys.readdir @@ (top // d) in
   let body = Buffer.create 256 in
   Printf.bprintf body "<ul>\n";
   begin match parent with
@@ -38,10 +41,9 @@ let html_list_dir ~parent d : string =
   end;
   Array.iter
     (fun f ->
-       let full = Filename.concat d f in
-       if not @@ contains_dot_dot f then (
+       if not @@ contains_dot_dot (d // f) then (
          Printf.bprintf body "  <li> <a href=\"/%s\"> %s %s </a> </li>\n"
-           full (if Sys.is_directory full then "[dir]" else "") f;
+           (d // f) f (if Sys.is_directory (top // d // f) then "[dir]" else "");
        )
     )
     entries;
@@ -53,7 +55,20 @@ let same_path a b =
   Filename.basename a = Filename.basename b
 
 let serve ~config (dir:string) : _ result = 
+  Printf.printf "serve directory %s on http://%s:%d\n%!" dir config.addr config.port;
   let server = S.create ~addr:config.addr ~port:config.port () in
+  if config.delete then (
+    S.add_path_handler server ~meth:`DELETE "/%s"
+      (fun path _req ->
+         if contains_dot_dot path then (
+           S.Response.fail_raise ~code:403 "invalid path in delete"
+         );
+         S.Response.make
+           (try
+              Sys.remove (dir // path); Ok "file deleted successfully"
+            with e -> Error (500, Printexc.to_string e))
+      );
+  );
   if config.upload then (
     S.add_path_handler server ~meth:`PUT "/%s"
       ~accept:(fun req ->
@@ -68,7 +83,7 @@ let serve ~config (dir:string) : _ result =
                         string_of_int config.max_upload_size)
         )
       (fun path req ->
-         let fpath = Filename.concat dir path in
+         let fpath = dir // path in
          let oc =
            try open_out fpath
            with e ->
@@ -83,21 +98,23 @@ let serve ~config (dir:string) : _ result =
   );
   S.add_path_handler server ~meth:`GET "/%s"
     (fun path _req ->
-       let f = Filename.concat dir path in
-       if contains_dot_dot f then (
+       let path_dir = Filename.dirname path in
+       let path_f = Filename.basename path in
+       let full_path = dir // path_dir // path_f in
+       if contains_dot_dot full_path then (
          S.Response.fail ~code:403 "Path is forbidden";
-       ) else if not (Sys.file_exists f) then (
+       ) else if not (Sys.file_exists full_path) then (
          S.Response.fail ~code:404 "file not found";
-       ) else if Sys.is_directory f then (
-         S._debug (fun k->k "list dir %S (topdir %S)"  f dir);
+       ) else if Sys.is_directory full_path then (
+         S._debug (fun k->k "list dir %S (topdir %S)"  full_path dir);
          let body =
-           html_list_dir f
-             ~parent:(if same_path f dir then None else Some dir)
+           html_list_dir ~top:dir path
+             ~parent:(if same_path full_path dir then None else Some dir)
          in
          S.Response.make ~headers:[header_html] (Ok body)
        ) else (
          try
-           let ic = open_in path in
+           let ic = open_in full_path in
            S.Response.make_raw_chunked ~code:200 (input ic)
          with e ->
            S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e)
@@ -118,7 +135,9 @@ let main () =
       "--max-upload", Int (fun i -> config.max_upload_size <- 1024 * 1024 * i),
       "maximum size of files that can be uploaded, in MB";
       "--debug", Unit (fun () -> S._enable_debug true), " debug mode";
-    ]) (fun _ -> raise (Arg.Bad "no positional arguments")) "http_of_dir [options]";
+      "--delete", Unit (fun () -> config.delete <- true), " enable `delete` on files";
+      "--no-delete", Unit (fun () -> config.delete <- false), " disable `delete` on files";
+    ]) (fun s -> dir_ := s) "http_of_dir [options] [dir]";
   match serve ~config !dir_ with
   | Ok () -> ()
   | Error e ->

@@ -5,6 +5,7 @@ module Meth : sig
     | `PUT
     | `POST
     | `HEAD
+    | `DELETE
   ]
 
   val pp : Format.formatter -> t -> unit
