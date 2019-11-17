@@ -5,9 +5,9 @@ services:
 - docker
 env:
   global:
-  - PINS="simplehttpserver"
+  - PINS="tiny_httpd:."
   - DISTRO="ubuntu-16.04"
-  - PACKAGE="simplehttpserver"
+  - PACKAGE="tiny_httpd"
   matrix:
   - OCAML_VERSION="4.03"
   - OCAML_VERSION="4.04"
