@@ -118,7 +118,7 @@ let serve ~config (dir:string) : _ result =
        ) else (
          try
            let ic = open_in full_path in
-           S.Response.make_raw_stream ~code:200 (S.Input_stream.of_chan ic)
+           S.Response.make_raw_stream ~code:200 (S.Stream_.of_chan ic)
          with e ->
            S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e)
        ));

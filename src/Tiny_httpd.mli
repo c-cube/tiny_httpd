@@ -1,22 +1,19 @@
-type input_stream = (bytes -> int -> int -> int) * (unit -> unit)
+type stream = (bytes -> int -> int -> int) * (unit -> unit)
 (** An input stream is a function to read bytes into a buffer,
     and a function to close *)
-
-type output_stream = (string -> int -> int -> unit) * (unit -> unit) * (unit -> unit)
-(** An output stream is a function to output bytes, a function to [flush],
-    and a function to close. *)
 
 (** {2 Tiny buffer implementation} *)
 module Buf_ : sig
   type t
+  val size : t -> int
   val clear : t -> unit
   val create : ?size:int -> unit -> t
   val contents : t -> string
 end
 
-(** {2 Generic input stream} *)
-module Input_stream : sig
-  type t = input_stream
+(** {2 Generic stream of data} *)
+module Stream_ : sig
+  type t = stream
 
   val of_chan : in_channel -> t
   val of_chan_close_noerr : in_channel -> t
@@ -29,23 +26,6 @@ module Input_stream : sig
   val read_line : ?buf:Buf_.t -> t -> string
   val read_all : ?buf:Buf_.t -> t -> string
 end
-
-(** {2 Generic output stream} *)
-module Output_stream : sig
-  type t = output_stream
-  val of_chan : out_channel -> t
-  val of_chan_close_noerr : out_channel -> t
-  val of_buf : Buf_.t -> t
-  val write : t -> string -> unit
-  val flush : t -> unit
-  val close : t -> unit
-
-  val with_file : string -> (t -> 'a) -> 'a
-  (** Open a file with given name, and obtain an output stream *)
-end
-
-val pipe : ?buf:Buf_.t -> input_stream -> output_stream -> unit
-(** [pipe is os] pipes the content of [is] into [os]. *)
 
 module Meth : sig
   type t = [
@@ -62,7 +42,7 @@ end
 
 module Headers : sig
   type t = (string * string) list
-  val get : string -> t -> string option
+  val get : ?f:(string->string) -> string -> t -> string option
   val set : string -> string -> t -> t
   val contains : string -> t -> bool
   val pp : Format.formatter -> t -> unit
@@ -77,14 +57,16 @@ module Request : sig
   }
 
   val pp : Format.formatter -> string t -> unit
+  val pp_ : Format.formatter -> _ t -> unit
 
   val headers : _ t -> Headers.t
-  val get_header : _ t -> string -> string option
+  val get_header : ?f:(string->string) -> _ t -> string -> string option
   val get_header_int : _ t -> string -> int option
+  val set_header : 'a t -> string -> string -> 'a t
   val meth : _ t -> Meth.t
   val path : _ t -> string
   val body : 'b t -> 'b
-  val read_body_full : ?buf:Buf_.t -> input_stream t -> string t
+  val read_body_full : stream t -> string t
 end
 
 module Response_code : sig
@@ -95,7 +77,7 @@ module Response_code : sig
 end
 
 module Response : sig
-  type body = [`String of string | `Stream of input_stream]
+  type body = [`String of string | `Stream of stream]
   type t
 
   val make_raw :
@@ -107,7 +89,7 @@ module Response : sig
   val make_raw_stream :
     ?headers:Headers.t ->
     code:Response_code.t ->
-    input_stream ->
+    stream ->
     t
 
   val make :
@@ -120,7 +102,7 @@ module Response : sig
 
   val make_stream :
     ?headers:Headers.t ->
-    (input_stream, Response_code.t * string) result -> t
+    (stream, Response_code.t * string) result -> t
 
   val fail : ?headers:Headers.t -> code:int ->
     ('a, unit, string, t) format4 -> 'a
@@ -153,10 +135,10 @@ val port : t -> int
 
 val add_decode_request_cb :
   t ->
-  (input_stream Request.t -> input_stream Request.t option) -> unit
+  (unit Request.t -> (unit Request.t * (stream -> stream)) option) -> unit
 (** Add a callback for every request.
-    The callback can modify the request by returning [Some r'] where [r']
-    is the new request, or just perform side effects (logging?) and return [None].
+    The callback can provide a stream transformer and a new request (with
+    modified headers, typically).
 *)
 
 val add_encode_response_cb:
