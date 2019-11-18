@@ -47,6 +47,7 @@ module Headers : sig
   type t = (string * string) list
   val get : ?f:(string->string) -> string -> t -> string option
   val set : string -> string -> t -> t
+  val remove : string -> t -> t
   val contains : string -> t -> bool
   val pp : Format.formatter -> t -> unit
 end
@@ -81,7 +82,11 @@ end
 
 module Response : sig
   type body = [`String of string | `Stream of stream]
-  type t
+  type t = {
+    code: Response_code.t;
+    headers: Headers.t;
+    body: body;
+  }
 
   val make_raw :
     ?headers:Headers.t ->

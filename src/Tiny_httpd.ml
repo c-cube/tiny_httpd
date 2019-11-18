@@ -149,7 +149,7 @@ module Stream_ = struct
            while !j < i+len && Bytes.get s !j <> '\n' do
              incr j
            done;
-           if !j-i <= len then (
+           if !j-i < len then (
              assert (Bytes.get s !j = '\n');
              Buf_.add_bytes buf s i (!j-i); (* without \n *)
              self.is_consume (!j-i+1); (* remove \n *)
@@ -233,6 +233,7 @@ module Headers = struct
   type t = (string * string) list
   let contains = List.mem_assoc
   let get ?(f=fun x->x) x h = try Some (List.assoc x h |> f) with Not_found -> None
+  let remove x h = List.filter (fun (k,_) -> k<>x) h
   let set x y h = (x,y) :: List.filter (fun (k,_) -> k<>x) h
   let pp out l =
     let pp_pair out (k,v) = Format.fprintf out "@[<h>%s: %s@]" k v in
@@ -452,7 +453,7 @@ module Response = struct
       self.code Headers.pp self.headers pp_body self.body
 
   (* print a stream as a series of chunks *)
-  let output_stream_ (oc:out_channel) (str:stream) : unit =
+  let output_stream_chunked_ (oc:out_channel) (str:stream) : unit =
     let continue = ref true in
     while !continue do
       (* next chunk *)
@@ -476,7 +477,7 @@ module Response = struct
     begin match self.body with
       | `String "" -> ()
       | `String s -> output_string oc s;
-      | `Stream str -> output_stream_ oc str;
+      | `Stream str -> output_stream_chunked_ oc str;
     end;
     flush oc
 end
