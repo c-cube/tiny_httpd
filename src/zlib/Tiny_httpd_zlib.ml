@@ -20,11 +20,10 @@ let mk_decode_deflate_stream_ () (is:S.byte_stream) : S.byte_stream =
         len !buf_len
     );
     write_offset := !write_offset + len;
-    buf_len := !buf_len - len;
   in
   let bs_fill_buf () : _*_*_ =
     (* refill [buf] if needed *)
-    if !buf_len = 0 && not !is_done then (
+    if !write_offset >= !buf_len && not !is_done then (
       let ib, ioff, ilen = is.S.bs_fill_buf () in
       begin
         try
@@ -45,7 +44,7 @@ let mk_decode_deflate_stream_ () (is:S.byte_stream) : S.byte_stream =
       end;
       S._debug (fun k->k "inflate: refill %d bytes into internal buf" !buf_len);
     );
-    buf, !write_offset, !buf_len
+    buf, !write_offset, !buf_len - !write_offset
   in
   {S.bs_fill_buf; bs_consume; bs_close}
 
