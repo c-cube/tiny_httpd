@@ -1,5 +1,5 @@
 type stream = {
-  is_fill_buf: 'a. (bytes -> int -> int -> 'a) -> 'a;
+  is_fill_buf: unit -> (bytes * int * int);
   is_consume: int -> unit;
   is_close: unit -> unit;
 }
@@ -63,12 +63,12 @@ module Stream_ = struct
     let i = ref 0 in
     let len = ref 0 in
     let buf = Bytes.make 4096 ' ' in
-    { is_fill_buf=(fun k ->
+    { is_fill_buf=(fun () ->
       if !i >= !len then (
         i := 0;
         len := input ic buf 0 (Bytes.length buf);
       );
-      k buf !i (!len - !i));
+      buf, !i,!len - !i);
       is_consume=(fun n -> i := !i + n);
       is_close=(fun () -> close ic)
     }
@@ -85,7 +85,7 @@ module Stream_ = struct
       )
     in
     let i = ref i in
-    { is_fill_buf=(fun k -> k s !i !len);
+    { is_fill_buf=(fun () -> s, !i, !len);
       is_close=(fun () -> ());
       is_consume=(fun n -> i := !i + n; len := !len - n);
     }
@@ -102,13 +102,12 @@ module Stream_ = struct
 
   (* Read as much as possible into [buf]. *)
   let read_into_buf (self:t) (buf:Buf_.t) : int =
-    self.is_fill_buf
-      (fun s i len ->
-         if len > 0 then (
-           Buf_.add_bytes buf s i len;
-           self.is_consume len;
-         );
-         len)
+    let s, i, len = self.is_fill_buf () in
+     if len > 0 then (
+       Buf_.add_bytes buf s i len;
+       self.is_consume len;
+     );
+     len
 
   let read_all ?(buf=Buf_.create()) (self:t) : string =
     let continue = ref true in
@@ -126,13 +125,12 @@ module Stream_ = struct
     let offset = ref 0 in
     while !offset < n do
       let n_read =
-        self.is_fill_buf
-          (fun s i len ->
-             let n_read = min len (n- !offset) in
-             Bytes.blit s i bytes !offset n_read;
-             offset := !offset + n_read;
-             self.is_consume n_read;
-             n_read)
+        let s, i, len = self.is_fill_buf () in
+        let n_read = min len (n- !offset) in
+        Bytes.blit s i bytes !offset n_read;
+        offset := !offset + n_read;
+        self.is_consume n_read;
+        n_read
       in
       if n_read=0 then too_short();
     done
@@ -142,21 +140,20 @@ module Stream_ = struct
     Buf_.clear buf;
     let continue = ref true in
     while !continue do
-      self.is_fill_buf
-        (fun s i len ->
-           let j = ref i in
-           while !j < i+len && Bytes.get s !j <> '\n' do
-             incr j
-           done;
-           if !j-i < len then (
-             assert (Bytes.get s !j = '\n');
-             Buf_.add_bytes buf s i (!j-i); (* without \n *)
-             self.is_consume (!j-i+1); (* remove \n *)
-             continue := false
-           ) else (
-             Buf_.add_bytes buf s i len;
-             self.is_consume len;
-           ));
+      let s, i, len = self.is_fill_buf () in
+      let j = ref i in
+      while !j < i+len && Bytes.get s !j <> '\n' do
+        incr j
+      done;
+      if !j-i < len then (
+        assert (Bytes.get s !j = '\n');
+        Buf_.add_bytes buf s i (!j-i); (* without \n *)
+        self.is_consume (!j-i+1); (* remove \n *)
+        continue := false
+      ) else (
+        Buf_.add_bytes buf s i len;
+        self.is_consume len;
+      )
     done
 
   let read_line ?(buf=Buf_.create()) self : string =
@@ -307,7 +304,7 @@ module Request = struct
     let len = ref 0 in
     let chunk_size = ref 0 in
     { is_fill_buf=
-        (fun k ->
+        (fun () ->
            (* do we need to refill? *)
            if !offset >= !len then (
              if !chunk_size = 0 && !refill then (
@@ -327,7 +324,7 @@ module Request = struct
                refill := false; (* stream is finished *)
              )
            );
-           k bytes !offset !len
+           bytes, !offset, !len
         );
       is_consume=(fun n -> offset := !offset + n);
       is_close=(fun () -> Stream_.close is);
@@ -456,15 +453,13 @@ module Response = struct
     let continue = ref true in
     while !continue do
       (* next chunk *)
-      str.is_fill_buf
-        (fun s i len ->
-           Printf.fprintf oc "%x\r\n" len;
-           output oc s i len;
-           str.is_consume len;
-           if len = 0 then (
-             continue := false;
-           )
-        );
+      let s, i, len = str.is_fill_buf () in
+      Printf.fprintf oc "%x\r\n" len;
+      output oc s i len;
+      str.is_consume len;
+      if len = 0 then (
+        continue := false;
+      );
       output_string oc "\r\n";
     done;
     ()

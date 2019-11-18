@@ -1,5 +1,5 @@
 type stream = {
-  is_fill_buf: 'a. (bytes -> int -> int -> 'a) -> 'a;
+  is_fill_buf: unit -> (bytes * int * int);
   is_consume: int -> unit;
   is_close: unit -> unit;
 }
