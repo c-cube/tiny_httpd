@@ -134,7 +134,6 @@ module Stream_ = struct
              self.is_consume n_read;
              n_read)
       in
-      _debug (fun k->k "read %d" n_read);
       if n_read=0 then too_short();
     done
 
