@@ -63,7 +63,7 @@ let serve ~config (dir:string) : _ result =
          if contains_dot_dot path then (
            S.Response.fail_raise ~code:403 "invalid path in delete"
          );
-         S.Response.make
+         S.Response.make_string
            (try
               Sys.remove (dir // path); Ok "file deleted successfully"
             with e -> Error (500, Printexc.to_string e))
@@ -114,11 +114,11 @@ let serve ~config (dir:string) : _ result =
          let parent = Filename.(dirname path) in
          let parent = if parent <> path then Some parent else None in
          let body = html_list_dir ~top:dir path ~parent in
-         S.Response.make ~headers:[header_html] (Ok body)
+         S.Response.make_string ~headers:[header_html] (Ok body)
        ) else (
          try
            let ic = open_in full_path in
-           S.Response.make_raw_chunked ~code:200 (input ic)
+           S.Response.make_raw_stream ~code:200 (S.Input_stream.of_chan ic)
          with e ->
            S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e)
        ));

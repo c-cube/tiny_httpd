@@ -3,4 +3,5 @@
   (name tiny_httpd)
   (public_name tiny_httpd)
   (libraries threads)
+  (flags :standard -safe-string)
   (wrapped false))
