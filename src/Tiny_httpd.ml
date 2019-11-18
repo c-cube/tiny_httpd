@@ -28,6 +28,7 @@ module Buf_ = struct
     { bytes=Bytes.make size ' '; i=0 }
 
   let size self = self.i
+  let bytes_slice self = self.bytes
   let clear self : unit =
     if Bytes.length self.bytes > 4_096 * 1_024 then (
       self.bytes <- Bytes.make 4096 ' '; (* free big buffer *)

@@ -11,6 +11,7 @@ let () =
       "-j", Arg.Set_int j, " maximum number of connections";
     ]) (fun _ -> raise (Arg.Bad "")) "echo [option]*";
   let server = S.create ~port:!port_ ~max_connections:!j () in
+  Tiny_httpd_zlib.setup server;
   (* say hello *)
   S.add_path_handler ~meth:`GET server
     "/hello/%s@/" (fun name _req -> S.Response.make_string (Ok ("hello " ^name ^"!\n")));
