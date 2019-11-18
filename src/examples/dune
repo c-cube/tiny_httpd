@@ -1,4 +1,4 @@
 
 (executables
   (names echo)
-  (libraries tiny_httpd))
+  (libraries tiny_httpd tiny_httpd_zlib))

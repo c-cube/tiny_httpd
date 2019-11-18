@@ -79,6 +79,18 @@ module Buf_ : sig
   val clear : t -> unit
   val create : ?size:int -> unit -> t
   val contents : t -> string
+
+  val bytes_slice : t -> bytes
+  (** Access underlying slice of bytes.
+      @since NEXT_RELEASE *)
+
+  val contents_and_clear : t -> string
+  (** Get contents of the buffer and clear it.
+      @since NEXT_RELEASE *)
+
+  val add_bytes : t -> bytes -> int -> int -> unit
+  (** Append given bytes slice to the buffer.
+      @since NEXT_RELEASE *)
 end
 
 (** {2 Generic stream of data}
