@@ -11,12 +11,14 @@
     features by declaring a few endpoints, including one for uploading files:
 
     {[
+module S = Tiny_httpd
 
 let () =
   let server = S.create () in
   (* say hello *)
   S.add_path_handler ~meth:`GET server
-    "/hello/%s@/" (fun name _req -> S.Response.make_string (Ok ("hello " ^name ^"!\n")));
+    "/hello/%s@/" (fun name _req ->
+        S.Response.make_string (Ok ("hello " ^name ^"!\n")));
   (* echo request *)
   S.add_path_handler server
     "/echo" (fun req -> S.Response.make_string

@@ -4,4 +4,4 @@
   (public_name http_of_dir)
   (package tiny_httpd)
   (flags :standard -warn-error -3)
-  (libraries tiny_httpd str))
+  (libraries tiny_httpd))
