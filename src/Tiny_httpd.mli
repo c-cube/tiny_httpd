@@ -81,7 +81,7 @@ end
 
 (** {2 Generic stream of data}
 
-  Streams are used to represent a series of bytes that can arrive progressively.
+    Streams are used to represent a series of bytes that can arrive progressively.
     For example, an uploaded file will be sent as a series of chunks. *)
 
 type stream = {
@@ -98,7 +98,7 @@ type stream = {
 }
 (** A buffered stream, with a view into the current buffer (or refill if empty),
     and a function to consume [n] bytes.
-    See {!Buf_} for more details. *)
+    See {!Stream_} for more details. *)
 
 module Stream_ : sig
   type t = stream
@@ -179,16 +179,17 @@ end
 module Request : sig
   type 'body t = {
     meth: Meth.t;
+    host: string;
     headers: Headers.t;
     path: string;
     body: 'body;
   }
-(** A request with method, path, headers, and a body, sent by a client.
+  (** A request with method, path, host, headers, and a body, sent by a client.
 
-    The body is polymorphic because the request goes through
-    several transformations. First it has no body, as only the request
-    and headers are read; then it has a stream body; then the body might be
-    entirely read as a string via {!read_body_full}. *)
+      The body is polymorphic because the request goes through
+      several transformations. First it has no body, as only the request
+      and headers are read; then it has a stream body; then the body might be
+      entirely read as a string via {!read_body_full}. *)
 
   val pp : Format.formatter -> string t -> unit
   (** Pretty print the request and its body *)
@@ -197,6 +198,7 @@ module Request : sig
   (** Pretty print the request without its body *)
 
   val headers : _ t -> Headers.t
+  (** List of headers of the request, including ["Host"] *)
 
   val get_header : ?f:(string->string) -> _ t -> string -> string option
 
@@ -204,11 +206,17 @@ module Request : sig
 
   val set_header : 'a t -> string -> string -> 'a t
 
+  val host : _ t -> string
+  (** Host field of the request. It also appears in the headers. *)
+
   val meth : _ t -> Meth.t
+  (** Method for the request. *)
 
   val path : _ t -> string
+  (** Request path. *)
 
   val body : 'b t -> 'b
+  (** Request body, possibly empty. *)
 
   val read_body_full : stream t -> string t
   (** Read the whole body into a string. Potentially blocking. *)
@@ -331,10 +339,10 @@ val create :
     *)
 
 val addr : t -> string
-(** Address on which the server listen. *)
+(** Address on which the server listens. *)
 
 val port : t -> int
-(** Port on which the server listen. *)
+(** Port on which the server listens. *)
 
 val add_decode_request_cb :
   t ->

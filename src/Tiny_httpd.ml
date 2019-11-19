@@ -257,12 +257,14 @@ end
 module Request = struct
   type 'body t = {
     meth: Meth.t;
+    host: string;
     headers: Headers.t;
     path: string;
     body: 'body;
   }
 
   let headers self = self.headers
+  let host self = self.host
   let meth self = self.meth
   let path self = self.path
   let body self = self.body
@@ -274,11 +276,11 @@ module Request = struct
   let set_header self k v = {self with headers=Headers.set k v self.headers}
 
   let pp_ out self : unit =
-    Format.fprintf out "{@[meth=%s;@ headers=%a;@ path=%S;@ body=?@]}"
-      (Meth.to_string self.meth) Headers.pp self.headers self.path
+    Format.fprintf out "{@[meth=%s;@ host=%s;@ headers=%a;@ path=%S;@ body=?@]}"
+      (Meth.to_string self.meth) self.host Headers.pp self.headers self.path
   let pp out self : unit =
-    Format.fprintf out "{@[meth=%s;@ headers=%a;@ path=%S;@ body=%S@]}"
-      (Meth.to_string self.meth) Headers.pp self.headers
+    Format.fprintf out "{@[meth=%s;@ host=%s;@ headers=%a;@ path=%S;@ body=%S@]}"
+      (Meth.to_string self.meth) self.host Headers.pp self.headers
       self.path self.body
 
   let read_body_exact (is:stream) (n:int) : string =
@@ -364,7 +366,11 @@ module Request = struct
       let meth = Meth.of_string meth in
       _debug (fun k->k "got meth: %s, path %S" (Meth.to_string meth) path);
       let headers = Headers.parse_ ~buf is in
-      Ok (Some {meth; path; headers; body=()})
+      let host =
+        try List.assoc "Host" headers
+        with Not_found -> bad_reqf 400 "No 'Host' header in request"
+      in
+      Ok (Some {meth; host; path; headers; body=()})
     with
     | End_of_file | Sys_error _ -> Ok None
     | Bad_req (c,s) -> Error (c,s)
@@ -658,7 +664,7 @@ let run (self:t) : (unit,_) result =
     Unix.setsockopt_optint sock Unix.SO_LINGER None;
     let inet_addr = Unix.inet_addr_of_string self.addr in
     Unix.bind sock (Unix.ADDR_INET (inet_addr, self.port));
-    Unix.listen sock 10;
+    Unix.listen sock (2 * self.sem_max_connections.Sem_.n);
     while self.running do
       (* limit concurrency *)
       Sem_.acquire 1 self.sem_max_connections;
