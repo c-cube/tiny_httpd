@@ -1,6 +1,10 @@
-type stream = (bytes -> int -> int -> int) * (unit -> unit)
-(** An input stream is a function to read bytes into a buffer,
-    and a function to close *)
+type stream = {
+  is_fill_buf: 'a. (bytes -> int -> int -> 'a) -> 'a;
+  is_consume: int -> unit;
+  is_close: unit -> unit;
+}
+(** A buffer input stream, with a view into the current buffer (or refill if empty),
+    and a function to consume [n] bytes *)
 
 (** {2 Tiny buffer implementation} *)
 module Buf_ : sig
@@ -15,11 +19,10 @@ end
 module Stream_ : sig
   type t = stream
 
+  val close : t -> unit
   val of_chan : in_channel -> t
   val of_chan_close_noerr : in_channel -> t
-  val of_string : ?i:int -> ?len:int -> string -> t
   val of_bytes : ?i:int -> ?len:int -> bytes -> t
-  val close : t -> unit
   val with_file : string -> (t -> 'a) -> 'a
   (** Open a file with given name, and obtain an input stream *)
 
