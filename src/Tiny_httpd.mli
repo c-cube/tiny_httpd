@@ -19,7 +19,8 @@ let () =
     "/hello/%s@/" (fun name _req -> S.Response.make_string (Ok ("hello " ^name ^"!\n")));
   (* echo request *)
   S.add_path_handler server
-    "/echo" (fun req -> S.Response.make_string (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
+    "/echo" (fun req -> S.Response.make_string
+                (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
   S.add_path_handler ~meth:`PUT server
     "/upload/%s" (fun path req ->
         try
@@ -28,7 +29,8 @@ let () =
           flush oc;
           S.Response.make_string (Ok "uploaded file")
         with e ->
-          S.Response.fail ~code:500 "couldn't upload file: %s" (Printexc.to_string e)
+          S.Response.fail ~code:500 "couldn't upload file: %s"
+            (Printexc.to_string e)
       );
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);
   match S.run server with
@@ -62,6 +64,26 @@ echo:
 
 *)
 
+
+(** {2 Tiny buffer implementation}
+
+    These buffers are used to avoid allocating too many byte arrays when
+    processing streams and parsing requests.
+*)
+
+module Buf_ : sig
+  type t
+  val size : t -> int
+  val clear : t -> unit
+  val create : ?size:int -> unit -> t
+  val contents : t -> string
+end
+
+(** {2 Generic stream of data}
+
+  Streams are used to represent a series of bytes that can arrive progressively.
+    For example, an uploaded file will be sent as a series of chunks. *)
+
 type stream = {
   is_fill_buf: unit -> (bytes * int * int);
   (** See the current slice of the internal buffer as [bytes, i, len],
@@ -78,23 +100,6 @@ type stream = {
     and a function to consume [n] bytes.
     See {!Buf_} for more details. *)
 
-(** {2 Tiny buffer implementation}
-
-    These buffers are used to avoid allocating too many byte arrays when
-    processing streams and parsing requests.
-*)
-module Buf_ : sig
-  type t
-  val size : t -> int
-  val clear : t -> unit
-  val create : ?size:int -> unit -> t
-  val contents : t -> string
-end
-
-(** {2 Generic stream of data}
-
-  Streams are used to represent a series of bytes that can arrive progressively.
-    For example, an uploaded file will be sent as a series of chunks. *)
 module Stream_ : sig
   type t = stream
 
@@ -123,6 +128,8 @@ module Stream_ : sig
       @param buf a buffer to (re)use. Its content will be cleared. *)
 end
 
+(** {2 HTTP methods} *)
+
 module Meth : sig
   type t = [
     | `GET
@@ -139,6 +146,8 @@ module Meth : sig
   val pp : Format.formatter -> t -> unit
   val to_string : t -> string
 end
+
+(** {2 HTTP headers} *)
 
 module Headers : sig
   type t = (string * string) list
@@ -165,9 +174,8 @@ module Headers : sig
   (** Pretty print the headers. *)
 end
 
-(** {2 HTTP request}
+(** {2 HTTP requests} *)
 
-    A request sent by a client. *)
 module Request : sig
   type 'body t = {
     meth: Meth.t;
@@ -175,7 +183,7 @@ module Request : sig
     path: string;
     body: 'body;
   }
-(** A request with method, path, headers, and a body.
+(** A request with method, path, headers, and a body, sent by a client.
 
     The body is polymorphic because the request goes through
     several transformations. First it has no body, as only the request
@@ -206,7 +214,8 @@ module Request : sig
   (** Read the whole body into a string. Potentially blocking. *)
 end
 
-(** {2 Response code} *)
+(** {2 Response codes} *)
+
 module Response_code : sig
   type t = int
   (** A standard HTTP code.
@@ -224,9 +233,8 @@ module Response_code : sig
       NOTE: this is not complete (yet). *)
 end
 
-(** {2 Response}
+(** {2 Response} *)
 
-    A response sent back to a client. *)
 module Response : sig
   type body = [`String of string | `Stream of stream]
   (** Body of a response, either as a simple string,
@@ -237,7 +245,7 @@ module Response : sig
     headers: Headers.t; (** Headers of the reply. Some will be set by [Tiny_httpd] automatically. *)
     body: body; (** Body of the response. Can be empty. *)
   }
-  (** A response. *)
+  (** A response to send back to a client. *)
 
   val make_raw :
     ?headers:Headers.t ->
@@ -290,6 +298,8 @@ module Response : sig
   val pp : Format.formatter -> t -> unit
   (** Pretty print the response. *)
 end
+
+(** {2 Server} *)
 
 type t
 (** A HTTP server. See {!create} for more details. *)
