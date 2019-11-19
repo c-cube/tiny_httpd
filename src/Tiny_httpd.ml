@@ -141,6 +141,7 @@ module Stream_ = struct
     let continue = ref true in
     while !continue do
       let s, i, len = self.is_fill_buf () in
+      if len=0 then continue := false;
       let j = ref i in
       while !j < i+len && Bytes.get s !j <> '\n' do
         incr j
@@ -550,7 +551,10 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
     | Ok None -> continue := false
     | Error (c,s) ->
       let res = Response.make_raw ~code:c s in
-      Response.output_ oc res
+      begin
+        try Response.output_ oc res
+        with Sys_error _ -> continue := false
+      end
     | Ok (Some req) ->
       let res =
         try
@@ -594,7 +598,10 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
         | e ->
           Response.fail ~code:500 "server error: %s" (Printexc.to_string e)
       in
-      Response.output_ oc res
+      begin
+        try Response.output_ oc res
+        with Sys_error _ -> continue := false
+      end
     | exception Bad_req (code,s) ->
       Response.output_ oc (Response.make_raw ~code s);
       continue := false
@@ -611,6 +618,7 @@ let run (self:t) : (unit,_) result =
       ignore (Unix.sigprocmask Unix.SIG_BLOCK [Sys.sigpipe] : _ list);
     );
     let sock = Unix.socket PF_INET Unix.SOCK_STREAM 0 in
+    Unix.clear_nonblock sock;
     Unix.setsockopt sock Unix.SO_REUSEADDR true;
     Unix.setsockopt_optint sock Unix.SO_LINGER None;
     let inet_addr = Unix.inet_addr_of_string self.addr in
