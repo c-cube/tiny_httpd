@@ -60,7 +60,7 @@ let encode_deflate_stream_ (is:S.byte_stream) : S.byte_stream =
     BS.close is
   in
   let bs_consume n =
-    write_offset := n + !write_offset 
+    write_offset := n + !write_offset
   in
   let bs_fill_buf () =
     S._debug (fun k->k "deflate.fill buf");
@@ -127,9 +127,6 @@ let cb_decode_compressed_stream (req:unit S.Request.t) : _ option =
       let req' = S.Request.set_header req "Transfer-Encoding" "chunked" in
       Some (req', decode_gzip_stream_)
   *)
-  | Some "deflate" ->
-    let req' = S.Request.set_header req "Transfer-Encoding" "chunked" in
-    Some (req', mk_decode_deflate_stream_ ())
   | Some s when has_deflate s ->
     begin match Scanf.sscanf s "deflate; %s" (fun s -> s) with
       | tr' ->
