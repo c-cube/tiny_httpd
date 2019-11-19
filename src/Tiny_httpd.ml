@@ -179,6 +179,7 @@ module Response_code = struct
     | 300 -> "Multiple choices"
     | 301 -> "Moved permanently"
     | 302 -> "Found"
+    | 304 -> "Not Modified"
     | 400 -> "Bad request"
     | 403 -> "Forbidden"
     | 404 -> "Not found"
