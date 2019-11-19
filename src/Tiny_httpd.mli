@@ -6,6 +6,60 @@
     so that several handlers can be registered.
 
     It is possible to use a thread pool, see {!create}'s argument [new_thread].
+
+    The [echo] example (see [src/examples/echo.ml]) demonstrates some of the
+    features by declaring a few endpoints, including one for uploading files:
+
+    {[
+
+let () =
+  let server = S.create () in
+  (* say hello *)
+  S.add_path_handler ~meth:`GET server
+    "/hello/%s@/" (fun name _req -> S.Response.make_string (Ok ("hello " ^name ^"!\n")));
+  (* echo request *)
+  S.add_path_handler server
+    "/echo" (fun req -> S.Response.make_string (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
+  S.add_path_handler ~meth:`PUT server
+    "/upload/%s" (fun path req ->
+        try
+          let oc = open_out @@ "/tmp/" ^ path in
+          output_string oc req.S.Request.body;
+          flush oc;
+          S.Response.make_string (Ok "uploaded file")
+        with e ->
+          S.Response.fail ~code:500 "couldn't upload file: %s" (Printexc.to_string e)
+      );
+  Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);
+  match S.run server with
+  | Ok () -> ()
+  | Error e -> raise e
+    ]}
+
+    It is then possible to query it using curl:
+
+    {[
+$ dune exec src/examples/echo.exe &
+listening on http://127.0.0.1:8080
+
+# the path "hello/name" greets you.
+$ curl -X GET http://localhost:8080/hello/quadrarotaphile
+hello quadrarotaphile!
+
+# the path "echo" just prints the request.
+$ curl -X GET http://localhost:8080/echo --data "howdy y'all" 
+echo:
+{meth=GET;
+ headers=Host: localhost:8080
+         User-Agent: curl/7.66.0
+         Accept: */*
+         Content-Length: 10
+         Content-Type: application/x-www-form-urlencoded;
+ path="/echo"; body="howdy y'all"}
+
+
+    ]}
+
 *)
 
 type stream = {

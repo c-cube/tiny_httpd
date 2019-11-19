@@ -26,7 +26,7 @@ let () =
 ```
 
 ```sh
-$ ./echo.sh &
+$ dune exec src/examples/echo.exe &
 listening on http://127.0.0.1:8080
 
 # the path "hello/name" greets you.
