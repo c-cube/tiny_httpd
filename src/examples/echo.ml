@@ -7,7 +7,12 @@ let debug_ k =
   )
 
 let () =
-  let server = S.create () in
+  let j = ref 32 in
+  Arg.parse (Arg.align [
+      "--debug", Arg.Unit (fun () -> S._enable_debug true), " enable debug";
+      "-j", Arg.Set_int j, " maximum number of connections";
+    ]) (fun _ -> raise (Arg.Bad "")) "echo [option]*";
+  let server = S.create ~max_connections:!j () in
   (* say hello *)
   S.add_path_handler ~meth:`GET server
     "/hello/%s@/" (fun name _req -> S.Response.make_string (Ok ("hello " ^name ^"!\n")));

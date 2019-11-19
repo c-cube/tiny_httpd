@@ -306,6 +306,7 @@ type t
 
 val create :
   ?masksigpipe:bool ->
+  ?max_connections:int ->
   ?new_thread:((unit -> unit) -> unit) ->
   ?addr:string ->
   ?port:int ->
@@ -324,6 +325,7 @@ val create :
     new client connection. By default it is {!Thread.create} but one
     could use a thread pool instead.
 
+    @param max_connections maximum number of simultaneous connections.
     @param addr the address (IPv4) to listen on. Default ["127.0.0.1"].
     @param port to listen on. Default [8080].
     *)

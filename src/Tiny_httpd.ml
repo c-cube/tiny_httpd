@@ -478,11 +478,41 @@ module Response = struct
     flush oc
 end
 
+(* semaphore, for limiting concurrency. *)
+module Sem_ = struct
+  type t = {
+    mutable n : int;
+    mutex : Mutex.t;
+    cond : Condition.t;
+  }
+
+  let create n =
+    if n <= 0 then invalid_arg "Semaphore.create";
+    { n; mutex=Mutex.create(); cond=Condition.create(); }
+
+  let acquire m t =
+    Mutex.lock t.mutex;
+    while t.n < m do
+      Condition.wait t.cond t.mutex;
+    done;
+    assert (t.n >= m);
+    t.n <- t.n - m;
+    Condition.broadcast t.cond;
+    Mutex.unlock t.mutex
+
+  let release m t =
+    Mutex.lock t.mutex;
+    t.n <- t.n + m;
+    Condition.broadcast t.cond;
+    Mutex.unlock t.mutex
+end
+
 type cb_path_handler = string Request.t -> Response.t
 
 type t = {
   addr: string;
   port: int;
+  sem_max_connections: Sem_.t;
   new_thread: (unit -> unit) -> unit;
   masksigpipe: bool;
   mutable handler: (string Request.t -> Response.t);
@@ -521,10 +551,13 @@ let add_path_handler
 
 let create
     ?(masksigpipe=true)
+    ?(max_connections=32)
     ?(new_thread=(fun f -> ignore (Thread.create f () : Thread.t)))
     ?(addr="127.0.0.1") ?(port=8080) () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
-  { new_thread; addr; port; masksigpipe; handler; running= true;
+  let max_connections = max 4 max_connections in
+  { new_thread; addr; port; masksigpipe; handler;
+    running= true; sem_max_connections=Sem_.create max_connections;
     path_handlers=[];
     cb_encode_resp=[]; cb_decode_req=[];
   }
@@ -611,6 +644,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
       Unix.close client_sock;
   done;
   _debug (fun k->k "done with client, exiting");
+  (try Unix.close client_sock with _ -> ());
   ()
 
 let run (self:t) : (unit,_) result =
@@ -626,9 +660,19 @@ let run (self:t) : (unit,_) result =
     Unix.bind sock (Unix.ADDR_INET (inet_addr, self.port));
     Unix.listen sock 10;
     while self.running do
+      (* limit concurrency *)
+      Sem_.acquire 1 self.sem_max_connections;
       let client_sock, _ = Unix.accept sock in
       self.new_thread
-        (fun () -> handle_client_ self client_sock);
+        (fun () ->
+           try
+             handle_client_ self client_sock;
+             Sem_.release 1 self.sem_max_connections;
+           with e ->
+             (try Unix.close client_sock with _ -> ());
+             Sem_.release 1 self.sem_max_connections;
+             raise e
+        );
     done;
     Ok ()
   with e -> Error e

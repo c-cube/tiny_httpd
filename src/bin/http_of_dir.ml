@@ -8,6 +8,7 @@ type config = {
   mutable upload: bool;
   mutable max_upload_size: int;
   mutable delete: bool;
+  mutable j: int;
 }
 
 let default_config () : config = {
@@ -16,6 +17,7 @@ let default_config () : config = {
   delete=false;
   upload=true;
   max_upload_size = 10 * 1024 * 1024;
+  j=32;
 }
 
 let contains_dot_dot s =
@@ -65,7 +67,7 @@ let date_of_time (f:float) : string =
 
 let serve ~config (dir:string) : _ result =
   Printf.printf "serve directory %s on http://%s:%d\n%!" dir config.addr config.port;
-  let server = S.create ~addr:config.addr ~port:config.port () in
+  let server = S.create ~max_connections:config.j ~addr:config.addr ~port:config.port () in
   if config.delete then (
     S.add_path_handler server ~meth:`DELETE "/%s"
       (fun path _req ->
@@ -167,6 +169,7 @@ let main () =
       "--debug", Unit (fun () -> S._enable_debug true), " debug mode";
       "--delete", Unit (fun () -> config.delete <- true), " enable `delete` on files";
       "--no-delete", Unit (fun () -> config.delete <- false), " disable `delete` on files";
+      "-j", Int (fun j->config.j <- j), " maximum number of simultaneous connections";
     ]) (fun s -> dir_ := s) "http_of_dir [options] [dir]";
   match serve ~config !dir_ with
   | Ok () -> ()
