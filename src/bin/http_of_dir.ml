@@ -124,6 +124,13 @@ let serve ~config (dir:string) : _ result =
        ));
   S.run server
 
+let parse_size s : int =
+  try Scanf.sscanf s "%dM" (fun n -> n * 1_024 * 1_024)
+  with _ ->
+  try Scanf.sscanf s "%dk" (fun n -> n * 1_024)
+  with _ ->
+  try int_of_string s
+  with _ -> raise (Arg.Bad "invalid size (expected <int>[kM]?)")
 
 let main () =
   let config = default_config () in
@@ -135,8 +142,8 @@ let main () =
       "-p", Int (fun x -> config.port <- x), " alias to --port";
       "--dir", Set_string dir_, " directory to serve (default: \".\")";
       "--no-upload", Unit (fun () -> config.upload <- false), " disable file uploading";
-      "--max-upload", Int (fun i -> config.max_upload_size <- 1024 * 1024 * i),
-      "maximum size of files that can be uploaded, in MB";
+      "--max-upload", String (fun i -> config.max_upload_size <- parse_size i),
+      "maximum size of files that can be uploaded";
       "--debug", Unit (fun () -> S._enable_debug true), " debug mode";
       "--delete", Unit (fun () -> config.delete <- true), " enable `delete` on files";
       "--no-delete", Unit (fun () -> config.delete <- false), " disable `delete` on files";
