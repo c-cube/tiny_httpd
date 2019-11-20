@@ -48,8 +48,13 @@ let html_list_dir ~top ~parent d : string =
   Array.iter
     (fun f ->
        if not @@ contains_dot_dot (d // f) then (
-         Printf.bprintf body "  <li> <a href=\"/%s\"> %s %s </a> </li>\n"
-           (d // f) f (if Sys.is_directory (top // d // f) then "[dir]" else "");
+         let fpath = top // d // f in
+         if not @@ Sys.file_exists fpath then (
+           Printf.bprintf body "  <li> %s [invalid file]</li>\n" f
+         ) else (
+           Printf.bprintf body "  <li> <a href=\"/%s\"> %s %s </a> </li>\n"
+             (d // f) f (if Sys.is_directory fpath then "[dir]" else "")
+         );
        )
     )
     entries;
