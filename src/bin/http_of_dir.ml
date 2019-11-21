@@ -29,11 +29,18 @@ let contains_dot_dot s =
     false
   with Exit -> true
 
+(* Human readable size *)
+let human_size (x:int) : string =
+  if x >= 1_000_000 then Printf.sprintf "%d.%dM" (x / 1_000_000) ((x/1000) mod 1_000)
+  else if x >= 1_000 then Printf.sprintf "%d.%dk" (x/1000) ((x/100) mod 10)
+  else Printf.sprintf "%db" x
+
 let header_html = "Content-Type", "text/html"
 let (//) = Filename.concat
 
 let html_list_dir ~top ~parent d : string =
   let entries = Sys.readdir @@ (top // d) in
+  Array.sort compare entries;
   let body = Buffer.create 256 in
   Printf.bprintf body {|<head><title> http_of_dir %S</title>
   </head><body>
@@ -52,8 +59,12 @@ let html_list_dir ~top ~parent d : string =
          if not @@ Sys.file_exists fpath then (
            Printf.bprintf body "  <li> %s [invalid file]</li>\n" f
          ) else (
-           Printf.bprintf body "  <li> <a href=\"/%s\"> %s %s </a> </li>\n"
-             (d // f) f (if Sys.is_directory fpath then "[dir]" else "")
+           let size =
+             try Printf.sprintf " (%s)" @@ human_size (Unix.stat fpath).Unix.st_size
+             with _ -> ""
+           in
+           Printf.bprintf body "  <li> <a href=\"/%s\"> %s </a> %s%s </li>\n"
+             (d // f) f (if Sys.is_directory fpath then "[dir]" else "") size
          );
        )
     )
