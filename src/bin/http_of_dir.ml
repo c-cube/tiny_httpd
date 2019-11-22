@@ -1,4 +1,5 @@
 module S = Tiny_httpd
+module U = Tiny_httpd_util
 module Pf = Printf
 
 type config = {
@@ -38,8 +39,6 @@ let human_size (x:int) : string =
 let header_html = "Content-Type", "text/html"
 let (//) = Filename.concat
 
-(* TODO: percent encoding/decoding *)
-
 let html_list_dir ~top ~parent d : string =
   let entries = Sys.readdir @@ (top // d) in
   Array.sort compare entries;
@@ -66,7 +65,7 @@ let html_list_dir ~top ~parent d : string =
              with _ -> ""
            in
            Printf.bprintf body "  <li> <a href=\"/%s\"> %s </a> %s%s </li>\n"
-             (d // f) f (if Sys.is_directory fpath then "[dir]" else "") size
+             (U.percent_encode (d // f)) f (if Sys.is_directory fpath then "[dir]" else "") size
          );
        )
     )
@@ -89,13 +88,15 @@ let serve ~config (dir:string) : _ result =
   if config.delete then (
     S.add_path_handler server ~meth:`DELETE "/%s"
       (fun path _req ->
-         if contains_dot_dot path then (
+         match U.percent_decode path  with
+         | None -> S.Response.fail_raise ~code:404 "invalid percent encoding"
+         | Some path when contains_dot_dot path ->
            S.Response.fail_raise ~code:403 "invalid path in delete"
-         );
-         S.Response.make_string
-           (try
-              Sys.remove (dir // path); Ok "file deleted successfully"
-            with e -> Error (500, Printexc.to_string e))
+         | Some path ->
+           S.Response.make_string
+             (try
+                Sys.remove (dir // path); Ok "file deleted successfully"
+              with e -> Error (500, Printexc.to_string e))
       );
   ) else (
     S.add_path_handler server ~meth:`DELETE "/%s"
@@ -133,6 +134,10 @@ let serve ~config (dir:string) : _ result =
   );
   S.add_path_handler server ~meth:`GET "/%s"
     (fun path req ->
+       let path = match U.percent_decode path with
+         | None -> S.Response.fail_raise ~code:404 "invalid path"
+         | Some p -> p
+       in
        let full_path = dir // path in
        let mtime = lazy (
          try Printf.sprintf "mtime: %f" (Unix.stat full_path).Unix.st_mtime
