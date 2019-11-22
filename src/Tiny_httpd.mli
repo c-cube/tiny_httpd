@@ -86,24 +86,24 @@ end
     Streams are used to represent a series of bytes that can arrive progressively.
     For example, an uploaded file will be sent as a series of chunks. *)
 
-type stream = {
-  is_fill_buf: unit -> (bytes * int * int);
+type byte_stream = {
+  bs_fill_buf: unit -> (bytes * int * int);
   (** See the current slice of the internal buffer as [bytes, i, len],
       where the slice is [bytes[i] .. [bytes[i+len-1]]].
       Can block to refill the buffer if there is currently no content.
       If [len=0] then there is no more data. *)
-  is_consume: int -> unit;
+  bs_consume: int -> unit;
   (** Consume n bytes from the buffer. This should only be called with [n <= len]
       after a call to [is_fill_buf] that returns a slice of length [len]. *)
-  is_close: unit -> unit;
+  bs_close: unit -> unit;
   (** Close the stream. *)
 }
 (** A buffered stream, with a view into the current buffer (or refill if empty),
     and a function to consume [n] bytes.
-    See {!Stream_} for more details. *)
+    See {!Byte_stream} for more details. *)
 
-module Stream_ : sig
-  type t = stream
+module Byte_stream : sig
+  type t = byte_stream
 
   val close : t -> unit
 
@@ -220,7 +220,7 @@ module Request : sig
   val body : 'b t -> 'b
   (** Request body, possibly empty. *)
 
-  val read_body_full : stream t -> string t
+  val read_body_full : byte_stream t -> string t
   (** Read the whole body into a string. Potentially blocking. *)
 end
 
@@ -246,7 +246,7 @@ end
 (** {2 Response} *)
 
 module Response : sig
-  type body = [`String of string | `Stream of stream]
+  type body = [`String of string | `Stream of byte_stream]
   (** Body of a response, either as a simple string,
       or a stream of bytes. *)
 
@@ -268,7 +268,7 @@ module Response : sig
   val make_raw_stream :
     ?headers:Headers.t ->
     code:Response_code.t ->
-    stream ->
+    byte_stream ->
     t
   (** Same as {!make_raw} but with a stream body. The body will be sent with
       the chunked transfer-encoding. *)
@@ -290,7 +290,7 @@ module Response : sig
 
   val make_stream :
     ?headers:Headers.t ->
-    (stream, Response_code.t * string) result -> t
+    (byte_stream, Response_code.t * string) result -> t
   (** Same as {!make} but with a stream body. *)
 
   val fail : ?headers:Headers.t -> code:int ->
@@ -348,7 +348,7 @@ val port : t -> int
 
 val add_decode_request_cb :
   t ->
-  (unit Request.t -> (unit Request.t * (stream -> stream)) option) -> unit
+  (unit Request.t -> (unit Request.t * (byte_stream -> byte_stream)) option) -> unit
 (** Add a callback for every request.
     The callback can provide a stream transformer and a new request (with
     modified headers, typically).
@@ -380,7 +380,7 @@ val add_path_handler :
    'b, 'c -> string Request.t -> Response.t, 'a -> 'd, 'd) format6 ->
   'c -> unit
 (** [add_path_handler server "/some/path/%s@/%d/" f]
-    calls [f request "foo" 42 ()] when a request with path "some/path/foo/42/"
+    calls [f "foo" 42 request] when a request with path "some/path/foo/42/"
     is received.
 
     This uses {!Scanf}'s splitting, which has some gotchas (in particular,

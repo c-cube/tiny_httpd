@@ -1,7 +1,7 @@
-type stream = {
-  is_fill_buf: unit -> (bytes * int * int);
-  is_consume: int -> unit;
-  is_close: unit -> unit;
+type byte_stream = {
+  bs_fill_buf: unit -> (bytes * int * int);
+  bs_consume: int -> unit;
+  bs_close: unit -> unit;
 }
 (** A buffer input stream, with a view into the current buffer (or refill if empty),
     and a function to consume [n] bytes *)
@@ -54,23 +54,23 @@ module Buf_ = struct
     x
 end
 
-module Stream_ = struct
-  type t = stream
+module Byte_stream = struct
+  type t = byte_stream
 
-  let close self = self.is_close()
+  let close self = self.bs_close()
 
   let of_chan_ ~close ic : t =
     let i = ref 0 in
     let len = ref 0 in
     let buf = Bytes.make 4096 ' ' in
-    { is_fill_buf=(fun () ->
+    { bs_fill_buf=(fun () ->
       if !i >= !len then (
         i := 0;
         len := input ic buf 0 (Bytes.length buf);
       );
       buf, !i,!len - !i);
-      is_consume=(fun n -> i := !i + n);
-      is_close=(fun () -> close ic)
+      bs_consume=(fun n -> i := !i + n);
+      bs_close=(fun () -> close ic)
     }
 
   let of_chan = of_chan_ ~close:close_in
@@ -85,9 +85,9 @@ module Stream_ = struct
       )
     in
     let i = ref i in
-    { is_fill_buf=(fun () -> s, !i, !len);
-      is_close=(fun () -> ());
-      is_consume=(fun n -> i := !i + n; len := !len - n);
+    { bs_fill_buf=(fun () -> s, !i, !len);
+      bs_close=(fun () -> ());
+      bs_consume=(fun n -> i := !i + n; len := !len - n);
     }
 
   let with_file file f =
@@ -102,10 +102,10 @@ module Stream_ = struct
 
   (* Read as much as possible into [buf]. *)
   let read_into_buf (self:t) (buf:Buf_.t) : int =
-    let s, i, len = self.is_fill_buf () in
+    let s, i, len = self.bs_fill_buf () in
      if len > 0 then (
        Buf_.add_bytes buf s i len;
-       self.is_consume len;
+       self.bs_consume len;
      );
      len
 
@@ -125,11 +125,11 @@ module Stream_ = struct
     let offset = ref 0 in
     while !offset < n do
       let n_read =
-        let s, i, len = self.is_fill_buf () in
+        let s, i, len = self.bs_fill_buf () in
         let n_read = min len (n- !offset) in
         Bytes.blit s i bytes !offset n_read;
         offset := !offset + n_read;
-        self.is_consume n_read;
+        self.bs_consume n_read;
         n_read
       in
       if n_read=0 then too_short();
@@ -140,7 +140,7 @@ module Stream_ = struct
     Buf_.clear buf;
     let continue = ref true in
     while !continue do
-      let s, i, len = self.is_fill_buf () in
+      let s, i, len = self.bs_fill_buf () in
       if len=0 then continue := false;
       let j = ref i in
       while !j < i+len && Bytes.get s !j <> '\n' do
@@ -149,11 +149,11 @@ module Stream_ = struct
       if !j-i < len then (
         assert (Bytes.get s !j = '\n');
         Buf_.add_bytes buf s i (!j-i); (* without \n *)
-        self.is_consume (!j-i+1); (* remove \n *)
+        self.bs_consume (!j-i+1); (* remove \n *)
         continue := false
       ) else (
         Buf_.add_bytes buf s i len;
-        self.is_consume len;
+        self.bs_consume len;
       )
     done
 
@@ -237,9 +237,9 @@ module Headers = struct
     let pp_pair out (k,v) = Format.fprintf out "@[<h>%s: %s@]" k v in
     Format.fprintf out "@[<v>%a@]" (Format.pp_print_list pp_pair) l
 
-  let parse_ ~buf (is:stream) : t =
+  let parse_ ~buf (bs:byte_stream) : t =
     let rec loop acc =
-      let line = Stream_.read_line ~buf is in
+      let line = Byte_stream.read_line ~buf bs in
       _debug (fun k->k  "parsed header line %S" line);
       if line = "\r" then (
         acc
@@ -283,16 +283,16 @@ module Request = struct
       (Meth.to_string self.meth) self.host Headers.pp self.headers
       self.path self.body
 
-  let read_body_exact (is:stream) (n:int) : string =
+  let read_body_exact (bs:byte_stream) (n:int) : string =
     let bytes = Bytes.make n ' ' in
-    Stream_.read_exactly_ is bytes n
+    Byte_stream.read_exactly_ bs bytes n
       ~too_short:(fun () -> bad_reqf 400 "body is too short");
     Bytes.unsafe_to_string bytes
 
   (* decode a "chunked" stream into a normal stream *)
-  let read_stream_chunked_ ?(buf=Buf_.create()) (is:stream) : stream =
+  let read_stream_chunked_ ?(buf=Buf_.create()) (bs:byte_stream) : byte_stream =
     let read_next_chunk_len () : int =
-      let line = Stream_.read_line ~buf is in
+      let line = Byte_stream.read_line ~buf bs in
       (* parse chunk length, ignore extensions *)
       let chunk_size = (
         if String.trim line = "" then 0
@@ -307,7 +307,7 @@ module Request = struct
     let offset = ref 0 in
     let len = ref 0 in
     let chunk_size = ref 0 in
-    { is_fill_buf=
+    { bs_fill_buf=
         (fun () ->
            (* do we need to refill? *)
            if !offset >= !len then (
@@ -319,9 +319,9 @@ module Request = struct
              if !chunk_size > 0 then (
                (* read the whole chunk, or [Bytes.length bytes] of it *)
                let to_read = min !chunk_size (Bytes.length bytes) in
-               Stream_.read_exactly_
+               Byte_stream.read_exactly_
                  ~too_short:(fun () -> bad_reqf 400 "chunk is too short")
-                 is bytes to_read;
+                 bs bytes to_read;
                len := to_read;
                chunk_size := !chunk_size - to_read;
              ) else (
@@ -330,17 +330,17 @@ module Request = struct
            );
            bytes, !offset, !len
         );
-      is_consume=(fun n -> offset := !offset + n);
-      is_close=(fun () -> Stream_.close is);
+      bs_consume=(fun n -> offset := !offset + n);
+      bs_close=(fun () -> Byte_stream.close bs);
     }
 
-  let read_body_chunked ~tr_stream ~buf ~size:max_size (is:stream) : string =
+  let read_body_chunked ~tr_stream ~buf ~size:max_size (bs:byte_stream) : string =
     _debug (fun k->k "read body with chunked encoding (max-size: %d)" max_size);
-    let is = tr_stream @@ read_stream_chunked_ ~buf is in
+    let is = tr_stream @@ read_stream_chunked_ ~buf bs in
     let buf_res = Buf_.create() in (* store the accumulated chunks *)
     (* TODO: extract this as a function [read_all_up_to ~max_size is]? *)
     let rec read_chunks () =
-      let n = Stream_.read_into_buf is buf_res in
+      let n = Byte_stream.read_into_buf is buf_res in
       if n = 0 then (
         Buf_.contents buf_res (* done *)
       ) else (
@@ -356,16 +356,16 @@ module Request = struct
     read_chunks()
 
   (* parse request, but not body (yet) *)
-  let parse_req_start ~buf (is:stream) : unit t option resp_result =
+  let parse_req_start ~buf (bs:byte_stream) : unit t option resp_result =
     try
-      let line = Stream_.read_line ~buf is in
+      let line = Byte_stream.read_line ~buf bs in
       let meth, path =
         try Scanf.sscanf line "%s %s HTTP/1.1\r" (fun x y->x,y)
         with _ -> raise (Bad_req (400, "Invalid request line"))
       in
       let meth = Meth.of_string meth in
       _debug (fun k->k "got meth: %s, path %S" (Meth.to_string meth) path);
-      let headers = Headers.parse_ ~buf is in
+      let headers = Headers.parse_ ~buf bs in
       let host =
         try List.assoc "Host" headers
         with Not_found -> bad_reqf 400 "No 'Host' header in request"
@@ -379,7 +379,7 @@ module Request = struct
 
   (* parse body, given the headers.
      @param tr_stream a transformation of the input stream. *)
-  let parse_body_ ~tr_stream ~buf (req:stream t) : string t resp_result =
+  let parse_body_ ~tr_stream ~buf (req:byte_stream t) : string t resp_result =
     try
       let size =
         match List.assoc "Content-Length" req.headers |> int_of_string with
@@ -401,9 +401,9 @@ module Request = struct
     | e ->
       Error (400, Printexc.to_string e)
 
-  let read_body_full (self:stream t) : string t =
+  let read_body_full (self:byte_stream t) : string t =
     try
-      let body = Stream_.read_all self.body in
+      let body = Byte_stream.read_all self.body in
       { self with body }
     with
     | Bad_req _ as e -> raise e
@@ -411,7 +411,7 @@ module Request = struct
 end
 
 module Response = struct
-  type body = [`String of string | `Stream of stream]
+  type body = [`String of string | `Stream of byte_stream]
   type t = {
     code: Response_code.t;
     headers: Headers.t;
@@ -457,14 +457,14 @@ module Response = struct
       self.code Headers.pp self.headers pp_body self.body
 
   (* print a stream as a series of chunks *)
-  let output_stream_chunked_ (oc:out_channel) (str:stream) : unit =
+  let output_stream_chunked_ (oc:out_channel) (str:byte_stream) : unit =
     let continue = ref true in
     while !continue do
       (* next chunk *)
-      let s, i, len = str.is_fill_buf () in
+      let s, i, len = str.bs_fill_buf () in
       Printf.fprintf oc "%x\r\n" len;
       output oc s i len;
-      str.is_consume len;
+      str.bs_consume len;
       if len = 0 then (
         continue := false;
       );
@@ -523,7 +523,8 @@ type t = {
   masksigpipe: bool;
   mutable handler: (string Request.t -> Response.t);
   mutable path_handlers : (unit Request.t -> cb_path_handler resp_result option) list;
-  mutable cb_decode_req: (unit Request.t -> (unit Request.t * (stream -> stream)) option) list;
+  mutable cb_decode_req:
+    (unit Request.t -> (unit Request.t * (byte_stream -> byte_stream)) option) list;
   mutable cb_encode_resp: (string Request.t -> Response.t -> Response.t option) list;
   mutable running: bool;
 }
@@ -583,7 +584,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
   let ic = Unix.in_channel_of_descr client_sock in
   let oc = Unix.out_channel_of_descr client_sock in
   let buf = Buf_.create() in
-  let is = Stream_.of_chan ic in
+  let is = Byte_stream.of_chan ic in
   let continue = ref true in
   while !continue && self.running do
     _debug (fun k->k "read next request");
