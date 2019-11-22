@@ -1,4 +1,3 @@
-
 module S = Tiny_httpd
 module Pf = Printf
 
@@ -31,12 +30,15 @@ let contains_dot_dot s =
 
 (* Human readable size *)
 let human_size (x:int) : string =
-  if x >= 1_000_000 then Printf.sprintf "%d.%dM" (x / 1_000_000) ((x/1000) mod 1_000)
+  if x >= 1_000_000_000 then Printf.sprintf "%d.%dG" (x / 1_000_000_000) ((x/1_000_000) mod 1_000_000)
+  else if x >= 1_000_000 then Printf.sprintf "%d.%dM" (x / 1_000_000) ((x/1000) mod 1_000)
   else if x >= 1_000 then Printf.sprintf "%d.%dk" (x/1000) ((x/100) mod 10)
   else Printf.sprintf "%db" x
 
 let header_html = "Content-Type", "text/html"
 let (//) = Filename.concat
+
+(* TODO: percent encoding/decoding *)
 
 let html_list_dir ~top ~parent d : string =
   let entries = Sys.readdir @@ (top // d) in
