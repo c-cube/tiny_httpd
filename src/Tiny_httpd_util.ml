@@ -1,7 +1,8 @@
-let percent_encode s =
+let percent_encode ?(skip=fun _->false) s =
   let buf = Buffer.create (String.length s) in
   String.iter
     (function
+      | c when skip c -> Buffer.add_char buf c
       | ' ' -> Buffer.add_string buf "%20"
       | '!' -> Buffer.add_string buf "%21"
       | '"' -> Buffer.add_string buf "%22"

@@ -39,10 +39,14 @@ let human_size (x:int) : string =
 let header_html = "Content-Type", "text/html"
 let (//) = Filename.concat
 
+let encode_path s =
+  U.percent_encode ~skip:(fun c -> c='/') s
+
 let html_list_dir ~top ~parent d : string =
   let entries = Sys.readdir @@ (top // d) in
   Array.sort compare entries;
   let body = Buffer.create 256 in
+  (* TODO: breadcrumbs for the path, each element a link to the given ancestor dir *)
   Printf.bprintf body {|<head><title> http_of_dir %S</title>
   </head><body>
     <h2> Index of %S</h2>
@@ -65,7 +69,7 @@ let html_list_dir ~top ~parent d : string =
              with _ -> ""
            in
            Printf.bprintf body "  <li> <a href=\"/%s\"> %s </a> %s%s </li>\n"
-             (U.percent_encode (d // f)) f (if Sys.is_directory fpath then "[dir]" else "") size
+             (encode_path (d // f)) f (if Sys.is_directory fpath then "[dir]" else "") size
          );
        )
     )
