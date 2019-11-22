@@ -59,11 +59,16 @@ let html_list_dir ~top ~parent d : string =
       Printf.bprintf body "<a href=\"/%s\"> (parent directory) </a>\n" p;
   end;
   Printf.bprintf body "<ul>\n";
+  let hidden_stop = ref 0 in
   Array.iteri
     (fun i f ->
        if is_hidden f && (i=0 || not (is_hidden entries.(i-1))) then (
-         Printf.bprintf body "<details> <summary>(hidden files)</summary>\n";
-       ) else if not (is_hidden f) && i>0 && is_hidden entries.(i-1) then (
+         hidden_stop := i;
+         while !hidden_stop < Array.length entries && is_hidden entries.(!hidden_stop) do
+           incr hidden_stop;
+         done;
+         Printf.bprintf body "<details> <summary>(%d hidden files)</summary>\n" (!hidden_stop-i);
+       ) else if i = !hidden_stop then (
          Printf.bprintf body "</details/>\n";
        );
        if not @@ contains_dot_dot (d // f) then (
