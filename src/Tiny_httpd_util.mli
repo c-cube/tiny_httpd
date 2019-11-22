@@ -1,6 +1,6 @@
 (** {1 Some utils for writing web servers}
 
-    @since NEXT_RELEASE
+    @since 0.2
 *)
 
 val percent_encode : ?skip:(char -> bool) -> string -> string
