@@ -42,6 +42,8 @@ let (//) = Filename.concat
 let encode_path s =
   U.percent_encode ~skip:(fun c -> c='/') s
 
+let is_hidden s = String.length s>0 && s.[0] = '.'
+
 let html_list_dir ~top ~parent d : string =
   let entries = Sys.readdir @@ (top // d) in
   Array.sort compare entries;
@@ -57,8 +59,13 @@ let html_list_dir ~top ~parent d : string =
       Printf.bprintf body "<a href=\"/%s\"> (parent directory) </a>\n" p;
   end;
   Printf.bprintf body "<ul>\n";
-  Array.iter
-    (fun f ->
+  Array.iteri
+    (fun i f ->
+       if is_hidden f && (i=0 || not (is_hidden entries.(i-1))) then (
+         Printf.bprintf body "<details> <summary>(hidden files)</summary>\n";
+       ) else if not (is_hidden f) && i>0 && is_hidden entries.(i-1) then (
+         Printf.bprintf body "</details/>\n";
+       );
        if not @@ contains_dot_dot (d // f) then (
          let fpath = top // d // f in
          if not @@ Sys.file_exists fpath then (
