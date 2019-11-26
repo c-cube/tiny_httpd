@@ -130,7 +130,7 @@ module Byte_stream : sig
       @param buf a buffer to (re)use. Its content will be cleared. *)
 end
 
-(** {2 HTTP methods} *)
+(** {2 Methods} *)
 
 module Meth : sig
   type t = [
@@ -149,7 +149,9 @@ module Meth : sig
   val to_string : t -> string
 end
 
-(** {2 HTTP headers} *)
+(** {2 Headers}
+
+    Headers are metadata associated with a request or response. *)
 
 module Headers : sig
   type t = (string * string) list
@@ -176,7 +178,9 @@ module Headers : sig
   (** Pretty print the headers. *)
 end
 
-(** {2 HTTP requests} *)
+(** {2 Requests}
+
+    Requests are sent by a client, e.g. a web browser or cURL. *)
 
 module Request : sig
   type 'body t = {
@@ -224,7 +228,7 @@ module Request : sig
   (** Read the whole body into a string. Potentially blocking. *)
 end
 
-(** {2 Response codes} *)
+(** {2 Response Codes} *)
 
 module Response_code : sig
   type t = int
@@ -243,7 +247,10 @@ module Response_code : sig
       NOTE: this is not complete (yet). *)
 end
 
-(** {2 Response} *)
+(** {2 Responses}
+
+    Responses are what a http server, such as {!Tiny_httpd}, send back to
+    the client to answer a {!Request.t}*)
 
 module Response : sig
   type body = [`String of string | `Stream of byte_stream]
