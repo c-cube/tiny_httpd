@@ -15,7 +15,7 @@ let default_config () : config = {
   addr="127.0.0.1";
   port=8080;
   delete=false;
-  upload=true;
+  upload=false;
   max_upload_size = 10 * 1024 * 1024;
   j=32;
 }
@@ -203,10 +203,11 @@ let main () =
       "--port", Int (fun x -> config.port <- x), " port to listen on";
       "-p", Int (fun x -> config.port <- x), " alias to --port";
       "--dir", Set_string dir_, " directory to serve (default: \".\")";
+      "--debug", Unit (fun () -> S._enable_debug true), " debug mode";
+      "--upload", Unit (fun () -> config.upload <- true), " enable file uploading";
       "--no-upload", Unit (fun () -> config.upload <- false), " disable file uploading";
       "--max-upload", String (fun i -> config.max_upload_size <- parse_size i),
-      "maximum size of files that can be uploaded";
-      "--debug", Unit (fun () -> S._enable_debug true), " debug mode";
+        " maximum size of files that can be uploaded";
       "--delete", Unit (fun () -> config.delete <- true), " enable `delete` on files";
       "--no-delete", Unit (fun () -> config.delete <- false), " disable `delete` on files";
       "-j", Int (fun j->config.j <- j), " maximum number of simultaneous connections";
