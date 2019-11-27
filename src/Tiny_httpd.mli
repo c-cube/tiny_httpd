@@ -322,7 +322,6 @@ type t
 (** A HTTP server. See {!create} for more details. *)
 
 val create :
-  ?ipv6:bool ->
   ?masksigpipe:bool ->
   ?max_connections:int ->
   ?new_thread:((unit -> unit) -> unit) ->
@@ -344,12 +343,16 @@ val create :
     could use a thread pool instead.
 
     @param max_connections maximum number of simultaneous connections.
-    @param addr the address (IPv4) to listen on. Default ["127.0.0.1"].
+    @param addr address (IPv4 or IPv6) to listen on. Default ["127.0.0.1"].
     @param port to listen on. Default [8080].
     *)
 
 val addr : t -> string
 (** Address on which the server listens. *)
+
+val is_ipv6 : t -> bool
+(** [is_ipv6 server] returns [true] iff the address of the server is an IPv6 address.
+    @since 0.3 *)
 
 val port : t -> int
 (** Port on which the server listens. *)

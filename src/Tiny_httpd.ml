@@ -518,7 +518,6 @@ type cb_path_handler = string Request.t -> Response.t
 type t = {
   addr: string;
   port: int;
-  ipv6: bool;
   sem_max_connections: Sem_.t;
   new_thread: (unit -> unit) -> unit;
   masksigpipe: bool;
@@ -558,14 +557,13 @@ let add_path_handler
   self.path_handlers <- ph :: self.path_handlers
 
 let create
-    ?(ipv6=false)
     ?(masksigpipe=true)
     ?(max_connections=32)
     ?(new_thread=(fun f -> ignore (Thread.create f () : Thread.t)))
     ?(addr="127.0.0.1") ?(port=8080) () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let max_connections = max 4 max_connections in
-  { new_thread; addr; port; masksigpipe; handler; ipv6;
+  { new_thread; addr; port; masksigpipe; handler;
     running= true; sem_max_connections=Sem_.create max_connections;
     path_handlers=[];
     cb_encode_resp=[]; cb_decode_req=[];
@@ -656,14 +654,17 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
   (try Unix.close client_sock with _ -> ());
   ()
 
+let is_ipv6 self = String.contains self.addr ':'
+
 let run (self:t) : (unit,_) result =
   try
     if self.masksigpipe then (
       ignore (Unix.sigprocmask Unix.SIG_BLOCK [Sys.sigpipe] : _ list);
     );
     let sock =
-      Unix.socket (if self.ipv6 then Unix.PF_INET6 else Unix.PF_INET)
-        Unix.SOCK_STREAM 0 in
+      Unix.socket (if is_ipv6 self then Unix.PF_INET6 else Unix.PF_INET)
+        Unix.SOCK_STREAM 0
+    in
     Unix.clear_nonblock sock;
     Unix.setsockopt sock Unix.SO_REUSEADDR true;
     Unix.setsockopt_optint sock Unix.SO_LINGER None;
