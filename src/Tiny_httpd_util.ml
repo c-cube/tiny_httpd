@@ -1,3 +1,14 @@
+
+(* test utils *)
+(*$inject
+  let pp_res f = function Ok x -> f x | Error e -> Printexc.to_string e
+  let pp_res_query = (Q.Print.(pp_res (list (pair string string))))
+  let err_map f = function Ok x-> Ok (f x) | Error e -> Error e
+  let sort_l l = List.sort compare l
+  let eq_sorted a b = (=) (err_map sort_l a)(err_map sort_l b)
+  let is_ascii_char c = Char.code c < 128
+*)
+
 let percent_encode ?(skip=fun _->false) s =
   let buf = Buffer.create (String.length s) in
   String.iter
@@ -10,6 +21,12 @@ let percent_encode ?(skip=fun _->false) s =
       | c -> Buffer.add_char buf c)
     s;
   Buffer.contents buf
+
+(*$= & ~printer:(fun s->s)
+  "hello%20world" (percent_encode "hello world")
+  "%23%25^%24%40^%40" (percent_encode "#%^$@^@")
+  "a%20ohm%2b5235%25%26%40%23%20---%20_" (percent_encode "a ohm+5235%&@# --- _")
+*)
 
 let hex_int (s:string) : int = Scanf.sscanf s "%x" (fun x->x)
 
@@ -35,6 +52,13 @@ let percent_decode (s:string) : _ option =
     Some (Buffer.contents buf)
   with Exit -> None
 
+(*$QR & ~count:1_000 ~long_factor:20
+    Q.string (fun s ->
+        String.iter (fun c -> Q.assume @@ is_ascii_char c) s;
+        match percent_decode (percent_encode s) with
+        | Some s' -> s=s'
+        | None -> Q.Test.fail_report "invalid percent encoding")
+*)
 
 let parse_query s : (_ list, _) result=
   let pairs = ref [] in
@@ -63,3 +87,19 @@ let parse_query s : (_ list, _) result=
     Ok !pairs
   with e -> Error e
 
+(*$= & ~printer:pp_res_query ~cmp:eq_sorted
+  (Ok ["a", "b"; "c", "d"]) (parse_query "a=b&c=d")
+*)
+
+(*$QR & ~long_factor:20 ~count:1_000
+    Q.(small_list (pair string string))
+      (fun l ->
+        List.iter (fun (a,b) ->
+            Q.assume (a<>"" && b<>"" );
+            String.iter (fun c -> Q.assume @@ is_ascii_char c) a;
+            String.iter (fun c -> Q.assume @@ is_ascii_char c) b;
+          ) l;
+        let s = String.concat "&"
+            (List.map (fun (x,y) -> percent_encode x ^"="^percent_encode y) l) in
+        eq_sorted (Ok l) (parse_query s))
+*)
