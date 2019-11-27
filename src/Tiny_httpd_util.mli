@@ -13,7 +13,7 @@ val percent_decode : string -> string option
 (** Inverse operation of {!percent_encode}.
     Can fail since some strings are not valid percent encodings. *)
 
-val parse_query : string -> ((string*string) list, exn) result
+val parse_query : string -> ((string*string) list, string) result
 (** Parse a query as a list of ['&'] or [';'] separated [key=value] pairs.
     The order might not be preserved.
     @since 0.3
