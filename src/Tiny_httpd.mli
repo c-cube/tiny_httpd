@@ -322,6 +322,7 @@ type t
 (** A HTTP server. See {!create} for more details. *)
 
 val create :
+  ?ipv6:bool ->
   ?masksigpipe:bool ->
   ?max_connections:int ->
   ?new_thread:((unit -> unit) -> unit) ->
