@@ -14,7 +14,7 @@ let _enable_debug b = _debug_on := b
 let _debug k =
   if !_debug_on then (
     k (fun fmt->
-       Printf.fprintf stdout "[thread %d]: " Thread.(id @@ self());
+       Printf.fprintf stdout "[http.thread %d]: " Thread.(id @@ self());
        Printf.kfprintf (fun oc -> Printf.fprintf oc "\n%!") stdout fmt)
   )
 
