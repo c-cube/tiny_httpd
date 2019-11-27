@@ -35,3 +35,31 @@ let percent_decode (s:string) : _ option =
     Some (Buffer.contents buf)
   with Exit -> None
 
+
+let parse_query s : (_ list, _) result=
+  let pairs = ref [] in
+  let is_sep_ = function '&' | ';' -> true | _ -> false in
+  try
+    let i = ref 0 in
+    let j = ref 0 in
+    let parse_pair () =
+      let eq = String.index_from s !i '=' in
+      let k = String.sub s !i (eq- !i) in
+      let v = String.sub s (eq+1) (!j-eq-1) in
+      pairs := (k,v) :: !pairs;
+    in
+    while !i < String.length s do
+      while !j < String.length s && not (is_sep_ (String.get s !j)) do incr j done;
+      if !j < String.length s then (
+        assert (is_sep_ (String.get s !j));
+        parse_pair();
+        i := !j+1;
+        j := !i;
+      ) else (
+        parse_pair();
+        i := String.length s; (* done *)
+      )
+    done;
+    Ok !pairs
+  with e -> Error e
+
