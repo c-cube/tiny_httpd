@@ -120,17 +120,14 @@ let serve ~config (dir:string) : _ result =
       (fun _ _  -> S.Response.make_raw ~code:405 "delete not allowed");
   );
   if config.upload then (
-    S.add_path_handler server ~meth:`PUT "/%s"
+    S.add_path_handler_stream server ~meth:`PUT "/%s"
       ~accept:(fun req ->
           match S.Request.get_header_int req "Content-Length" with
           | Some n when n > config.max_upload_size ->
             Error (403, "max upload size is " ^ string_of_int config.max_upload_size)
           | Some _ when contains_dot_dot req.S.Request.path ->
             Error (403, "invalid path (contains '..')")
-          | Some _ -> Ok ()
-          | None ->
-            Error (411, "must know size before hand: max upload size is " ^
-                        string_of_int config.max_upload_size)
+          | _ -> Ok ()
         )
       (fun path req ->
          let fpath = dir // path in
@@ -140,7 +137,8 @@ let serve ~config (dir:string) : _ result =
              S.Response.fail_raise ~code:403 "cannot upload to %S: %s"
                path (Printexc.to_string e)
          in
-         output_string oc req.S.Request.body;
+         let req = S.Request.limit_body_size ~max_size:config.max_upload_size req in
+         S.Byte_stream.to_chan oc req.S.Request.body;
          flush oc;
          close_out oc;
          S.Response.make_raw ~code:201 "upload successful"

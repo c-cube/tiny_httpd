@@ -59,6 +59,12 @@ module Byte_stream = struct
 
   let close self = self.bs_close()
 
+  let empty = {
+    bs_fill_buf=(fun () -> Bytes.empty, 0, 0);
+    bs_consume=(fun _ -> ());
+    bs_close=(fun () -> ());
+  }
+
   let of_chan_ ~close ic : t =
     let i = ref 0 in
     let len = ref 0 in
@@ -76,7 +82,19 @@ module Byte_stream = struct
   let of_chan = of_chan_ ~close:close_in
   let of_chan_close_noerr = of_chan_ ~close:close_in_noerr
 
+  let rec iter f (self:t) : unit =
+    let s, i, len = self.bs_fill_buf () in
+    if len > 0 then (
+      f s i len;
+      self.bs_consume len;
+      (iter [@tailcall]) f self
+    )
+
+  let to_chan (oc:out_channel) (self:t) =
+    iter (fun s i len -> output oc s i len) self
+
   let of_bytes ?(i=0) ?len s : t =
+    (* invariant: !i+!len is constant *)
     let len =
       ref (
         match len with
@@ -87,8 +105,11 @@ module Byte_stream = struct
     let i = ref i in
     { bs_fill_buf=(fun () -> s, !i, !len);
       bs_close=(fun () -> ());
-      bs_consume=(fun n -> i := !i + n; len := !len - n);
+      bs_consume=(fun n -> assert (n<= !len); i := !i + n; len := !len - n);
     }
+
+  let of_string s : t =
+    of_bytes (Bytes.unsafe_of_string s)
 
   let with_file file f =
     let ic = open_in file in
@@ -103,11 +124,11 @@ module Byte_stream = struct
   (* Read as much as possible into [buf]. *)
   let read_into_buf (self:t) (buf:Buf_.t) : int =
     let s, i, len = self.bs_fill_buf () in
-     if len > 0 then (
-       Buf_.add_bytes buf s i len;
-       self.bs_consume len;
-     );
-     len
+    if len > 0 then (
+      Buf_.add_bytes buf s i len;
+      self.bs_consume len;
+    );
+    len
 
   let read_all ?(buf=Buf_.create()) (self:t) : string =
     let continue = ref true in
@@ -283,12 +304,6 @@ module Request = struct
       (Meth.to_string self.meth) self.host Headers.pp self.headers
       self.path self.body
 
-  let read_body_exact (bs:byte_stream) (n:int) : string =
-    let bytes = Bytes.make n ' ' in
-    Byte_stream.read_exactly_ bs bytes n
-      ~too_short:(fun () -> bad_reqf 400 "body is too short");
-    Bytes.unsafe_to_string bytes
-
   (* decode a "chunked" stream into a normal stream *)
   let read_stream_chunked_ ?(buf=Buf_.create()) (bs:byte_stream) : byte_stream =
     let read_next_chunk_len () : int =
@@ -313,6 +328,7 @@ module Request = struct
            if !offset >= !len then (
              if !chunk_size = 0 && !refill then (
                chunk_size := read_next_chunk_len();
+               _debug (fun k->k"read next chunk of size %d" !chunk_size);
              );
              offset := 0;
              len := 0;
@@ -331,29 +347,53 @@ module Request = struct
            bytes, !offset, !len
         );
       bs_consume=(fun n -> offset := !offset + n);
-      bs_close=(fun () -> Byte_stream.close bs);
+      bs_close=(fun () ->
+          (* close this overlay, do not close underlying stream *)
+          len := 0; refill:= false);
     }
 
-  let read_body_chunked ~tr_stream ~buf ~size:max_size (bs:byte_stream) : string =
-    _debug (fun k->k "read body with chunked encoding (max-size: %d)" max_size);
-    let is = tr_stream @@ read_stream_chunked_ ~buf bs in
-    let buf_res = Buf_.create() in (* store the accumulated chunks *)
-    (* TODO: extract this as a function [read_all_up_to ~max_size is]? *)
-    let rec read_chunks () =
-      let n = Byte_stream.read_into_buf is buf_res in
-      if n = 0 then (
-        Buf_.contents buf_res (* done *)
-      ) else (
-        (* is the body bigger than expected? *)
-        if max_size>0 && Buf_.size buf_res > max_size then (
-          bad_reqf 413
-            "body size was supposed to be %d, but at least %d bytes received"
-            max_size (Buf_.size buf_res)
-        );
-        read_chunks()
-      )
-    in
-    read_chunks()
+  let limit_body_size_ ~max_size (bs:byte_stream) : byte_stream =
+    _debug (fun k->k "limit size of body to max-size=%d" max_size);
+    let size = ref 0 in
+    { bs_fill_buf = bs.bs_fill_buf;
+      bs_close=bs.bs_close;
+      bs_consume = (fun n ->
+          size := !size + n;
+          if !size > max_size then (
+            (* read too much *)
+            bad_reqf 413
+              "body size was supposed to be %d, but at least %d bytes received"
+              max_size !size
+          );
+          bs.bs_consume n);
+    }
+
+  let limit_body_size ~max_size (req:byte_stream t) : byte_stream t =
+    { req with body=limit_body_size_ ~max_size req.body }
+
+  (* read exactly [size] bytes from the stream *)
+  let read_exactly ~size (bs:byte_stream) : byte_stream =
+    if size=0 then (
+      Byte_stream.empty
+    ) else (
+      let size = ref size in
+      { bs_fill_buf = (fun () ->
+            let buf, i, len = bs.bs_fill_buf () in
+            let len = min len !size in
+            if len = 0 && !size > 0 then (
+              bad_reqf 400 "body is too short"
+            );
+            buf, i, len
+          );
+        bs_close=(fun () ->
+            (* do not close underlying stream *)
+            size := 0);
+        bs_consume = (fun n ->
+            let n = min n !size in
+            size := !size - n;
+            bs.bs_consume n);
+      }
+    )
 
   (* parse request, but not body (yet) *)
   let parse_req_start ~buf (bs:byte_stream) : unit t option resp_result =
@@ -379,7 +419,7 @@ module Request = struct
 
   (* parse body, given the headers.
      @param tr_stream a transformation of the input stream. *)
-  let parse_body_ ~tr_stream ~buf (req:byte_stream t) : string t resp_result =
+  let parse_body_ ~tr_stream ~buf (req:byte_stream t) : byte_stream t resp_result =
     try
       let size =
         match List.assoc "Content-Length" req.headers |> int_of_string with
@@ -389,9 +429,12 @@ module Request = struct
       in
       let body =
         match get_header ~f:String.trim req "Transfer-Encoding" with
-        | None -> read_body_exact (tr_stream req.body) size
+        | None -> read_exactly ~size @@ tr_stream req.body
         | Some "chunked" ->
-          read_body_chunked ~tr_stream ~buf ~size req.body (* body sent by chunks *)
+          let bs =
+            read_stream_chunked_ ~buf @@ tr_stream req.body (* body sent by chunks *)
+          in
+          if size>0 then limit_body_size_ ~max_size:size bs else bs
         | Some s -> bad_reqf 500 "cannot handle transfer encoding: %s" s
       in
       Ok {req with body}
@@ -513,7 +556,7 @@ module Sem_ = struct
     Mutex.unlock t.mutex
 end
 
-type cb_path_handler = string Request.t -> Response.t
+type cb_path_handler = byte_stream Request.t -> Response.t
 
 type t = {
   addr: string;
@@ -525,7 +568,7 @@ type t = {
   mutable path_handlers : (unit Request.t -> cb_path_handler resp_result option) list;
   mutable cb_decode_req:
     (unit Request.t -> (unit Request.t * (byte_stream -> byte_stream)) option) list;
-  mutable cb_encode_resp: (string Request.t -> Response.t -> Response.t option) list;
+  mutable cb_encode_resp: (unit Request.t -> Response.t -> Response.t option) list;
   mutable running: bool;
 }
 
@@ -536,9 +579,9 @@ let add_decode_request_cb self f =  self.cb_decode_req <- f :: self.cb_decode_re
 let add_encode_response_cb self f = self.cb_encode_resp <- f :: self.cb_encode_resp
 let set_top_handler self f = self.handler <- f
 
-let add_path_handler
+let add_path_handler_
     ?(accept=fun _req -> Ok ())
-    ?meth self fmt f =
+    ?meth ~tr_req self fmt f =
   let ph req: cb_path_handler resp_result option =
     match meth with
     | Some m when m <> req.Request.meth -> None (* ignore *)
@@ -547,7 +590,7 @@ let add_path_handler
         | handler ->
           (* we have a handler, do we accept the request based on its headers? *)
           begin match accept req with
-            | Ok () -> Some (Ok handler)
+            | Ok () -> Some (Ok (fun req -> handler @@ tr_req req))
             | Error _ as e -> Some e
           end
         | exception _ ->
@@ -555,6 +598,12 @@ let add_path_handler
       end
   in
   self.path_handlers <- ph :: self.path_handlers
+
+let add_path_handler ?accept ?meth self fmt f=
+  add_path_handler_ ?accept ?meth ~tr_req:Request.read_body_full self fmt f
+
+let add_path_handler_stream ?accept ?meth self fmt f=
+  add_path_handler_ ?accept ?meth ~tr_req:(fun x->x) self fmt f
 
 let create
     ?(masksigpipe=true)
@@ -603,7 +652,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
           let handler =
             match find_map (fun ph -> ph req) self.path_handlers with
             | Some f -> unwrap_resp_result f
-            | None -> self.handler
+            | None -> (fun req -> self.handler @@ Request.read_body_full req)
           in
           (* handle expectations *)
           begin match Request.get_header ~f:String.trim req "Expect" with
@@ -614,7 +663,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
             | None -> ()
           end;
           (* preprocess request's input stream *)
-          let req, tr_stream =
+          let req0, tr_stream =
             List.fold_left
               (fun (req,tr) cb ->
                  match cb req with
@@ -624,13 +673,13 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
           in
           (* now actually read request's body *)
           let req =
-            Request.parse_body_ ~tr_stream ~buf {req with body=is}
+            Request.parse_body_ ~tr_stream ~buf {req0 with body=is}
             |> unwrap_resp_result
           in
           let resp = handler req in
           (* post-process response *)
           List.fold_left
-            (fun resp cb -> match cb req resp with None -> resp | Some r' -> r')
+            (fun resp cb -> match cb req0 resp with None -> resp | Some r' -> r')
             resp self.cb_encode_resp
         with
         | Bad_req (code,s) ->

@@ -107,6 +107,8 @@ module Byte_stream : sig
 
   val close : t -> unit
 
+  val empty : t
+
   val of_chan : in_channel -> t
   (** Make a buffered stream from the given channel. *)
 
@@ -116,6 +118,16 @@ module Byte_stream : sig
   val of_bytes : ?i:int -> ?len:int -> bytes -> t
   (** A stream that just returns the slice of bytes starting from [i]
       and of length [len]. *)
+
+  val of_string : string -> t
+
+  val iter : (bytes -> int -> int -> unit) -> t -> unit
+  (** Iterate on the chunks of the stream
+      @since NEXT_RELEASE *)
+
+  val to_chan : out_channel -> t -> unit
+  (** Write the stream to the channel.
+      @since NEXT_RELEASE *)
 
   val with_file : string -> (t -> 'a) -> 'a
   (** Open a file with given name, and obtain an input stream
@@ -223,6 +235,12 @@ module Request : sig
 
   val body : 'b t -> 'b
   (** Request body, possibly empty. *)
+
+  val limit_body_size : max_size:int -> byte_stream t -> byte_stream t
+  (** Limit the body size to [max_size] bytes, or return
+      a [413] error.
+      @since 0.3
+  *)
 
   val read_body_full : byte_stream t -> string t
   (** Read the whole body into a string. Potentially blocking. *)
@@ -368,12 +386,12 @@ val add_decode_request_cb :
 *)
 
 val add_encode_response_cb:
-  t -> (string Request.t -> Response.t -> Response.t option) -> unit
+  t -> (unit Request.t -> Response.t -> Response.t option) -> unit
 (** Add a callback for every request/response pair.
     Similarly to {!add_encode_response_cb} the callback can return a new
     response, for example to compress it.
-    The callback is given the fully parsed query as well as the current
-    response.
+    The callback is given the query with only its headers,
+    as well as the current response.
 *)
 
 val set_top_handler : t -> (string Request.t -> Response.t) -> unit
@@ -410,6 +428,19 @@ val add_path_handler :
     See the {!http_of_dir} program for an example of how to use [accept] to
     filter uploads that are too large before the upload even starts.
 *)
+
+val add_path_handler_stream :
+  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?meth:Meth.t ->
+  t ->
+  ('a, Scanf.Scanning.in_channel,
+   'b, 'c -> byte_stream Request.t -> Response.t, 'a -> 'd, 'd) format6 ->
+  'c -> unit
+(** Similar to {!add_path_handler}, but where the body of the request
+    is a stream of bytes that has not been read yet.
+    This is useful when one wants to stream the body directly into a parser,
+    json decoder (such as [Jsonm]) or into a file.
+    @since 0.3 *)
 
 val stop : t -> unit
 (** Ask the server to stop. This might not have an immediate effect
