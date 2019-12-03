@@ -358,7 +358,14 @@ module Request = struct
   (* decode a "chunked" stream into a normal stream *)
   let read_stream_chunked_ ?(buf=Buf_.create()) (bs:byte_stream) : byte_stream =
     _debug (fun k->k "body: start reading chunked stream...");
+    let first = ref true in
     let read_next_chunk_len () : int =
+      if !first then (
+        first := false
+      ) else (
+        let line = Byte_stream.read_line ~buf bs in
+        if String.trim line <> "" then bad_reqf 400 "expected crlf between chunks";
+      );
       let line = Byte_stream.read_line ~buf bs in
       (* parse chunk length, ignore extensions *)
       let chunk_size = (
@@ -370,7 +377,7 @@ module Request = struct
       chunk_size
     in
     let refill = ref true in
-    let bytes = Bytes.make (16 * 4096)  ' ' in
+    let bytes = Bytes.make (16 * 4096)  ' ' in (* internal buffer, 16kb *)
     let offset = ref 0 in
     let len = ref 0 in
     let chunk_size = ref 0 in
@@ -380,7 +387,7 @@ module Request = struct
            if !offset >= !len then (
              if !chunk_size = 0 && !refill then (
                chunk_size := read_next_chunk_len();
-               _debug (fun k->k"read next chunk of size %d" !chunk_size);
+               (* _debug (fun k->k"read next chunk of size %d" !chunk_size); *)
              );
              offset := 0;
              len := 0;
@@ -406,7 +413,7 @@ module Request = struct
 
   let limit_body_size_ ~max_size (bs:byte_stream) : byte_stream =
     _debug (fun k->k "limit size of body to max-size=%d" max_size);
-    Byte_stream.limit_size_to ~max_size ~close_rec:true bs
+    Byte_stream.limit_size_to ~max_size ~close_rec:false bs
       ~too_big:(fun size ->
           (* read too much *)
           bad_reqf 413
@@ -673,8 +680,9 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
       let res = Response.make_raw ~code:c s in
       begin
         try Response.output_ oc res
-        with Sys_error _ -> continue := false
-      end
+        with Sys_error _ -> ()
+      end;
+      continue := false
     | Ok (Some req) ->
       let res =
         try
