@@ -123,11 +123,11 @@ module Byte_stream : sig
 
   val iter : (bytes -> int -> int -> unit) -> t -> unit
   (** Iterate on the chunks of the stream
-      @since NEXT_RELEASE *)
+      @since 0.3 *)
 
   val to_chan : out_channel -> t -> unit
   (** Write the stream to the channel.
-      @since NEXT_RELEASE *)
+      @since 0.3 *)
 
   val with_file : string -> (t -> 'a) -> 'a
   (** Open a file with given name, and obtain an input stream
