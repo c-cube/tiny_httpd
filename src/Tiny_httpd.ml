@@ -577,7 +577,7 @@ module Response = struct
   let output_ (oc:out_channel) (self:t) : unit =
     Printf.fprintf oc "HTTP/1.1 %d %s\r\n" self.code (Response_code.descr self.code);
     List.iter (fun (k,v) -> Printf.fprintf oc "%s: %s\r\n" k v) self.headers;
-    Printf.fprintf oc "\r\n";
+    output_string oc "\r\n";
     begin match self.body with
       | `String "" -> ()
       | `String s -> output_string oc s;

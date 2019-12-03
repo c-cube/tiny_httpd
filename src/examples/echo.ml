@@ -1,11 +1,6 @@
 
 module S = Tiny_httpd
 
-let debug_ k =
-  if None<>Sys.getenv_opt "HTTP_DBG" then (
-    k (fun fmt -> Printf.kfprintf (fun oc -> k (Printf.fprintf oc)) stdout fmt)
-  )
-
 let () =
   let port_ = ref 8080 in
   let j = ref 32 in
@@ -24,7 +19,7 @@ let () =
     "/echo" (fun req -> S.Response.make_string (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
   S.add_path_handler ~meth:`PUT server
     "/upload/%s" (fun path req ->
-        debug_ (fun k->k "start upload %S\n%!" path);
+        S._debug (fun k->k "start upload %S\n%!" path);
         try
           let oc = open_out @@ "/tmp/" ^ path in
           output_string oc req.S.Request.body;
