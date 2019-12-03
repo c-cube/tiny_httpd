@@ -141,6 +141,7 @@ let serve ~config (dir:string) : _ result =
          S.Byte_stream.to_chan oc req.S.Request.body;
          flush oc;
          close_out oc;
+         S._debug (fun k->k "done uploading");
          S.Response.make_raw ~code:201 "upload successful"
       )
   ) else (
