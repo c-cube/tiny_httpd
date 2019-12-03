@@ -41,7 +41,7 @@ module Buf_ = struct
 
   let add_bytes (self:t) s i len : unit =
     if self.i + len >= Bytes.length self.bytes then (
-      resize self (self.i + len + 10);
+      resize self (self.i + self.i / 2 + len + 10);
     );
     Bytes.blit s i self.bytes self.i len;
     self.i <- self.i + len
