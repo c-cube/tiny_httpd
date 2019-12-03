@@ -7,12 +7,15 @@ let debug_ k =
   )
 
 let () =
+  let port_ = ref 8080 in
   let j = ref 32 in
   Arg.parse (Arg.align [
+      "--port", Arg.Set_int port_, " set port";
+      "-p", Arg.Set_int port_, " set port";
       "--debug", Arg.Unit (fun () -> S._enable_debug true), " enable debug";
       "-j", Arg.Set_int j, " maximum number of connections";
     ]) (fun _ -> raise (Arg.Bad "")) "echo [option]*";
-  let server = S.create ~max_connections:!j () in
+  let server = S.create ~port:!port_ ~max_connections:!j () in
   (* say hello *)
   S.add_path_handler ~meth:`GET server
     "/hello/%s@/" (fun name _req -> S.Response.make_string (Ok ("hello " ^name ^"!\n")));
