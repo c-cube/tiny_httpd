@@ -67,6 +67,14 @@ Why not? If you just want a super basic local server (perhaps for exposing
 data from a local demon, like Cups or Syncthing do), no need for a ton of
 dependencies or high scalability libraries.
 
+Use cases might include:
+
+- serve content directly from a static blog generator
+- provide a web UI to some tool (like CUPS and syncthing do)
+- implement a basic monitoring page for a service
+- provide a simple json API for a service, on top of http
+- use `http_of_dir` to serve odoc-generated docs or some assets directory
+
 ## Documentation
 
 See https://c-cube.github.io/tiny_httpd
