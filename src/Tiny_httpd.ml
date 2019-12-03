@@ -488,7 +488,29 @@ module Request = struct
     with
     | Bad_req _ as e -> raise e
     | e -> bad_reqf 500 "failed to read body: %s" (Printexc.to_string e)
+
+  module Internal_ = struct
+    let parse_req_start ?(buf=Buf_.create()) bs =
+      parse_req_start ~buf bs |> unwrap_resp_result
+
+    let parse_body ?(buf=Buf_.create()) req bs : _ t =
+      parse_body_ ~tr_stream:(fun s->s) ~buf {req with body=bs} |> unwrap_resp_result
+  end
 end
+
+(*$R
+  let q = "GET hello HTTP/1.1\r\nHost: coucou\r\nContent-Length: 11\r\n\r\nsalutationsSOMEJUNK" in
+  let str = Byte_stream.of_string q in
+  let r = Request.Internal_.parse_req_start str in
+  match r with
+  | None -> assert_failure "should parse"
+  | Some req ->
+    assert_equal (Some "coucou") (Headers.get "Host" req.Request.headers);
+    assert_equal "hello" req.Request.path;
+    let req = Request.Internal_.parse_body req str |> Request.read_body_full in
+    assert_equal ~printer:(fun s->s) "salutations" req.Request.body;
+    ()
+*)
 
 module Response = struct
   type body = [`String of string | `Stream of byte_stream]

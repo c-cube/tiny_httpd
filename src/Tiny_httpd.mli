@@ -244,6 +244,14 @@ module Request : sig
 
   val read_body_full : byte_stream t -> string t
   (** Read the whole body into a string. Potentially blocking. *)
+
+  (**/**)
+  (* for testing purpose, do not use *)
+  module Internal_ : sig
+    val parse_req_start : ?buf:Buf_.t -> byte_stream -> unit t option
+    val parse_body : ?buf:Buf_.t -> unit t -> byte_stream -> byte_stream t
+  end
+  (**/**)
 end
 
 (** {2 Response Codes} *)
