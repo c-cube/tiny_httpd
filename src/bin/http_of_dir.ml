@@ -89,6 +89,15 @@ let html_list_dir ~top ~parent d : string =
   Printf.bprintf body "</ul></body>\n";
   Buffer.contents body
 
+let finally_ ~h x f =
+  try
+    let y = f x in
+    h x;
+    y
+  with e ->
+    h x;
+    raise e
+
 (* TODO
 let wdays = [|"Sun"; "Mon"; "Tue"; "Wed"; "Thu"; "Fri"; "Sat"|]
 let date_of_time (f:float) : string =
@@ -177,8 +186,17 @@ let serve ~config (dir:string) : _ result =
        ) else (
          try
            let ic = open_in full_path in
+           let mime_type =
+             try
+               let p = Unix.open_process_in (Printf.sprintf "file -i -b %S" full_path) in
+               finally_ ~h:(fun p->ignore @@ Unix.close_process_in p) p
+                (fun p ->
+                 try ["Content-Type", String.trim (input_line p)]
+                 with _ -> [])
+             with _ -> []
+           in
            S.Response.make_raw_stream
-             ~headers:["Etag", Lazy.force mtime]
+             ~headers:(mime_type@["Etag", Lazy.force mtime])
              ~code:200 (S.Byte_stream.of_chan ic)
          with e ->
            S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e)
