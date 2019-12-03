@@ -735,10 +735,10 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
       continue := false
     | exception Sys_error _ ->
       continue := false; (* connection broken somehow *)
-      Unix.close client_sock;
   done;
   _debug (fun k->k "done with client, exiting");
-  (try Unix.close client_sock with _ -> ());
+  (try Unix.close client_sock
+   with e -> _debug (fun k->k "error when closing sock: %s" (Printexc.to_string e)));
   ()
 
 let is_ipv6 self = String.contains self.addr ':'
