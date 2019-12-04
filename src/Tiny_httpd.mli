@@ -1,4 +1,3 @@
-
 (** {1 Tiny Http Server}
 
     This library implements a very simple, basic HTTP/1.1 server using blocking
@@ -112,6 +111,18 @@ module Byte_stream : sig
   val of_chan : in_channel -> t
   (** Make a buffered stream from the given channel. *)
 
+  val of_fd : Unix.file_descr -> t
+  (** Make a buffered stream from the given unix filedescriptor, which
+      must be readable.
+      @since 0.4
+  *)
+
+  val to_fd : Unix.file_descr -> t -> unit
+  (** Make a buffered stream from the given unix filedescriptor, which
+      must be readable.
+      @since 0.4
+  *)
+
   val of_chan_close_noerr : in_channel -> t
   (** Same as {!of_chan} but the [close] method will never fail. *)
 
@@ -121,8 +132,13 @@ module Byte_stream : sig
 
   val of_string : string -> t
 
+  val iter_full : (bytes -> int -> int -> int) -> t -> unit
+  (** Iterate on the chunks, consuming chunks partially.
+      The function returns how many bytes were actually consumed.
+      @since 0.4 *)
+
   val iter : (bytes -> int -> int -> unit) -> t -> unit
-  (** Iterate on the chunks of the stream
+  (** Iterate on the chunks of the stream.
       @since 0.3 *)
 
   val to_chan : out_channel -> t -> unit
