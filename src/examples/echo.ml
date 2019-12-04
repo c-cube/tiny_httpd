@@ -17,6 +17,8 @@ let () =
   (* echo request *)
   S.add_path_handler server
     "/echo" (fun req -> S.Response.make_string (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
+  S.add_path_handler ~meth:`POST server
+    "/debug/%B" (fun b _req -> S._enable_debug b; S.Response.make_string (Ok "ok"));
   S.add_path_handler ~meth:`PUT server
     "/upload/%s" (fun path req ->
         S._debug (fun k->k "start upload %S\n%!" path);
