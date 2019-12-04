@@ -687,9 +687,7 @@ let find_map f l =
         | None -> aux f l'
   in aux f l
 
-let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
-  let ic = Unix.in_channel_of_descr client_sock in
-  let oc = Unix.out_channel_of_descr client_sock in
+let handle_client_ (self:t) ic oc : unit =
   let buf = Buf_.create() in
   let is = Byte_stream.of_chan ic in
   let continue = ref true in
@@ -758,8 +756,6 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
       continue := false; (* connection broken somehow *)
   done;
   _debug (fun k->k "done with client, exiting");
-  (try Unix.close client_sock
-   with e -> _debug (fun k->k "error when closing sock: %s" (Printexc.to_string e)));
   ()
 
 let is_ipv6 self = String.contains self.addr ':'
@@ -788,17 +784,25 @@ let run (self:t) : (unit,_) result =
 
     while self.running do
       (* limit concurrency *)
-      let client_sock, _ = Unix.accept sock in
       Sem_.acquire self.sem_max_connections;
+      let client_sock, _ = Unix.accept sock in
+      (try Unix.setsockopt_optint sock Unix.SO_LINGER None; with _ -> ());
       self.new_thread
         (fun () ->
+           let ic = Unix.in_channel_of_descr client_sock in
+           let oc = Unix.out_channel_of_descr client_sock in
+           let close_ () =
+             (try close_in_noerr ic; close_out_noerr oc;
+              with e ->
+                _debug (fun k->k "error when closing sock: %s" (Printexc.to_string e)));
+           in
            try
-             handle_client_ self client_sock;
+             handle_client_ self ic oc;
              Sem_.release self.sem_max_connections;
-             (try Unix.close client_sock with _ -> ());
+             close_();
            with e ->
              Sem_.release self.sem_max_connections;
-             (try Unix.close client_sock with _ -> ());
+             close_();
              raise e
         );
     done;
