@@ -598,19 +598,18 @@ module Sem_ = struct
     if n <= 0 then invalid_arg "Semaphore.create";
     { n; mutex=Mutex.create(); cond=Condition.create(); }
 
-  let acquire m t =
+  let acquire t =
     Mutex.lock t.mutex;
-    while t.n < m do
+    while t.n < 1 do
       Condition.wait t.cond t.mutex;
     done;
-    assert (t.n >= m);
-    t.n <- t.n - m;
-    Condition.broadcast t.cond;
+    assert (t.n >= 1);
+    t.n <- t.n - 1;
     Mutex.unlock t.mutex
 
-  let release m t =
+  let release t =
     Mutex.lock t.mutex;
-    t.n <- t.n + m;
+    t.n <- t.n + 1;
     Condition.broadcast t.cond;
     Mutex.unlock t.mutex
 end
@@ -779,19 +778,27 @@ let run (self:t) : (unit,_) result =
     Unix.setsockopt_optint sock Unix.SO_LINGER None;
     let inet_addr = Unix.inet_addr_of_string self.addr in
     Unix.bind sock (Unix.ADDR_INET (inet_addr, self.port));
-    Unix.listen sock (2 * self.sem_max_connections.Sem_.n);
+    Unix.listen sock (self.sem_max_connections.Sem_.n);
+
+      ignore @@ Thread.create (fun () ->
+          while true do
+            _debug (fun k->k "sem: %d" self.sem_max_connections.n);
+            Unix.sleep 1;
+          done) ();
+
     while self.running do
       (* limit concurrency *)
-      Sem_.acquire 1 self.sem_max_connections;
       let client_sock, _ = Unix.accept sock in
+      Sem_.acquire self.sem_max_connections;
       self.new_thread
         (fun () ->
            try
              handle_client_ self client_sock;
-             Sem_.release 1 self.sem_max_connections;
-           with e ->
+             Sem_.release self.sem_max_connections;
              (try Unix.close client_sock with _ -> ());
-             Sem_.release 1 self.sem_max_connections;
+           with e ->
+             Sem_.release self.sem_max_connections;
+             (try Unix.close client_sock with _ -> ());
              raise e
         );
     done;
