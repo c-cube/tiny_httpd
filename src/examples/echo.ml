@@ -19,6 +19,10 @@ let () =
     "/echo" (fun req -> S.Response.make_string (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
   S.add_path_handler ~meth:`POST server
     "/debug/%B" (fun b _req -> S._enable_debug b; S.Response.make_string (Ok "ok"));
+  S.add_path_handler ~meth:`POST server
+    "/compact/" (fun _req -> Gc.compact(); S.Response.make_string (Ok "gc.compact: done"));
+  S.add_path_handler ~meth:`POST server
+    "/quit/" (fun _req -> S.stop server; S.Response.make_string (Ok "bye"));
   S.add_path_handler ~meth:`PUT server
     "/upload/%s" (fun path req ->
         S._debug (fun k->k "start upload %S\n%!" path);
@@ -31,6 +35,7 @@ let () =
           S.Response.fail ~code:500 "couldn't upload file: %s" (Printexc.to_string e)
       );
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);
+  ignore @@ Thread.create (fun () -> Statmemprof_inuit.start 1e-4 300 2) ();
   match S.run server with
   | Ok () -> ()
   | Error e -> raise e

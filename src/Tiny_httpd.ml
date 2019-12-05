@@ -775,13 +775,6 @@ let run (self:t) : (unit,_) result =
     let inet_addr = Unix.inet_addr_of_string self.addr in
     Unix.bind sock (Unix.ADDR_INET (inet_addr, self.port));
     Unix.listen sock (self.sem_max_connections.Sem_.n);
-
-      ignore @@ Thread.create (fun () ->
-          while true do
-            _debug (fun k->k "sem: %d" self.sem_max_connections.n);
-            Unix.sleep 1;
-          done) ();
-
     while self.running do
       (* limit concurrency *)
       Sem_.acquire self.sem_max_connections;
