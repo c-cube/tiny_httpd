@@ -796,7 +796,7 @@ let run (self:t) : (unit,_) result =
            with e ->
              Sem_.release self.sem_max_connections;
              close_();
-             raise e
+             _debug (fun k->k "error in thread: %s" (Printexc.to_string e));
         );
     done;
     Ok ()
