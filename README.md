@@ -5,6 +5,9 @@ Minimal HTTP server using good old threads and `Scanf` for routing.
 
 Free from all forms of `ppx`, async monads, etc.
 
+**Note**: it can be useful to add the `jemalloc` opam package for long running
+server, as it does a good job at controlling memory usage.
+
 The basic echo server from `src/examples/echo.ml`:
 
 ```ocaml
