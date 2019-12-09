@@ -13,6 +13,10 @@ val percent_decode : string -> string option
 (** Inverse operation of {!percent_encode}.
     Can fail since some strings are not valid percent encodings. *)
 
+val get_query : string -> string
+(** Obtain the query part of a path
+    @since NEXT_RELEASE *)
+
 val parse_query : string -> ((string*string) list, string) result
 (** Parse a query as a list of ['&'] or [';'] separated [key=value] pairs.
     The order might not be preserved.

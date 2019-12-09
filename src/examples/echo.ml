@@ -16,7 +16,13 @@ let () =
     "/hello/%s@/" (fun name _req -> S.Response.make_string (Ok ("hello " ^name ^"!\n")));
   (* echo request *)
   S.add_path_handler server
-    "/echo" (fun req -> S.Response.make_string (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
+    "/echo" (fun req ->
+        let q =
+          S.Request.query req |> List.map (fun (k,v) -> Printf.sprintf "%S = %S" k v)
+          |> String.concat ";"
+        in
+        S.Response.make_string
+          (Ok (Format.asprintf "echo:@ %a@ (query: %s)@." S.Request.pp req q)));
   S.add_path_handler ~meth:`PUT server
     "/upload/%s" (fun path req ->
         S._debug (fun k->k "start upload %S\n%!" path);

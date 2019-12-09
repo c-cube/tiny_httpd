@@ -233,6 +233,10 @@ module Request : sig
   val path : _ t -> string
   (** Request path. *)
 
+  val query : _ t -> (string*string) list
+  (** Decode the query part of the {!path} field
+      @since NEXT_RELEASE *)
+
   val body : 'b t -> 'b
   (** Request body, possibly empty. *)
 

@@ -351,6 +351,11 @@ module Request = struct
   let path self = self.path
   let body self = self.body
 
+  let query self =
+    match Tiny_httpd_util.(parse_query @@ get_query self.path) with
+    | Ok l -> l
+    | Error e -> bad_reqf 400 "invalid query: %s" e
+
   let get_header ?f self h = Headers.get ?f h self.headers
   let get_header_int self h = match get_header self h with
     | Some x -> (try Some (int_of_string x) with _ -> None)

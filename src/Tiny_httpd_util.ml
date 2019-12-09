@@ -66,6 +66,11 @@ let percent_decode (s:string) : _ option =
 
 exception Invalid_query
 
+let get_query s : string =
+  match String.index s '?' with
+  | i -> String.sub s (i+1) (String.length s-i-1)
+  | exception Not_found -> ""
+
 let parse_query s : (_ list, string) result=
   let pairs = ref [] in
   let is_sep_ = function '&' | ';' -> true | _ -> false in
