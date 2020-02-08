@@ -268,7 +268,7 @@ module Response_code = struct
     | n -> "Unknown response code " ^ string_of_int n (* TODO *)
 end
 
-type 'a resp_result = ('a, Response_code.t * string) result 
+type 'a resp_result = ('a, Response_code.t * string) result
 let unwrap_resp_result = function
   | Ok x -> x
   | Error (c,s) -> raise (Bad_req (c,s))
