@@ -1,4 +1,11 @@
 
+## 0.4
+
+- easy accessor to the query parameters in path
+- fix: header field names are case insensitive
+- doc: add note on jemalloc in the readme
+- log error when closing client socket
+
 ## 0.3
 
 - feat(http_of_dir): use `file` to guess mime type of file

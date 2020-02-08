@@ -15,7 +15,7 @@ val percent_decode : string -> string option
 
 val get_query : string -> string
 (** Obtain the query part of a path
-    @since NEXT_RELEASE *)
+    @since 0.4 *)
 
 val parse_query : string -> ((string*string) list, string) result
 (** Parse a query as a list of ['&'] or [';'] separated [key=value] pairs.
