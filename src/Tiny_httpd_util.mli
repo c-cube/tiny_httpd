@@ -13,8 +13,16 @@ val percent_decode : string -> string option
 (** Inverse operation of {!percent_encode}.
     Can fail since some strings are not valid percent encodings. *)
 
+val split_query : string -> string * string
+(** Split a path between the path and the query
+    @since NEXT_RELEASE *)
+
+val get_non_query_path : string -> string
+(** get the part of the path that is not the query parameters.
+    @since NEXT_RELEASE *)
+
 val get_query : string -> string
-(** Obtain the query part of a path
+(** Obtain the query part of a path.
     @since 0.4 *)
 
 val parse_query : string -> ((string*string) list, string) result

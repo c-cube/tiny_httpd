@@ -66,10 +66,19 @@ let percent_decode (s:string) : _ option =
 
 exception Invalid_query
 
+let find_q_index_ s = String.index s '?'
+
+let get_non_query_path s =
+  match find_q_index_ s with
+  | i -> String.sub s 0 i
+  | exception Not_found -> s
+
 let get_query s : string =
-  match String.index s '?' with
+  match find_q_index_ s with
   | i -> String.sub s (i+1) (String.length s-i-1)
   | exception Not_found -> ""
+
+let split_query s = get_non_query_path s, get_query s
 
 let parse_query s : (_ list, string) result=
   let pairs = ref [] in
