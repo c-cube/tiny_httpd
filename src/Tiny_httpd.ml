@@ -351,6 +351,8 @@ module Request = struct
   let path self = self.path
   let body self = self.body
 
+  let non_query_path self = Tiny_httpd_util.get_non_query_path self.path
+
   let query self =
     match Tiny_httpd_util.(parse_query @@ get_query self.path) with
     | Ok l -> l
@@ -663,7 +665,7 @@ let add_path_handler_
     match meth with
     | Some m when m <> req.Request.meth -> None (* ignore *)
     | _ ->
-      begin match Scanf.sscanf req.Request.path fmt f with
+      begin match Scanf.sscanf (Request.non_query_path req) fmt f with
         | handler ->
           (* we have a handler, do we accept the request based on its headers? *)
           begin match accept req with
