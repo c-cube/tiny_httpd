@@ -3,7 +3,7 @@ version: "0.1"
 authors: ["Simon Cruanes"]
 maintainer: "simon.cruanes.2007@m4x.org"
 license: "MIT"
-description: "Interface to gzip for tiny_httpd"
+description: "Interface to camlzip for tiny_httpd"
 build: [
   ["dune" "build" "@install" "-p" name "-j" jobs]
   ["dune" "build" "@doc" "-p" name] {with-doc}
@@ -11,12 +11,12 @@ build: [
 ]
 depends: [
   "dune" { >= "1.1" }
-  "decompress"
+  "camlzip"
   "tiny_httpd" { = version }
   "ocaml" { >= "4.03.0" }
   "odoc" {with-doc}
 ]
-tags: [ "http" "thread" "server" "gzip" "decompress" ]
+tags: [ "http" "thread" "server" "gzip" "camlzip" ]
 homepage: "https://github.com/c-cube/tiny_httpd/"
 doc: "https://c-cube.github.io/tiny_httpd/"
 bug-reports: "https://github.com/c-cube/tiny_httpd/issues"
