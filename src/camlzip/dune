@@ -1,0 +1,7 @@
+
+(library
+  (name tiny_httpd_camlzip)
+  (public_name tiny_httpd_camlzip)
+  (synopsis "A wrapper around camlzip to bring compression to Tiny_httpd")
+  (flags :standard -safe-string -warn-error -a)
+  (libraries tiny_httpd camlzip))
