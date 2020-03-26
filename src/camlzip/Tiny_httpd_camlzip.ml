@@ -152,7 +152,7 @@ let cb_encode_compressed_stream
         headers=
           (resp.headers
            |> S.Headers.remove "Content-Length"
-           |> S.Headers.set "Transfer-Encoding" "deflate, chunked");
+           |> S.Headers.set "Content-Encoding" "deflate");
         body=`Stream (encode_deflate_stream_ ~buf_size str);
       }
   ) else None
