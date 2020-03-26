@@ -2,9 +2,9 @@
 module S = Tiny_httpd
 module BS = Tiny_httpd.Byte_stream
 
-let mk_decode_deflate_stream_ () (is:S.byte_stream) : S.byte_stream =
+let mk_decode_deflate_stream_ ~buf_size () (is:S.byte_stream) : S.byte_stream =
   S._debug (fun k->k "wrap stream with inflate.decode");
-  let buf = Bytes.make 4096 ' ' in
+  let buf = Bytes.make buf_size ' ' in
   let buf_len = ref 0 in
   let write_offset = ref 0 in
   let zlib_str = Zlib.inflate_init false in
@@ -48,14 +48,15 @@ let mk_decode_deflate_stream_ () (is:S.byte_stream) : S.byte_stream =
   in
   {S.bs_fill_buf; bs_consume; bs_close}
 
-let encode_deflate_stream_ (is:S.byte_stream) : S.byte_stream =
+let encode_deflate_stream_ ~buf_size (is:S.byte_stream) : S.byte_stream =
   S._debug (fun k->k "wrap stream with deflate.encode");
   let refill = ref true in
-  let buf = Bytes.make 4096 ' ' in
+  let buf = Bytes.make buf_size ' ' in
   let buf_len = ref 0 in
   let write_offset = ref 0 in
   let zlib_str = Zlib.deflate_init 4 false in
   let bs_close () =
+    S._debug (fun k->k "deflate: close");
     Zlib.deflate_end zlib_str;
     BS.close is
   in
@@ -84,7 +85,10 @@ let encode_deflate_stream_ (is:S.byte_stream) : S.byte_stream =
             S._debug
               (fun k->k "encode %d bytes as %d bytes using deflate (finished: %b)"
                   used_in used_out finished);
-            if finished then refill := false;
+            if finished then (
+              S._debug (fun k->k "deflate: finished");
+              refill := false;
+            );
           with Zlib.Error (e1,e2) ->
             S.Response.fail_raise ~code:400
               "deflate: error during compression:\n%s %s" e1 e2
@@ -120,7 +124,7 @@ let has_deflate s =
   try Scanf.sscanf s "deflate; %s" (fun _ -> true)
   with _ -> false
 
-let cb_decode_compressed_stream (req:unit S.Request.t) : _ option =
+let cb_decode_compressed_stream ~buf_size (req:unit S.Request.t) : _ option =
   match S.Request.get_header ~f:String.trim req "Transfer-Encoding" with
   (* TODO
     | Some "gzip" ->
@@ -128,15 +132,16 @@ let cb_decode_compressed_stream (req:unit S.Request.t) : _ option =
       Some (req', decode_gzip_stream_)
   *)
   | Some s when has_deflate s ->
-    begin match Scanf.sscanf s "deflate; %s" (fun s -> s) with
+    begin match Scanf.sscanf s "deflate, %s" (fun s -> s) with
       | tr' ->
         let req' = S.Request.set_header req "Transfer-Encoding" tr' in
-        Some (req', mk_decode_deflate_stream_ ())
+        Some (req', mk_decode_deflate_stream_ ~buf_size ())
       | exception _ -> None
     end
   | _ -> None
 
-let cb_encode_compressed_stream (req:_ S.Request.t) (resp:S.Response.t) : _ option =
+let cb_encode_compressed_stream
+    ~buf_size (req:_ S.Request.t) (resp:S.Response.t) : _ option =
   if accept_deflate req then (
     match resp.body with
     | `String _ -> None
@@ -147,14 +152,15 @@ let cb_encode_compressed_stream (req:_ S.Request.t) (resp:S.Response.t) : _ opti
         headers=
           (resp.headers
            |> S.Headers.remove "Content-Length"
-           |> S.Headers.set "Transfer-Coding" "deflate; chunked");
-        body=`Stream (encode_deflate_stream_ str);
+           |> S.Headers.set "Transfer-Encoding" "deflate, chunked");
+        body=`Stream (encode_deflate_stream_ ~buf_size str);
       }
   ) else None
 
-let setup (server:S.t) : unit =
-  S._debug (fun k->k "setup gzip support");
-  S.add_decode_request_cb server cb_decode_compressed_stream;
-  S.add_encode_response_cb server cb_encode_compressed_stream;
+let setup ?(buf_size=48 * 1_024) (server:S.t) : unit =
+  let buf_size = max buf_size 1_024 in
+  S._debug (fun k->k "setup gzip support (buf-size %d)" buf_size);
+  S.add_decode_request_cb server (cb_decode_compressed_stream ~buf_size);
+  S.add_encode_response_cb server (cb_encode_compressed_stream ~buf_size);
   ()
 
