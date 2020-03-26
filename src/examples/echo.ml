@@ -15,6 +15,26 @@ let () =
   (* say hello *)
   S.add_path_handler ~meth:`GET server
     "/hello/%s@/" (fun name _req -> S.Response.make_string (Ok ("hello " ^name ^"!\n")));
+  S.add_path_handler ~meth:`GET server
+    "/zcat/%s" (fun path _req ->
+        let path = match Tiny_httpd_util.percent_decode path with
+          | Some s -> s
+          | None -> S.Response.fail_raise ~code:404 "invalid path %S" path
+        in
+        let ic = open_in path in
+        let str = S.Byte_stream.of_chan ic in
+         let mime_type =
+           try
+             let p = Unix.open_process_in (Printf.sprintf "file -i -b %S" path) in
+             try
+               let s = ["Content-Type", String.trim (input_line p)] in
+               ignore @@ Unix.close_process_in p;
+               s
+             with _ -> ignore @@ Unix.close_process_in p; []
+           with _ -> []
+         in
+         S.Response.make_stream ~headers:mime_type (Ok str)
+      );
   (* echo request *)
   S.add_path_handler server
     "/echo" (fun req ->
@@ -24,12 +44,13 @@ let () =
         in
         S.Response.make_string
           (Ok (Format.asprintf "echo:@ %a@ (query: %s)@." S.Request.pp req q)));
-  S.add_path_handler ~meth:`PUT server
+  S.add_path_handler_stream ~meth:`PUT server
     "/upload/%s" (fun path req ->
-        S._debug (fun k->k "start upload %S\n%!" path);
+        S._debug (fun k->k "start upload %S, headers:\n%s\n\n%!" path
+                     (Format.asprintf "%a" S.Headers.pp (S.Request.headers req)));
         try
           let oc = open_out @@ "/tmp/" ^ path in
-          output_string oc req.S.Request.body;
+          S.Byte_stream.to_chan oc req.S.Request.body;
           flush oc;
           S.Response.make_string (Ok "uploaded file")
         with e ->
