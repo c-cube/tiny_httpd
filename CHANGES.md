@@ -1,4 +1,11 @@
 
+## 0.5
+
+- new `tiny_httpd_camlzip` library for handling `deflate` compression
+- feat: expose `Headers.empty`
+- fix: use the non-query path for routing
+- feat(util): add some query related utils
+
 ## 0.4
 
 - easy accessor to the query parameters in path

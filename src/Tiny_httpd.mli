@@ -82,15 +82,15 @@ module Buf_ : sig
 
   val bytes_slice : t -> bytes
   (** Access underlying slice of bytes.
-      @since NEXT_RELEASE *)
+      @since 0.5 *)
 
   val contents_and_clear : t -> string
   (** Get contents of the buffer and clear it.
-      @since NEXT_RELEASE *)
+      @since 0.5 *)
 
   val add_bytes : t -> bytes -> int -> int -> unit
   (** Append given bytes slice to the buffer.
-      @since NEXT_RELEASE *)
+      @since 0.5 *)
 end
 
 (** {2 Generic stream of data}
@@ -186,7 +186,7 @@ module Headers : sig
 
   val empty : t
   (** Empty list of headers
-      @since NEXT_RELEASE *)
+      @since 0.5 *)
 
   val get : ?f:(string->string) -> string -> t -> string option
   (** [get k headers] looks for the header field with key [k].

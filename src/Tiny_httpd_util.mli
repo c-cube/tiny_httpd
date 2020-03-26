@@ -15,11 +15,11 @@ val percent_decode : string -> string option
 
 val split_query : string -> string * string
 (** Split a path between the path and the query
-    @since NEXT_RELEASE *)
+    @since 0.5 *)
 
 val get_non_query_path : string -> string
 (** get the part of the path that is not the query parameters.
-    @since NEXT_RELEASE *)
+    @since 0.5 *)
 
 val get_query : string -> string
 (** Obtain the query part of a path.
