@@ -23,17 +23,17 @@ let () =
         in
         let ic = open_in path in
         let str = S.Byte_stream.of_chan ic in
-         let mime_type =
-           try
-             let p = Unix.open_process_in (Printf.sprintf "file -i -b %S" path) in
-             try
-               let s = ["Content-Type", String.trim (input_line p)] in
-               ignore @@ Unix.close_process_in p;
-               s
-             with _ -> ignore @@ Unix.close_process_in p; []
-           with _ -> []
-         in
-         S.Response.make_stream ~headers:mime_type (Ok str)
+        let mime_type =
+          try
+            let p = Unix.open_process_in (Printf.sprintf "file -i -b %S" path) in
+            try
+              let s = ["Content-Type", String.trim (input_line p)] in
+              ignore @@ Unix.close_process_in p;
+              s
+            with _ -> ignore @@ Unix.close_process_in p; []
+          with _ -> []
+        in
+        S.Response.make_stream ~headers:mime_type (Ok str)
       );
   (* echo request *)
   S.add_path_handler server
