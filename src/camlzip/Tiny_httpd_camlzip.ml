@@ -3,7 +3,7 @@ module S = Tiny_httpd
 module BS = Tiny_httpd.Byte_stream
 
 let mk_decode_deflate_stream_ ~buf_size () (is:S.byte_stream) : S.byte_stream =
-  S._debug (fun k->k "wrap stream with inflate.decode");
+  S._debug (fun k->k "wrap stream with deflate.decode");
   let buf = Bytes.make buf_size ' ' in
   let buf_len = ref 0 in
   let write_offset = ref 0 in
