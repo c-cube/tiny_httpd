@@ -14,7 +14,7 @@ jobs:
       with:
         ocaml-version: ${{ matrix.ocaml-version }}
     - run: opam pin -n .
-    - run: opam depext -yt tiny_httpd
+    - run: opam depext -yt tiny_httpd tiny_httpd_camlzip
     - run: opam install -t . --deps-only
     - run: opam exec -- dune build
     - run: opam exec -- dune runtest
