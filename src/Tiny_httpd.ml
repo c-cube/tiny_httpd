@@ -302,6 +302,7 @@ end
 
 module Headers = struct
   type t = (string * string) list
+  let empty = []
   let contains name headers =
     let name' = String.lowercase_ascii name in
     List.exists (fun (n, _) -> name'=n) headers

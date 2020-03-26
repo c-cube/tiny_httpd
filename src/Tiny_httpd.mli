@@ -184,6 +184,10 @@ module Headers : sig
       Neither the key nor the value can contain ['\r'] or ['\n'].
       See https://tools.ietf.org/html/rfc7230#section-3.2 *)
 
+  val empty : t
+  (** Empty list of headers
+      @since NEXT_RELEASE *)
+
   val get : ?f:(string->string) -> string -> t -> string option
   (** [get k headers] looks for the header field with key [k].
       @param f if provided, will transform the value before it is returned. *)
