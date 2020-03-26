@@ -121,7 +121,7 @@ let accept_deflate (req:_ S.Request.t) =
   | None -> false
 
 let has_deflate s =
-  try Scanf.sscanf s "deflate; %s" (fun _ -> true)
+  try Scanf.sscanf s "deflate, %s" (fun _ -> true)
   with _ -> false
 
 let cb_decode_compressed_stream ~buf_size (req:unit S.Request.t) : _ option =
