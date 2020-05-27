@@ -80,6 +80,36 @@ let get_query s : string =
 
 let split_query s = get_non_query_path s, get_query s
 
+let split_on_slash s : _ list =
+  let l = ref [] in
+  let i = ref 0 in
+  let n = String.length s in
+  while !i < n do
+    match String.index_from s !i '/' with
+    | exception Not_found ->
+      if !i < n then (
+        (* last component *)
+        l := String.sub s !i (n - !i) :: !l;
+      );
+      i := n (* done *)
+    | j ->
+      if j > !i then  (
+        l := String.sub s !i (j - !i) :: !l;
+      );
+      i := j+1;
+  done;
+  List.rev !l
+
+(*$= & ~printer:Q.Print.(list string)
+  ["a"; "b"] (split_on_slash "/a/b")
+  ["coucou"; "lol"] (split_on_slash "/coucou/lol")
+  ["a"; "b"; "c"] (split_on_slash "/a/b//c/")
+  ["a"; "b"] (split_on_slash "//a/b/")
+  ["a"] (split_on_slash "/a//")
+  [] (split_on_slash "/")
+  [] (split_on_slash "//")
+*)
+
 let parse_query s : (_ list, string) result=
   let pairs = ref [] in
   let is_sep_ = function '&' | ';' -> true | _ -> false in

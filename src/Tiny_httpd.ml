@@ -344,6 +344,8 @@ module Request = struct
     host: string;
     headers: Headers.t;
     path: string;
+    path_components: string list;
+    query: (string*string) list;
     body: 'body;
   }
 
@@ -355,24 +357,30 @@ module Request = struct
 
   let non_query_path self = Tiny_httpd_util.get_non_query_path self.path
 
-  let query self =
-    match Tiny_httpd_util.(parse_query @@ get_query self.path) with
-    | Ok l -> l
-    | Error e -> bad_reqf 400 "invalid query: %s" e
-
+  let query self = self.query
   let get_header ?f self h = Headers.get ?f h self.headers
   let get_header_int self h = match get_header self h with
     | Some x -> (try Some (int_of_string x) with _ -> None)
     | None -> None
   let set_header self k v = {self with headers=Headers.set k v self.headers}
 
+  let pp_comp_ out comp =
+    Format.fprintf out "[%s]"
+      (String.concat ";" @@ List.map (Printf.sprintf "%S") comp)
+  let pp_query out q =
+    Format.fprintf out "[%s]"
+      (String.concat ";" @@
+       List.map (fun (a,b) -> Printf.sprintf "%S,%S" a b) q)
   let pp_ out self : unit =
-    Format.fprintf out "{@[meth=%s;@ host=%s;@ headers=%a;@ path=%S;@ body=?@]}"
+    Format.fprintf out "{@[meth=%s;@ host=%s;@ headers=[@[%a@]];@ \
+                        path=%S;@ body=?;@ path_components=%a;@ query=%a@]}"
       (Meth.to_string self.meth) self.host Headers.pp self.headers self.path
+      pp_comp_ self.path_components pp_query self.query
   let pp out self : unit =
-    Format.fprintf out "{@[meth=%s;@ host=%s;@ headers=%a;@ path=%S;@ body=%S@]}"
+    Format.fprintf out "{@[meth=%s;@ host=%s;@ headers=[@[%a@]];@ path=%S;@ \
+                        body=%S;@ path_components=%a;@ query=%a@]}"
       (Meth.to_string self.meth) self.host Headers.pp self.headers
-      self.path self.body
+      self.path self.body pp_comp_ self.path_components pp_query self.query
 
   (* decode a "chunked" stream into a normal stream *)
   let read_stream_chunked_ ?(buf=Buf_.create()) (bs:byte_stream) : byte_stream =
@@ -472,7 +480,15 @@ module Request = struct
         | None -> bad_reqf 400 "No 'Host' header in request"
         | Some h -> h
       in
-      Ok (Some {meth; host; path; headers; body=()})
+      let path_components, query = Tiny_httpd_util.split_query path in
+      let path_components = Tiny_httpd_util.split_on_slash path_components in
+      let query =
+        match Tiny_httpd_util.(parse_query query) with
+        | Ok l -> l
+        | Error e -> bad_reqf 400 "invalid query: %s" e
+      in
+      Ok (Some {meth; query; host; path; path_components;
+                headers; body=()})
     with
     | End_of_file | Sys_error _ -> Ok None
     | Bad_req (c,s) -> Error (c,s)
@@ -582,7 +598,7 @@ module Response = struct
       | `String s -> Format.fprintf out "%S" s
       | `Stream _ -> Format.pp_print_string out "<stream>"
     in
-    Format.fprintf out "{@[code=%d;@ headers=%a;@ body=%a@]}"
+    Format.fprintf out "{@[code=%d;@ headers=[@[%a@]];@ body=%a@]}"
       self.code Headers.pp self.headers pp_body self.body
 
   (* print a stream as a series of chunks *)
@@ -644,6 +660,55 @@ end
 
 type cb_path_handler = byte_stream Request.t -> Response.t
 
+module Route = struct
+  type path = string list (* split on '/' *)
+
+  type (_, _) comp =
+    | Exact : string -> ('a, 'a) comp
+    | Int : (int -> 'a, 'a) comp
+    | String : (string -> 'a, 'a) comp
+    | String_urlencoded : (string -> 'a, 'a) comp
+
+  type (_, _) t =
+    | Fire : ('b, 'b) t
+    | Compose: ('a, 'b) comp * ('b, 'c) t -> ('a, 'c) t
+
+  let return = Fire
+  let (@/) a b = Compose (a,b)
+  let string = String
+  let string_urlencoded = String_urlencoded
+  let int = Int
+  let exact (s:string) = Exact s
+
+  let rec eval :
+    type a b. path -> (a,b) t -> a -> b option =
+    fun path route f ->
+    begin match path, route with
+      | [], Fire -> Some f
+      | _, Fire -> None
+      | (c1 :: path'), Compose (comp, route') ->
+        begin match comp with
+          | Int ->
+            begin match int_of_string c1 with
+              | i -> eval path' route' (f i)
+              | exception _ -> None
+            end
+          | String ->
+            eval path' route' (f c1)
+          | String_urlencoded ->
+            begin match Tiny_httpd_util.percent_decode c1 with
+              | None -> None
+              | Some s -> eval path' route' (f s)
+            end
+          | Exact s ->
+            if s = c1 then eval path' route' f else None
+        end
+      | [], Compose (String, Fire) -> Some (f "") (* trailing *)
+      | [], Compose (String_urlencoded, Fire) -> Some (f "") (* trailing *)
+      | [], Compose _ -> None
+    end
+end
+
 type t = {
   addr: string;
   port: int;
@@ -668,7 +733,7 @@ let set_top_handler self f = self.handler <- f
 let add_path_handler_
     ?(accept=fun _req -> Ok ())
     ?meth ~tr_req self fmt f =
-  let ph req: cb_path_handler resp_result option =
+  let ph req : cb_path_handler resp_result option =
     match meth with
     | Some m when m <> req.Request.meth -> None (* ignore *)
     | _ ->
@@ -685,11 +750,39 @@ let add_path_handler_
   in
   self.path_handlers <- ph :: self.path_handlers
 
-let add_path_handler ?accept ?meth self fmt f=
+(* TODO: remove *)
+let add_path_handler ?accept ?meth self fmt f =
   add_path_handler_ ?accept ?meth ~tr_req:Request.read_body_full self fmt f
 
-let add_path_handler_stream ?accept ?meth self fmt f=
+(* TODO: remove *)
+let add_path_handler_stream ?accept ?meth self fmt f =
   add_path_handler_ ?accept ?meth ~tr_req:(fun x->x) self fmt f
+
+let add_route_handler_
+    ?(accept=fun _req -> Ok ())
+    ?meth ~tr_req self (route:_ Route.t) f =
+  let ph req : cb_path_handler resp_result option =
+    match meth with
+    | Some m when m <> req.Request.meth -> None (* ignore *)
+    | _ ->
+      begin match Route.eval req.Request.path_components route f with
+        | Some handler ->
+          (* we have a handler, do we accept the request based on its headers? *)
+          begin match accept req with
+            | Ok () -> Some (Ok (fun req -> handler @@ tr_req req))
+            | Error _ as e -> Some e
+          end
+        | None ->
+          None (* path didn't match *)
+      end
+  in
+  self.path_handlers <- ph :: self.path_handlers
+
+let add_route_handler ?accept ?meth self route f =
+  add_route_handler_ ?accept ?meth ~tr_req:Request.read_body_full self route f
+
+let add_route_handler_stream ?accept ?meth self route f =
+  add_route_handler_ ?accept ?meth ~tr_req:(fun x->x) self route f
 
 let create
     ?(masksigpipe=true)
@@ -733,6 +826,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
       end;
       continue := false
     | Ok (Some req) ->
+      _debug (fun k->k "req: %s" (Format.asprintf "@[%a@]" Request.pp_ req));
       let res =
         try
           (* is there a handler for this path? *)

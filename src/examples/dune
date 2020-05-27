@@ -1,4 +1,5 @@
 
 (executables
   (names echo)
+  (flags :standard -warn-error -a+8)
   (libraries tiny_httpd tiny_httpd_camlzip))

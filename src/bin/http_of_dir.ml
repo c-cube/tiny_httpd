@@ -39,8 +39,7 @@ let human_size (x:int) : string =
 let header_html = "Content-Type", "text/html"
 let (//) = Filename.concat
 
-let encode_path s =
-  U.percent_encode ~skip:(fun c -> c='/') s
+let encode_path s = U.percent_encode  s
 
 let is_hidden s = String.length s>0 && s.[0] = '.'
 
@@ -56,7 +55,8 @@ let html_list_dir ~top ~parent d : string =
   begin match parent with
     | None -> ()
     | Some p ->
-      Printf.bprintf body "<a href=\"/%s\"> (parent directory) </a>\n" p;
+      Printf.bprintf body "<a href=\"/%s\"> (parent directory) </a>\n"
+        (encode_path p);
   end;
   Printf.bprintf body "<ul>\n";
   let hidden_stop = ref 0 in
@@ -112,24 +112,26 @@ let serve ~config (dir:string) : _ result =
   Printf.printf "serve directory %s on http://%(%s%):%d\n%!"
     dir (if S.is_ipv6 server then "[%s]" else "%s") config.addr config.port;
   if config.delete then (
-    S.add_path_handler server ~meth:`DELETE "/%s"
+    S.add_route_handler server ~meth:`DELETE
+      S.Route.(string_urlencoded @/ return)
       (fun path _req ->
-         match U.percent_decode path  with
-         | None -> S.Response.fail_raise ~code:404 "invalid percent encoding"
-         | Some path when contains_dot_dot path ->
+         if contains_dot_dot path then (
            S.Response.fail_raise ~code:403 "invalid path in delete"
-         | Some path ->
+         ) else (
            S.Response.make_string
              (try
                 Sys.remove (dir // path); Ok "file deleted successfully"
               with e -> Error (500, Printexc.to_string e))
+         )
       );
   ) else (
-    S.add_path_handler server ~meth:`DELETE "/%s"
+    S.add_route_handler server ~meth:`DELETE
+      S.Route.(string @/ return)
       (fun _ _  -> S.Response.make_raw ~code:405 "delete not allowed");
   );
   if config.upload then (
-    S.add_path_handler_stream server ~meth:`PUT "/%s"
+    S.add_route_handler_stream server ~meth:`PUT
+      S.Route.(string_urlencoded @/ return)
       ~accept:(fun req ->
           match S.Request.get_header_int req "Content-Length" with
           | Some n when n > config.max_upload_size ->
@@ -154,15 +156,13 @@ let serve ~config (dir:string) : _ result =
          S.Response.make_raw ~code:201 "upload successful"
       )
   ) else (
-    S.add_path_handler server ~meth:`PUT "/%s"
+    S.add_route_handler server ~meth:`PUT
+      S.Route.(string @/ return)
       (fun _ _  -> S.Response.make_raw ~code:405 "upload not allowed");
   );
-  S.add_path_handler server ~meth:`GET "/%s"
+  S.add_route_handler server ~meth:`GET
+    S.Route.(string_urlencoded @/ return)
     (fun path req ->
-       let path = match U.percent_decode path with
-         | None -> S.Response.fail_raise ~code:404 "invalid path"
-         | Some p -> p
-       in
        let full_path = dir // path in
        let mtime = lazy (
          try Printf.sprintf "mtime: %f" (Unix.stat full_path).Unix.st_mtime

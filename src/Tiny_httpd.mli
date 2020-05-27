@@ -216,6 +216,8 @@ module Request : sig
     host: string;
     headers: Headers.t;
     path: string;
+    path_components: string list;
+    query: (string*string) list;
     body: 'body;
   }
   (** A request with method, path, host, headers, and a body, sent by a client.
@@ -223,7 +225,13 @@ module Request : sig
       The body is polymorphic because the request goes through
       several transformations. First it has no body, as only the request
       and headers are read; then it has a stream body; then the body might be
-      entirely read as a string via {!read_body_full}. *)
+      entirely read as a string via {!read_body_full}.
+
+      The field [query] was added @since NEXT_RELEASE and contains
+        the query parameters in ["?foo=bar,x=y"]
+      The field [path_components] is the part of the path that precedes [query]
+        and is split on ["/"] and was added @since NEXT_RELEASE
+  *)
 
   val pp : Format.formatter -> string t -> unit
   (** Pretty print the request and its body *)
@@ -362,6 +370,37 @@ module Response : sig
   (** Pretty print the response. *)
 end
 
+(** {2 Routing}
+
+    Basic type-safe routing.
+    @since NEXT_RELEASE *)
+module Route : sig
+  type ('a, 'b) comp
+  (** An atomic component of a path *)
+
+  type ('a, 'b) t
+  (** A route, composed of path components *)
+
+  val int : (int -> 'a, 'a) comp
+  (** Matches an integer. *)
+
+  val string : (string -> 'a, 'a) comp
+  (** Matches a string and binds it as is. *)
+
+  val string_urlencoded : (string -> 'a, 'a) comp
+  (** Matches a URL-encoded string, and decodes it. *)
+
+  val exact : string -> ('a, 'a) comp
+  (** [exact "s"] matches ["s"] and nothing else. *)
+
+  val return : ('a, 'a) t
+  (** Matches the empty path. *)
+
+  val (@/) : ('a, 'b) comp -> ('b, 'c) t -> ('a, 'c) t
+  (** [comp / route] matches ["foo/bar/…"] iff [comp] matches ["foo"],
+      and [route] matches ["bar/…"]. *)
+end
+
 (** {2 Server} *)
 
 type t
@@ -436,6 +475,7 @@ val add_path_handler :
   ('a, Scanf.Scanning.in_channel,
    'b, 'c -> string Request.t -> Response.t, 'a -> 'd, 'd) format6 ->
   'c -> unit
+[@@ocaml.deprecated "use add_route_handler instead"]
 (** [add_path_handler server "/some/path/%s@/%d/" f]
     calls [f "foo" 42 request] when a request with path "some/path/foo/42/"
     is received.
@@ -457,6 +497,13 @@ val add_path_handler :
     filter uploads that are too large before the upload even starts.
 *)
 
+val add_route_handler :
+  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?meth:Meth.t ->
+  t ->
+  ('a, string Request.t -> Response.t) Route.t -> 'a ->
+  unit
+
 val add_path_handler_stream :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
   ?meth:Meth.t ->
@@ -464,11 +511,24 @@ val add_path_handler_stream :
   ('a, Scanf.Scanning.in_channel,
    'b, 'c -> byte_stream Request.t -> Response.t, 'a -> 'd, 'd) format6 ->
   'c -> unit
+[@@ocaml.deprecated "use add_route_handler_stream instead"]
 (** Similar to {!add_path_handler}, but where the body of the request
     is a stream of bytes that has not been read yet.
     This is useful when one wants to stream the body directly into a parser,
     json decoder (such as [Jsonm]) or into a file.
     @since 0.3 *)
+
+val add_route_handler_stream :
+  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?meth:Meth.t ->
+  t ->
+  ('a, byte_stream Request.t -> Response.t) Route.t -> 'a ->
+  unit
+(** Similar to {!add_route_handler}, but where the body of the request
+    is a stream of bytes that has not been read yet.
+    This is useful when one wants to stream the body directly into a parser,
+    json decoder (such as [Jsonm]) or into a file.
+    @since NEXT_RELEASE *)
 
 val stop : t -> unit
 (** Ask the server to stop. This might not have an immediate effect
