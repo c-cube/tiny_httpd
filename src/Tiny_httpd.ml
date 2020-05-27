@@ -456,10 +456,13 @@ module Request = struct
     try
       let line = Byte_stream.read_line ~buf bs in
       let meth, path =
-        try Scanf.sscanf line "%s %s HTTP/1.1\r" (fun x y->x,y)
-      with _ ->
-        _debug (fun k->k "invalid request line: `%s`" line);
-        raise (Bad_req (400, "Invalid request line"))
+        try
+          let m, p, v = Scanf.sscanf line "%s %s HTTP/1.%d\r" (fun x y z->x,y,z) in
+          if v != 0 && v != 1 then raise Exit;
+          m, p
+        with _ ->
+          _debug (fun k->k "invalid request line: `%s`" line);
+          raise (Bad_req (400, "Invalid request line"))
       in
       let meth = Meth.of_string meth in
       _debug (fun k->k "got meth: %s, path %S" (Meth.to_string meth) path);
