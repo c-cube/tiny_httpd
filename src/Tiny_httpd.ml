@@ -634,7 +634,8 @@ module Response = struct
       ) else self.headers
     in
     let self = {self with headers; body} in
-    _debug (fun k->k "output response: %s" (Format.asprintf "%a" pp self));
+    _debug (fun k->k "output response: %s"
+               (Format.asprintf "%a" pp {self with body=`String "<…>"}));
     List.iter (fun (k,v) -> Printf.fprintf oc "%s: %s\r\n" k v) headers;
     output_string oc "\r\n";
     begin match body with
