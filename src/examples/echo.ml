@@ -11,18 +11,14 @@ let () =
       "-j", Arg.Set_int j, " maximum number of connections";
     ]) (fun _ -> raise (Arg.Bad "")) "echo [option]*";
   let server = S.create ~port:!port_ ~max_connections:!j () in
-  Tiny_httpd_camlzip.setup server;
+  Tiny_httpd_camlzip.setup ~compress_above:1024 ~buf_size:(1024*1024) server;
   (* say hello *)
   S.add_route_handler ~meth:`GET server
     S.Route.(exact "hello" @/ string @/ return)
     (fun name _req -> S.Response.make_string (Ok ("hello " ^name ^"!\n")));
   S.add_route_handler ~meth:`GET server
-    S.Route.(exact "zcat" @/ string @/ return)
+    S.Route.(exact "zcat" @/ string_urlencoded @/ return)
     (fun path _req ->
-        let path = match Tiny_httpd_util.percent_decode path with
-          | Some s -> s
-          | None -> S.Response.fail_raise ~code:404 "invalid path %S" path
-        in
         let ic = open_in path in
         let str = S.Byte_stream.of_chan ic in
         let mime_type =
