@@ -102,7 +102,7 @@ module Byte_stream = struct
       ref (
         match len with
         | Some n ->
-          if n > Bytes.length s -i then invalid_arg "Byte_stream.of_bytes";
+          if n > Bytes.length s - i then invalid_arg "Byte_stream.of_bytes";
           n
         | None -> Bytes.length s - i
       )
@@ -110,7 +110,7 @@ module Byte_stream = struct
     let i = ref i in
     { bs_fill_buf=(fun () -> s, !i, !len);
       bs_close=(fun () -> len := 0);
-      bs_consume=(fun n -> assert (n<= !len); i := !i + n; len := !len - n);
+      bs_consume=(fun n -> assert (n>=0 && n<= !len); i := !i + n; len := !len - n);
     }
 
   let of_string s : t =
