@@ -619,7 +619,16 @@ module Response = struct
 
   let output_ (oc:out_channel) (self:t) : unit =
     Printf.fprintf oc "HTTP/1.1 %d %s\r\n" self.code (Response_code.descr self.code);
-    List.iter (fun (k,v) -> Printf.fprintf oc "%s: %s\r\n" k v) self.headers;
+    let is_chunked = match self.body with
+      | `String _ -> false
+      | `Stream _ -> true
+    in
+    let headers =
+      if is_chunked
+      then Headers.set "transfer-encoding" "chunked" self.headers
+      else self.headers
+    in
+    List.iter (fun (k,v) -> Printf.fprintf oc "%s: %s\r\n" k v) headers;
     output_string oc "\r\n";
     begin match self.body with
       | `String "" -> ()
