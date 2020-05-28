@@ -143,18 +143,29 @@ let cb_decode_compressed_stream ~buf_size (req:unit S.Request.t) : _ option =
 let cb_encode_compressed_stream
     ~buf_size (req:_ S.Request.t) (resp:S.Response.t) : _ option =
   if accept_deflate req then (
+    let set_headers h =
+      h
+      |> S.Headers.remove "Content-Length"
+      |> S.Headers.set "Content-Encoding" "deflate"
+      in
     match resp.body with
-    | `String _ -> None
-    | `Stream str ->
-      S._debug (fun k->k "encode response with deflate");
+    | `String s when String.length s > 500 * 1024 ->
+      S._debug (fun k->k "encode str response with deflate");
+      let body =
+        encode_deflate_stream_ ~buf_size @@ S.Byte_stream.of_string s
+      in
       Some {
         resp with
-        headers=
-          (resp.headers
-           |> S.Headers.remove "Content-Length"
-           |> S.Headers.set "Content-Encoding" "deflate");
+        headers= set_headers resp.headers; body=`Stream body;
+      }
+    | `Stream str ->
+      S._debug (fun k->k "encode stream response with deflate");
+      Some {
+        resp with
+        headers= set_headers resp.headers;
         body=`Stream (encode_deflate_stream_ ~buf_size str);
       }
+    | `String _ -> None
   ) else None
 
 let setup ?(buf_size=48 * 1_024) (server:S.t) : unit =
