@@ -620,17 +620,21 @@ module Response = struct
   let output_ (oc:out_channel) (self:t) : unit =
     Printf.fprintf oc "HTTP/1.1 %d %s\r\n" self.code (Response_code.descr self.code);
     let body, is_chunked = match self.body with
-      | `String s when String.length s > 1024 * 300 ->
+      | `String s when String.length s > 1024 * 500 ->
         (* chunk-encode large bodies *)
         `Stream (Byte_stream.of_string s), true
       | `String _ as b -> b, false
       | `Stream _ as b -> b, true
     in
     let headers =
-      if is_chunked
-      then Headers.set "transfer-encoding" "chunked" self.headers
-      else self.headers
+      if is_chunked then (
+        self.headers
+        |> Headers.set "transfer-encoding" "chunked"
+        |> Headers.remove "content-length"
+      ) else self.headers
     in
+    let self = {self with headers; body} in
+    _debug (fun k->k "output response: %s" (Format.asprintf "%a" pp self));
     List.iter (fun (k,v) -> Printf.fprintf oc "%s: %s\r\n" k v) headers;
     output_string oc "\r\n";
     begin match body with
