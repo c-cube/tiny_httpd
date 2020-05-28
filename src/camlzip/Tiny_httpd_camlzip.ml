@@ -168,7 +168,7 @@ let cb_encode_compressed_stream
     let set_headers h =
       h
       |> S.Headers.remove "Content-Length"
-      |> S.Headers.set "Content-Encoding" "deflate, chunked"
+      |> S.Headers.set "Content-Encoding" "deflate"
       in
     match resp.body with
     | `String s when String.length s > compress_above ->
