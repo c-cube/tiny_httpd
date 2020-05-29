@@ -16,15 +16,16 @@ module S = Tiny_httpd
 let () =
   let server = S.create () in
   (* say hello *)
-  S.add_path_handler ~meth:`GET server
-    "/hello/%s@/" (fun name _req ->
-        S.Response.make_string (Ok ("hello " ^name ^"!\n")));
+  S.add_route_handler ~meth:`GET server
+    S.Route.(exact "hello" @/ string @/ return)
+    (fun name _req -> S.Response.make_ok ("hello " ^name ^"!\n"));
   (* echo request *)
-  S.add_path_handler server
-    "/echo" (fun req -> S.Response.make_string
-                (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
-  S.add_path_handler ~meth:`PUT server
-    "/upload/%s" (fun path req ->
+  S.add_route_handler server
+    S.Route.(exact "echo" @/ return)
+    (fun req -> S.Response.make_ok (Format.asprintf "echo:@ %a@." S.Request.pp req));
+  S.add_route_handler ~meth:`PUT server
+    S.Route.(exact "upload" @/ string_urlencoded @/ return)
+    (fun path req ->
         try
           let oc = open_out @@ "/tmp/" ^ path in
           output_string oc req.S.Request.body;
@@ -51,7 +52,7 @@ $ curl -X GET http://localhost:8080/hello/quadrarotaphile
 hello quadrarotaphile!
 
 # the path "echo" just prints the request.
-$ curl -X GET http://localhost:8080/echo --data "howdy y'all" 
+$ curl -X GET http://localhost:8080/echo --data "howdy y'all"
 echo:
 {meth=GET;
  headers=Host: localhost:8080

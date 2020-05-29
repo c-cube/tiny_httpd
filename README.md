@@ -24,7 +24,7 @@ let () =
   (* echo request *)
   S.add_route_handler server
     S.Route.(exact "echo" @/ return)
-    "/echo" (fun req -> S.Response.make_ok (Format.asprintf "echo:@ %a@." S.Request.pp req));
+    (fun req -> S.Response.make_ok (Format.asprintf "echo:@ %a@." S.Request.pp req));
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);
   match S.run server with
   | Ok () -> ()
