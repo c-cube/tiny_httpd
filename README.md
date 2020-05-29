@@ -1,7 +1,8 @@
 
 # Tiny_httpd [![build status](https://travis-ci.org/c-cube/tiny_httpd.svg?branch=master)](https://travis-ci.org/c-cube/tiny_httpd) [![build](https://github.com/c-cube/tiny_httpd/workflows/build/badge.svg)](https://github.com/c-cube/tiny_httpd/actions)
 
-Minimal HTTP server using good old threads and `Scanf` for routing.
+Minimal HTTP server using good old threads, with stream abstractions,
+simple routing, URL encoding/decoding, and optional compression with camlzip.
 
 Free from all forms of `ppx`, async monads, etc.
 
@@ -17,10 +18,12 @@ module S = Tiny_httpd
 let () =
   let server = S.create () in
   (* say hello *)
-  S.add_path_handler ~meth:`GET server
-    "/hello/%s@/" (fun name _req -> S.Response.make_ok ("hello " ^name ^"!\n"));
+  S.add_route_handler ~meth:`GET server
+    S.Route.(exact "hello" @/ string @/ return)
+    (fun name _req -> S.Response.make_ok ("hello " ^name ^"!\n"));
   (* echo request *)
-  S.add_path_handler server
+  S.add_route_handler server
+    S.Route.(exact "echo" @/ return)
     "/echo" (fun req -> S.Response.make_ok (Format.asprintf "echo:@ %a@." S.Request.pp req));
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);
   match S.run server with
