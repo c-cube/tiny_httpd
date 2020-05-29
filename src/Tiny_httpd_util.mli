@@ -19,7 +19,7 @@ val split_query : string -> string * string
 
 val split_on_slash : string -> string list
 (** Split a string on ['/'], remove the trailing ['/'] if any.
-    @since NEXT_RELEASE *)
+    @since 0.6 *)
 
 val get_non_query_path : string -> string
 (** get the part of the path that is not the query parameters.

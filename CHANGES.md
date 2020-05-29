@@ -1,4 +1,17 @@
 
+## 0.6
+
+- feat: add `Route.t` construct, deprecate scanf, add more structured path
+- feat: use chunked encoding for large string responses, in addition to streams
+- refactor(echo): simplify code, use gzip aggressively
+- accept http1.0
+
+- fix: do not output a `content-length` for a chunked response
+- fix: set `transfer-encoding` header when returning a chunked stream
+- fix(zip): handle case where camlzip consumes 0 bytes
+- feat(zip): also compress string responses if they're big
+- add more debug msg
+
 ## 0.5
 
 - new `tiny_httpd_camlzip` library for handling `deflate` compression

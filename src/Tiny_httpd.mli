@@ -227,10 +227,10 @@ module Request : sig
       and headers are read; then it has a stream body; then the body might be
       entirely read as a string via {!read_body_full}.
 
-      The field [query] was added @since NEXT_RELEASE and contains
+      The field [query] was added @since 0.6 and contains
         the query parameters in ["?foo=bar,x=y"]
       The field [path_components] is the part of the path that precedes [query]
-        and is split on ["/"] and was added @since NEXT_RELEASE
+        and is split on ["/"] and was added @since 0.6
   *)
 
   val pp : Format.formatter -> string t -> unit
@@ -373,7 +373,7 @@ end
 (** {2 Routing}
 
     Basic type-safe routing.
-    @since NEXT_RELEASE *)
+    @since 0.6 *)
 module Route : sig
   type ('a, 'b) comp
   (** An atomic component of a path *)
@@ -528,7 +528,7 @@ val add_route_handler_stream :
     is a stream of bytes that has not been read yet.
     This is useful when one wants to stream the body directly into a parser,
     json decoder (such as [Jsonm]) or into a file.
-    @since NEXT_RELEASE *)
+    @since 0.6 *)
 
 val stop : t -> unit
 (** Ask the server to stop. This might not have an immediate effect
