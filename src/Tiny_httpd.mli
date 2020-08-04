@@ -538,7 +538,7 @@ val stop : t -> unit
 val run : t -> (unit, exn) result
 (** Run the main loop of the server, listening on a socket
     described at the server's creation time, using [new_thread] to
-    start a thread for each new client. 
+    start a thread for each new client.
 
     This returns [Ok ()] if the server exits gracefully, or [Error e] if
     it exits with an error. *)
