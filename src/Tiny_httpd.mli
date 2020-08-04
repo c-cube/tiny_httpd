@@ -400,6 +400,14 @@ module Route : sig
   val (@/) : ('a, 'b) comp -> ('b, 'c) t -> ('a, 'c) t
   (** [comp / route] matches ["foo/bar/…"] iff [comp] matches ["foo"],
       and [route] matches ["bar/…"]. *)
+
+  val pp : Format.formatter -> _ t -> unit
+  (** Print the route.
+      @since NEXT_RELEASE *)
+
+  val to_string : _ t -> string
+  (** Print the route.
+      @since NEXT_RELEASE *)
 end
 
 (** {2 Server} *)

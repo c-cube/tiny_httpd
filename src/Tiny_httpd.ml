@@ -724,6 +724,22 @@ module Route = struct
       | [], Compose (String_urlencoded, Fire) -> Some (f "") (* trailing *)
       | [], Compose _ -> None
     end
+
+  let bpf = Printf.bprintf
+  let rec pp_
+    : type a b. Buffer.t -> (a,b) t -> unit
+    = fun out -> function
+      | Fire -> bpf out "/"
+      | Compose (Exact s, tl) -> bpf out "%s/%a" s pp_ tl
+      | Compose (Int, tl) -> bpf out "<int>/%a" pp_ tl
+      | Compose (String, tl) -> bpf out "<str>/%a" pp_ tl
+      | Compose (String_urlencoded, tl) -> bpf out "<enc_str>/%a" pp_ tl
+
+  let to_string x =
+    let b = Buffer.create 16 in
+    pp_ b x;
+    Buffer.contents b
+  let pp out x = Format.pp_print_string out (to_string x)
 end
 
 type t = {
