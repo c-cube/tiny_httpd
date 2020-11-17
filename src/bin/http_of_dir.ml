@@ -39,7 +39,7 @@ let human_size (x:int) : string =
 let header_html = "Content-Type", "text/html"
 let (//) = Filename.concat
 
-let encode_path s = U.percent_encode  s
+let encode_path s = U.percent_encode ~skip:(function '/' -> true|_->false) s
 
 let is_hidden s = String.length s>0 && s.[0] = '.'
 
@@ -113,7 +113,7 @@ let serve ~config (dir:string) : _ result =
     dir (if S.is_ipv6 server then "[%s]" else "%s") config.addr config.port;
   if config.delete then (
     S.add_route_handler server ~meth:`DELETE
-      S.Route.(string_urlencoded @/ return)
+      S.Route.rest
       (fun path _req ->
          if contains_dot_dot path then (
            S.Response.fail_raise ~code:403 "invalid path in delete"
@@ -131,7 +131,7 @@ let serve ~config (dir:string) : _ result =
   );
   if config.upload then (
     S.add_route_handler_stream server ~meth:`PUT
-      S.Route.(string_urlencoded @/ return)
+      S.Route.rest
       ~accept:(fun req ->
           match S.Request.get_header_int req "Content-Length" with
           | Some n when n > config.max_upload_size ->
@@ -161,7 +161,7 @@ let serve ~config (dir:string) : _ result =
       (fun _ _  -> S.Response.make_raw ~code:405 "upload not allowed");
   );
   S.add_route_handler server ~meth:`GET
-    S.Route.(string_urlencoded @/ return)
+    S.Route.rest
     (fun path req ->
        let full_path = dir // path in
        let mtime = lazy (
