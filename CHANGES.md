@@ -1,3 +1,10 @@
+## 0.7
+
+- feat: add `rest_of_path_urlencoded` and rename `rest` to `rest_of_path`
+- feat: `http_of_dir`: redirect to index.html if present
+- fix: `http_of_dir`: do not url-encode '/' in paths
+- feat: add `Route.rest` to match the rest of the path
+- feat: printing routes
 
 ## 0.6
 

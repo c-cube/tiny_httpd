@@ -400,12 +400,12 @@ module Route : sig
   val rest_of_path : (string -> 'a, 'a) t
   (** Matches a string, even containing ['/']. This will match
       the entirety of the remaining route.
-      @since NEXT_RELEASE *)
+      @since 0.7 *)
 
   val rest_of_path_urlencoded : (string -> 'a, 'a) t
   (** Matches a string, even containing ['/'], an URL-decode it.
       This will match the entirety of the remaining route.
-      @since NEXT_RELEASE *)
+      @since 0.7 *)
 
   val (@/) : ('a, 'b) comp -> ('b, 'c) t -> ('a, 'c) t
   (** [comp / route] matches ["foo/bar/…"] iff [comp] matches ["foo"],
@@ -413,11 +413,11 @@ module Route : sig
 
   val pp : Format.formatter -> _ t -> unit
   (** Print the route.
-      @since NEXT_RELEASE *)
+      @since 0.7 *)
 
   val to_string : _ t -> string
   (** Print the route.
-      @since NEXT_RELEASE *)
+      @since 0.7 *)
 end
 
 (** {2 Server} *)
