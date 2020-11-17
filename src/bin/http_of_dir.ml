@@ -42,6 +42,7 @@ let header_html = "Content-Type", "text/html"
 let (//) = Filename.concat
 
 let encode_path s = U.percent_encode ~skip:(function '/' -> true|_->false) s
+let decode_path s = match U.percent_decode s with Some s->s | None -> s
 
 let is_hidden s = String.length s>0 && s.[0] = '.'
 
@@ -117,6 +118,7 @@ let serve ~config (dir:string) : _ result =
     S.add_route_handler server ~meth:`DELETE
       S.Route.rest
       (fun path _req ->
+         let path = decode_path path in
          if contains_dot_dot path then (
            S.Response.fail_raise ~code:403 "invalid path in delete"
          ) else (
@@ -143,6 +145,7 @@ let serve ~config (dir:string) : _ result =
           | _ -> Ok ()
         )
       (fun path req ->
+         let path = decode_path path in
          let fpath = dir // path in
          let oc =
            try open_out fpath
@@ -165,6 +168,7 @@ let serve ~config (dir:string) : _ result =
   S.add_route_handler server ~meth:`GET
     S.Route.rest
     (fun path req ->
+       let path = decode_path path in
        let full_path = dir // path in
        let mtime = lazy (
          try Printf.sprintf "mtime: %f" (Unix.stat full_path).Unix.st_mtime
@@ -182,7 +186,8 @@ let serve ~config (dir:string) : _ result =
          let parent = Filename.(dirname path) in
          let parent = if parent <> path then Some parent else None in
          if Sys.file_exists (full_path // "index.html") && config.auto_index_html then (
-           let new_path = "/" // full_path // "index.html" in
+           (* redirect using path, not full path *)
+           let new_path = "/" // path // "index.html" in
            S._debug (fun k->k "redirect to `%s`" new_path);
            S.Response.make_raw ~code:301 ""
              ~headers:S.Headers.(empty |> set "location" new_path)
