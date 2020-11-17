@@ -688,9 +688,11 @@ module Route = struct
 
   type (_, _) t =
     | Fire : ('b, 'b) t
+    | Rest : (string -> 'b, 'b) t
     | Compose: ('a, 'b) comp * ('b, 'c) t -> ('a, 'c) t
 
   let return = Fire
+  let rest = Rest
   let (@/) a b = Compose (a,b)
   let string = String
   let string_urlencoded = String_urlencoded
@@ -703,6 +705,9 @@ module Route = struct
     begin match path, route with
       | [], Fire -> Some f
       | _, Fire -> None
+      | _, Rest ->
+        let whole_path = String.concat "/" path in
+        Some (f whole_path)
       | (c1 :: path'), Compose (comp, route') ->
         begin match comp with
           | Int ->
@@ -730,6 +735,7 @@ module Route = struct
     : type a b. Buffer.t -> (a,b) t -> unit
     = fun out -> function
       | Fire -> bpf out "/"
+      | Rest -> bpf out "<rest>"
       | Compose (Exact s, tl) -> bpf out "%s/%a" s pp_ tl
       | Compose (Int, tl) -> bpf out "<int>/%a" pp_ tl
       | Compose (String, tl) -> bpf out "<str>/%a" pp_ tl

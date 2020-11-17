@@ -386,7 +386,7 @@ module Route : sig
   (** Matches an integer. *)
 
   val string : (string -> 'a, 'a) comp
-  (** Matches a string and binds it as is. *)
+  (** Matches a string not containing ['/'] and binds it as is. *)
 
   val string_urlencoded : (string -> 'a, 'a) comp
   (** Matches a URL-encoded string, and decodes it. *)
@@ -396,6 +396,11 @@ module Route : sig
 
   val return : ('a, 'a) t
   (** Matches the empty path. *)
+
+  val rest : (string -> 'a, 'a) t
+  (** Matches a string, even containing ['/']. This will match
+      the entirety of the remaining route.
+      @since NEXT_RELEASE *)
 
   val (@/) : ('a, 'b) comp -> ('b, 'c) t -> ('a, 'c) t
   (** [comp / route] matches ["foo/bar/…"] iff [comp] matches ["foo"],
