@@ -7,6 +7,7 @@ type config = {
   mutable port: int;
   mutable upload: bool;
   mutable max_upload_size: int;
+  mutable auto_index_html: bool;
   mutable delete: bool;
   mutable j: int;
 }
@@ -17,6 +18,7 @@ let default_config () : config = {
   delete=false;
   upload=false;
   max_upload_size = 10 * 1024 * 1024;
+  auto_index_html=true;
   j=32;
 }
 
@@ -179,10 +181,17 @@ let serve ~config (dir:string) : _ result =
          S._debug (fun k->k "list dir %S (topdir %S)"  full_path dir);
          let parent = Filename.(dirname path) in
          let parent = if parent <> path then Some parent else None in
-         let body = html_list_dir ~top:dir path ~parent in
-         S.Response.make_string
-           ~headers:[header_html; "ETag", Lazy.force mtime]
-           (Ok body)
+         if Sys.file_exists (full_path // "index.html") && config.auto_index_html then (
+           let new_path = "/" // full_path // "index.html" in
+           S._debug (fun k->k "redirect to `%s`" new_path);
+           S.Response.make_raw ~code:301 ""
+             ~headers:S.Headers.(empty |> set "location" new_path)
+         ) else (
+           let body = html_list_dir ~top:dir path ~parent in
+           S.Response.make_string
+             ~headers:[header_html; "ETag", Lazy.force mtime]
+             (Ok body)
+         )
        ) else (
          try
            let ic = open_in full_path in
@@ -225,6 +234,8 @@ let main () =
       "--no-upload", Unit (fun () -> config.upload <- false), " disable file uploading";
       "--max-upload", String (fun i -> config.max_upload_size <- parse_size i),
         " maximum size of files that can be uploaded";
+      "--auto-index", Bool (fun b -> config.auto_index_html <- b),
+      " <bool> automatically redirect to index.html if present";
       "--delete", Unit (fun () -> config.delete <- true), " enable `delete` on files";
       "--no-delete", Unit (fun () -> config.delete <- false), " disable `delete` on files";
       "-j", Int (fun j->config.j <- j), " maximum number of simultaneous connections";
