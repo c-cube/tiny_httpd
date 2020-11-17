@@ -228,10 +228,9 @@ module Request : sig
       and headers are read; then it has a stream body; then the body might be
       entirely read as a string via {!read_body_full}.
 
-      The field [query] was added @since 0.6 and contains
-        the query parameters in ["?foo=bar,x=y"]
-      The field [path_components] is the part of the path that precedes [query]
-        and is split on ["/"] and was added @since 0.6
+      @since 0.6 The field [query] was added and contains the query parameters in ["?foo=bar,x=y"]
+
+      @since 0.6 The field [path_components] is the part of the path that precedes [query] and is split on ["/"].
   *)
 
   val pp : Format.formatter -> string t -> unit
