@@ -397,9 +397,14 @@ module Route : sig
   val return : ('a, 'a) t
   (** Matches the empty path. *)
 
-  val rest : (string -> 'a, 'a) t
+  val rest_of_path : (string -> 'a, 'a) t
   (** Matches a string, even containing ['/']. This will match
       the entirety of the remaining route.
+      @since NEXT_RELEASE *)
+
+  val rest_of_path_urlencoded : (string -> 'a, 'a) t
+  (** Matches a string, even containing ['/'], an URL-decode it.
+      This will match the entirety of the remaining route.
       @since NEXT_RELEASE *)
 
   val (@/) : ('a, 'b) comp -> ('b, 'c) t -> ('a, 'c) t

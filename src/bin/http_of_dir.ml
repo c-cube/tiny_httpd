@@ -116,9 +116,8 @@ let serve ~config (dir:string) : _ result =
     dir (if S.is_ipv6 server then "[%s]" else "%s") config.addr config.port;
   if config.delete then (
     S.add_route_handler server ~meth:`DELETE
-      S.Route.rest
+      S.Route.rest_of_path_urlencoded
       (fun path _req ->
-         let path = decode_path path in
          if contains_dot_dot path then (
            S.Response.fail_raise ~code:403 "invalid path in delete"
          ) else (
@@ -135,7 +134,7 @@ let serve ~config (dir:string) : _ result =
   );
   if config.upload then (
     S.add_route_handler_stream server ~meth:`PUT
-      S.Route.rest
+      S.Route.rest_of_path_urlencoded
       ~accept:(fun req ->
           match S.Request.get_header_int req "Content-Length" with
           | Some n when n > config.max_upload_size ->
@@ -145,7 +144,6 @@ let serve ~config (dir:string) : _ result =
           | _ -> Ok ()
         )
       (fun path req ->
-         let path = decode_path path in
          let fpath = dir // path in
          let oc =
            try open_out fpath
@@ -166,9 +164,8 @@ let serve ~config (dir:string) : _ result =
       (fun _ _  -> S.Response.make_raw ~code:405 "upload not allowed");
   );
   S.add_route_handler server ~meth:`GET
-    S.Route.rest
+    S.Route.rest_of_path_urlencoded
     (fun path req ->
-       let path = decode_path path in
        let full_path = dir // path in
        let mtime = lazy (
          try Printf.sprintf "mtime: %f" (Unix.stat full_path).Unix.st_mtime

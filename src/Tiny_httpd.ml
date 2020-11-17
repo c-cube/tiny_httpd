@@ -688,11 +688,14 @@ module Route = struct
 
   type (_, _) t =
     | Fire : ('b, 'b) t
-    | Rest : (string -> 'b, 'b) t
+    | Rest : {
+        url_encoded: bool;
+      } -> (string -> 'b, 'b) t
     | Compose: ('a, 'b) comp * ('b, 'c) t -> ('a, 'c) t
 
   let return = Fire
-  let rest = Rest
+  let rest_of_path = Rest {url_encoded=false}
+  let rest_of_path_urlencoded = Rest {url_encoded=true}
   let (@/) a b = Compose (a,b)
   let string = String
   let string_urlencoded = String_urlencoded
@@ -705,9 +708,19 @@ module Route = struct
     begin match path, route with
       | [], Fire -> Some f
       | _, Fire -> None
-      | _, Rest ->
+      | _, Rest {url_encoded} ->
         let whole_path = String.concat "/" path in
-        Some (f whole_path)
+        begin match
+            if url_encoded
+            then match Tiny_httpd_util.percent_decode whole_path with
+              | Some s -> s
+              | None -> raise_notrace Exit
+            else whole_path
+          with
+          | whole_path ->
+            Some (f whole_path)
+          | exception Exit -> None
+        end
       | (c1 :: path'), Compose (comp, route') ->
         begin match comp with
           | Int ->
@@ -735,7 +748,8 @@ module Route = struct
     : type a b. Buffer.t -> (a,b) t -> unit
     = fun out -> function
       | Fire -> bpf out "/"
-      | Rest -> bpf out "<rest>"
+      | Rest {url_encoded} ->
+        bpf out "<rest_of_url%s>" (if url_encoded then "_urlencoded" else "")
       | Compose (Exact s, tl) -> bpf out "%s/%a" s pp_ tl
       | Compose (Int, tl) -> bpf out "<int>/%a" pp_ tl
       | Compose (String, tl) -> bpf out "<str>/%a" pp_ tl
