@@ -18,11 +18,12 @@ let () =
   (* say hello *)
   S.add_route_handler ~meth:`GET server
     S.Route.(exact "hello" @/ string @/ return)
-    (fun name _req -> S.Response.make_ok ("hello " ^name ^"!\n"));
+    (fun name _req -> S.Response.make_string (Ok ("hello " ^name ^"!\n")));
   (* echo request *)
   S.add_route_handler server
     S.Route.(exact "echo" @/ return)
-    (fun req -> S.Response.make_ok (Format.asprintf "echo:@ %a@." S.Request.pp req));
+    (fun req -> S.Response.make_string
+        (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
   S.add_route_handler ~meth:`PUT server
     S.Route.(exact "upload" @/ string_urlencoded @/ return)
     (fun path req ->
