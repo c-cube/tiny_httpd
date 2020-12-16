@@ -18,6 +18,8 @@ let percent_encode ?(skip=fun _->false) s =
         | ',' | '/' | ':' | ';' | '=' | '?' | '@' | '[' | ']' | '~')
         as c ->
         Printf.bprintf buf "%%%X" (Char.code c)
+      | c when Char.code c > 127 ->
+        Printf.bprintf buf "%%%X" (Char.code c)
       | c -> Buffer.add_char buf c)
     s;
   Buffer.contents buf
