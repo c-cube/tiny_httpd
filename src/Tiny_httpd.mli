@@ -428,7 +428,6 @@ type t
 val create :
   ?masksigpipe:bool ->
   ?max_connections:int ->
-  ?new_thread:((unit -> unit) -> unit) ->
   ?addr:string ->
   ?port:int ->
   unit ->
@@ -567,4 +566,3 @@ val _debug : ((('a, out_channel, unit, unit, unit, unit) format6 -> 'a) -> unit)
 val _enable_debug: bool -> unit
 
 (**/**)
-

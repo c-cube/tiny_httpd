@@ -14,7 +14,8 @@ let _enable_debug b = _debug_on := b
 let _debug k =
   if !_debug_on then (
     k (fun fmt->
-       Printf.fprintf stdout "[http.thread %d]: " Thread.(id @@ self());
+      let id = (Domain.self () :> int) in
+       Printf.fprintf stdout "[http.thread %d]: " id;
        Printf.kfprintf (fun oc -> Printf.fprintf oc "\n%!") stdout fmt)
   )
 
@@ -766,7 +767,8 @@ type t = {
   addr: string;
   port: int;
   sem_max_connections: Sem_.t;
-  new_thread: (unit -> unit) -> unit;
+  pool: Domainslib.Task.pool;
+  new_thread: unit Domainslib.Task.task -> unit Domainslib.Task.promise;
   masksigpipe: bool;
   mutable handler: (string Request.t -> Response.t);
   mutable path_handlers : (unit Request.t -> cb_path_handler resp_result option) list;
@@ -840,11 +842,14 @@ let add_route_handler_stream ?accept ?meth self route f =
 let create
     ?(masksigpipe=true)
     ?(max_connections=32)
-    ?(new_thread=(fun f -> ignore (Thread.create f () : Thread.t)))
     ?(addr="127.0.0.1") ?(port=8080) () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
+  (* TODO: Make pool size configurable, and pick a better heuristic for the pool size. *)
+  let pool = Domainslib.Task.setup_pool ~num_domains:8 in
+  let new_thread = fun f -> Domainslib.Task.async pool f in
   let max_connections = max 4 max_connections in
   { new_thread; addr; port; masksigpipe; handler;
+  pool;
     running= true; sem_max_connections=Sem_.create max_connections;
     path_handlers=[];
     cb_encode_resp=[]; cb_decode_req=[];
@@ -967,7 +972,7 @@ let run (self:t) : (unit,_) result =
              (try Unix.close client_sock with _ -> ());
              Sem_.release 1 self.sem_max_connections;
              raise e
-        );
+        ) |> ignore
     done;
     Ok ()
   with e -> Error e
