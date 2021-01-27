@@ -1,5 +1,5 @@
 
-# Tiny_httpd [![build status](https://travis-ci.org/c-cube/tiny_httpd.svg?branch=master)](https://travis-ci.org/c-cube/tiny_httpd) [![build](https://github.com/c-cube/tiny_httpd/workflows/build/badge.svg)](https://github.com/c-cube/tiny_httpd/actions)
+# Tiny_httpd [![build](https://github.com/c-cube/tiny_httpd/workflows/build/badge.svg)](https://github.com/c-cube/tiny_httpd/actions)
 
 Minimal HTTP server using good old threads, with stream abstractions,
 simple routing, URL encoding/decoding, and optional compression with camlzip.
