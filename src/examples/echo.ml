@@ -2,6 +2,7 @@
 module S = Tiny_httpd
 
 let () =
+  let module TP = CCPool.Make(struct let max_size=32 end) in
   let port_ = ref 8080 in
   let j = ref 32 in
   Arg.parse (Arg.align [
@@ -10,7 +11,9 @@ let () =
       "--debug", Arg.Unit (fun () -> S._enable_debug true), " enable debug";
       "-j", Arg.Set_int j, " maximum number of connections";
     ]) (fun _ -> raise (Arg.Bad "")) "echo [option]*";
-  let server = S.create ~port:!port_ ~max_connections:!j () in
+  let server = S.create ~port:!port_ ~max_connections:!j
+      ~new_thread:(fun task -> TP.run task)
+      () in
   Tiny_httpd_camlzip.setup ~compress_above:1024 ~buf_size:(1024*1024) server;
   (* say hello *)
   S.add_route_handler ~meth:`GET server
