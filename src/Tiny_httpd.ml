@@ -329,7 +329,11 @@ module Headers = struct
         acc
       ) else (
         let k,v =
-          try Scanf.sscanf line "%s@: %s@\r" (fun k v->k,v)
+          try
+            let i = String.index line ':' in
+            let k = String.sub line 0 i in
+            let v = String.sub line (i+1) (String.length line-i-1) |> String.trim in
+            k,v
           with _ -> bad_reqf 400 "invalid header line: %S" line
         in
         loop ((String.lowercase_ascii k,v)::acc)
