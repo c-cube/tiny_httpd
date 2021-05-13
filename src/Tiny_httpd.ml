@@ -321,6 +321,28 @@ module Headers = struct
     let pp_pair out (k,v) = Format.fprintf out "@[<h>%s: %s@]" k v in
     Format.fprintf out "@[<v>%a@]" (Format.pp_print_list pp_pair) l
 
+(*  token = 1*tchar
+    tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." / "^" / "_"
+             / "`" / "|" / "~" / DIGIT / ALPHA ; any VCHAR, except delimiters
+    Reference: https://datatracker.ietf.org/doc/html/rfc7230#section-3.2 *)
+let is_tchar = function
+  | '0' .. '9'
+  | 'a' .. 'z'
+  | 'A' .. 'Z'
+  | '!' | '#' | '$' | '%' | '&' | '\'' | '*' | '+' | '-' | '.' | '^' | '_' | '`'
+  | '|' | '~' ->
+      true
+  | _ -> false
+
+  let for_all pred s =
+    let len = String.length s in
+    let rec loop idx =
+      if idx = len then true
+      else if pred (String.unsafe_get s idx) then loop (idx + 1)
+      else false
+    in
+    loop 0
+
   let parse_ ~buf (bs:byte_stream) : t =
     let rec loop acc =
       let line = Byte_stream.read_line ~buf bs in
@@ -332,8 +354,10 @@ module Headers = struct
           try
             let i = String.index line ':' in
             let k = String.sub line 0 i in
-            let v = String.sub line (i+1) (String.length line-i-1) |> String.trim in
-            k,v
+            if for_all is_tchar k then (
+              let v = String.sub line (i+1) (String.length line-i-1) |> String.trim in
+              k,v)
+            else invalid_arg (Printf.sprintf "Invalid header key: %S" k)
           with _ -> bad_reqf 400 "invalid header line: %S" line
         in
         loop ((String.lowercase_ascii k,v)::acc)
