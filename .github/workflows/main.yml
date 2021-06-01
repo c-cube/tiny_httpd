@@ -1,5 +1,5 @@
 name: build
-on: [push]
+on: [push, pull_request]
 jobs:
   run:
     name: Build
@@ -7,15 +7,16 @@ jobs:
     strategy:
       matrix:
         operating-system: [macos-latest, ubuntu-latest, windows-latest]
-        ocaml-version: [ '4.08.0' ]
+        ocaml-compiler: [ '4.04.0', '4.11.0' ]
     steps:
     - uses: actions/checkout@master
-    - uses: avsm/setup-ocaml@master
+    - uses: avsm/setup-ocaml@v2
       with:
-        ocaml-version: ${{ matrix.ocaml-version }}
+        ocaml-compiler: ${{ matrix.ocaml-compiler }}
     - run: opam pin -n .
-    # more recent dune breaks the inline tests… because of warn-error 😱
-    - run: opam pin dune 2.7.1 -y -n
+    # dune 2.8 breaks the inline tests… because of warn-error 😱. So we use an
+    # older version
+    - run: opam pin dune 1.11.0 -y -n
     - run: opam depext -yt tiny_httpd tiny_httpd_camlzip
     - run: opam install -t . --deps-only
     - run: opam exec -- dune build
