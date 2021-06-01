@@ -12,7 +12,7 @@ build: [
 depends: [
   "dune" { >= "1.1" } # for now, since qtest needs old dune
   "base-threads"
-  "ocaml" { >= "4.03.0" }
+  "ocaml" { >= "4.04.0" }
   "odoc" {with-doc}
   "qtest" { >= "2.9" & with-test}
   "qcheck" {with-test & >= "0.9" }
