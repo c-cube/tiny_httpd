@@ -198,7 +198,11 @@ let serve ~config (dir:string) : _ result =
          try
            let ic = open_in full_path in
            let mime_type =
-             try
+             if Filename.extension full_path = ".css" then (
+               ["Content-Type", "text/css"]
+             ) else if Filename.extension full_path = ".js" then (
+               ["Content-Type", "text/javascript"]
+             ) else try
                let p = Unix.open_process_in (Printf.sprintf "file -i -b %S" full_path) in
                finally_ ~h:(fun p->ignore @@ Unix.close_process_in p) p
                 (fun p ->
