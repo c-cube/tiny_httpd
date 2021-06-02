@@ -3,6 +3,5 @@
   (name tiny_httpd)
   (public_name tiny_httpd)
   (libraries threads)
-  (inline_tests (backend qtest.lib))
   (flags :standard -safe-string -warn-error -a+8)
   (wrapped false))

@@ -14,9 +14,6 @@ jobs:
       with:
         ocaml-compiler: ${{ matrix.ocaml-compiler }}
     - run: opam pin -n .
-    # dune 2.8 breaks the inline tests… because of warn-error 😱. So we use an
-    # older version
-    - run: opam pin dune 1.11.0 -y -n
     - run: opam depext -yt tiny_httpd tiny_httpd_camlzip
     - run: opam install -t . --deps-only
     - run: opam exec -- dune build

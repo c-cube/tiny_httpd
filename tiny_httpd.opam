@@ -10,7 +10,7 @@ build: [
   ["dune" "runtest" "-p" name] {with-test}
 ]
 depends: [
-  "dune" { >= "1.1" } # for now, since qtest needs old dune
+  "dune" { >= "2.0" }
   "base-threads"
   "ocaml" { >= "4.04.0" }
   "odoc" {with-doc}

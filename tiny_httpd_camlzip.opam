@@ -10,10 +10,10 @@ build: [
   ["dune" "runtest" "-p" name] {with-test}
 ]
 depends: [
-  "dune" { >= "1.1" }
+  "dune" { >= "2.0" }
   "camlzip"
   "tiny_httpd" { = version }
-  "ocaml" { >= "4.03.0" }
+  "ocaml" { >= "4.04.0" }
   "odoc" {with-doc}
 ]
 tags: [ "http" "thread" "server" "gzip" "camlzip" ]
