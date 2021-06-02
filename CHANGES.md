@@ -1,3 +1,13 @@
+
+## 0.8
+
+- bump to ocaml 4.04
+- Validate header key's character set (#15)
+- perf: simpler parsing of headers
+
+- fix: workaround for css/js in `http_of_dir` (#16)
+- fix(urlencode): encode non ascii chars
+
 ## 0.7
 
 - feat: add `rest_of_path_urlencoded` and rename `rest` to `rest_of_path`
