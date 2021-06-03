@@ -13,5 +13,6 @@
 
 (rule
   (alias runtest)
+  (package tiny_httpd)
   (action (run ./qtest.exe)))
 
