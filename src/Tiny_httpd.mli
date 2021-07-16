@@ -487,22 +487,15 @@ val set_top_handler : t -> (string Request.t -> Response.t) -> unit
     installed via {!add_path_handler}.
     If no top handler is installed, unhandled paths will return a [404] not found. *)
 
-val add_path_handler :
+val add_route_handler :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
   ?meth:Meth.t ->
   t ->
-  ('a, Scanf.Scanning.in_channel,
-   'b, 'c -> string Request.t -> Response.t, 'a -> 'd, 'd) format6 ->
-  'c -> unit
-[@@ocaml.deprecated "use add_route_handler instead"]
-(** [add_path_handler server "/some/path/%s@/%d/" f]
-    calls [f "foo" 42 request] when a request with path "some/path/foo/42/"
+  ('a, string Request.t -> Response.t) Route.t -> 'a ->
+  unit
+(** [add_route_handler server Route.(exact "path" @/ string @/ int @/ return) f]
+    calls [f "foo" 42 request] when a [request] with path "path/foo/42/"
     is received.
-
-    This uses {!Scanf}'s splitting, which has some gotchas (in particular,
-    ["%s"] is eager, so it's generally necessary to delimit its
-    scope with a ["@/"] delimiter. The "@" before a character indicates it's
-    a separator.
 
     Note that the handlers are called in the reverse order of their addition,
     so the last registered handler can override previously registered ones.
@@ -514,14 +507,38 @@ val add_path_handler :
     its content is too big, or for some permission error).
     See the {!http_of_dir} program for an example of how to use [accept] to
     filter uploads that are too large before the upload even starts.
+
+    @since 0.6
 *)
 
-val add_route_handler :
+val add_route_handler_stream :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
   ?meth:Meth.t ->
   t ->
-  ('a, string Request.t -> Response.t) Route.t -> 'a ->
+  ('a, byte_stream Request.t -> Response.t) Route.t -> 'a ->
   unit
+(** Similar to {!add_route_handler}, but where the body of the request
+    is a stream of bytes that has not been read yet.
+    This is useful when one wants to stream the body directly into a parser,
+    json decoder (such as [Jsonm]) or into a file.
+    @since 0.6 *)
+
+val add_path_handler :
+  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?meth:Meth.t ->
+  t ->
+  ('a, Scanf.Scanning.in_channel,
+   'b, 'c -> string Request.t -> Response.t, 'a -> 'd, 'd) format6 ->
+  'c -> unit
+[@@ocaml.deprecated "use add_route_handler instead"]
+(** Similar to {!add_route_handler} but based on scanf.
+
+    This uses {!Scanf}'s splitting, which has some gotchas (in particular,
+    ["%s"] is eager, so it's generally necessary to delimit its
+    scope with a ["@/"] delimiter. The "@" before a character indicates it's
+    a separator.
+
+    @deprecated use {!add_route_handler} instead. *)
 
 val add_path_handler_stream :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
@@ -536,18 +553,6 @@ val add_path_handler_stream :
     This is useful when one wants to stream the body directly into a parser,
     json decoder (such as [Jsonm]) or into a file.
     @since 0.3 *)
-
-val add_route_handler_stream :
-  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
-  ?meth:Meth.t ->
-  t ->
-  ('a, byte_stream Request.t -> Response.t) Route.t -> 'a ->
-  unit
-(** Similar to {!add_route_handler}, but where the body of the request
-    is a stream of bytes that has not been read yet.
-    This is useful when one wants to stream the body directly into a parser,
-    json decoder (such as [Jsonm]) or into a file.
-    @since 0.6 *)
 
 val stop : t -> unit
 (** Ask the server to stop. This might not have an immediate effect
