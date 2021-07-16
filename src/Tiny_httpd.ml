@@ -788,6 +788,7 @@ type cb_path_handler =
   unit
 
 module type SERVER_SENT_GENERATOR = sig
+  val set_headers : Headers.t -> unit
   val send_event :
     ?event:string ->
     ?id:string ->
@@ -901,15 +902,21 @@ let[@inline] _opt_iter ~f o = match o with
 let add_route_server_sent_handler ?accept self route f =
   let tr_req oc req ~resp f =
     let req = Request.read_body_full req in
+    let headers = ref Headers.(empty |> set "content-type" "text/event-stream") in
 
-    (* send 200 response now *)
-    let initial_resp =
-      let headers = Headers.(empty |> set "content-type" "text/event-stream") in
-      Response.make_raw ~headers ~code:200 ""
+    (* send response once *)
+    let resp_sent = ref false in
+    let send_response_idempotent_ () =
+      if not !resp_sent then (
+        resp_sent := true;
+        (* send 200 response now *)
+        let initial_resp = Response.make_raw ~headers:!headers ~code:200 "" in
+        resp initial_resp;
+      )
     in
-    resp initial_resp;
 
     let send_event ?event ?id ?retry ~data () : unit =
+      send_response_idempotent_();
       _opt_iter event ~f:(fun e -> Printf.fprintf oc "data: %s\n" e);
       _opt_iter id ~f:(fun e -> Printf.fprintf oc "id: %s\n" e);
       _opt_iter retry ~f:(fun e -> Printf.fprintf oc "retry: %s\n" e);
@@ -919,6 +926,11 @@ let add_route_server_sent_handler ?accept self route f =
       flush oc
     in
     let module SSG = struct
+      let set_headers h =
+        if not !resp_sent then (
+          headers := List.rev_append h !headers;
+          send_response_idempotent_()
+        )
       let send_event = send_event
     end in
     f req (module SSG : SERVER_SENT_GENERATOR);

@@ -576,6 +576,12 @@ val add_path_handler_stream :
     @since NEXT_RELEASE
   *)
 module type SERVER_SENT_GENERATOR = sig
+  val set_headers : Headers.t -> unit
+  (** Set headers of the response.
+      This is not mandatory but if used at all, it must be called before
+      any call to {!send_event} (once events are sent the response is
+      already sent too). *)
+
   val send_event :
     ?event:string ->
     ?id:string ->

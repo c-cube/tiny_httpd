@@ -12,9 +12,15 @@ let () =
     ]) (fun _ -> ()) "sse_clock [opt*]";
   let server = S.create ~port:!port () in
 
+  let extra_headers = [
+    "Access-Control-Allow-Origin", "*";
+    "Access-Control-Allow-Methods", "POST, GET, OPTIONS";
+  ] in
+
   S.add_route_server_sent_handler server S.Route.(exact "clock" @/ return)
     (fun _req (module EV : S.SERVER_SENT_GENERATOR) ->
        S._debug (fun k->k"new connection");
+       EV.set_headers extra_headers;
        let tick = ref true in
        while true do
          let now = Ptime_clock.now() in
