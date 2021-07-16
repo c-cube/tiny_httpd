@@ -189,7 +189,7 @@ let cb_encode_compressed_stream
         headers= set_headers resp.headers;
         body=`Stream (encode_deflate_stream_ ~buf_size str);
       }
-    | `String _ -> None
+    | `String _ | `Void -> None
   ) else None
 
 let setup

@@ -15,15 +15,19 @@ module S = Tiny_httpd
 
 let () =
   let server = S.create () in
+
   (* say hello *)
   S.add_route_handler ~meth:`GET server
     S.Route.(exact "hello" @/ string @/ return)
     (fun name _req -> S.Response.make_string (Ok ("hello " ^name ^"!\n")));
+
   (* echo request *)
   S.add_route_handler server
     S.Route.(exact "echo" @/ return)
     (fun req -> S.Response.make_string
         (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
+
+  (* file upload *)
   S.add_route_handler ~meth:`PUT server
     S.Route.(exact "upload" @/ string_urlencoded @/ return)
     (fun path req ->
@@ -36,6 +40,8 @@ let () =
           S.Response.fail ~code:500 "couldn't upload file: %s"
             (Printexc.to_string e)
       );
+
+  (* run the server *)
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);
   match S.run server with
   | Ok () -> ()
@@ -557,55 +563,6 @@ val add_path_handler_stream :
     json decoder (such as [Jsonm]) or into a file.
     @since 0.3 *)
 
-(** {2 Async handler}
-
-    {b EXPERIMENTAL}: this API is not stable yet. *)
-
-(** Async handler arguments
-
-    Async handlers are handlers that do not block a thread.
-    Instead they receive this argument, and can call the functions
-    when they want. The functions might be registered in some event loop,
-    for example, or stashed in a table only to be called by a thread or thread
-    pool later when some event happened. *)
-module type ASYNC_HANDLER_ARG = sig
-  val write : bytes -> int -> int -> unit
-  (** Write some data on the socket.
-
-      Note that this is still done using blocking IO. *)
-
-  val set_response : Response.t -> unit
-  (** Write response. More data can still be written.
-      The writing is done using blocking IO. *)
-
-  val close : unit -> unit
-  (** Close connection. This is idempotent and failures will not be
-      reported here. *)
-end
-
-val add_route_async_handler :
-  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
-  ?meth:Meth.t ->
-  t ->
-  ('a, string Request.t -> (module ASYNC_HANDLER_ARG) -> unit) Route.t -> 'a ->
-  unit
-(** Add a route handler that replies asynchronously.
-
-    See {!ASYNC_HANDLER_ARG} for some details on how the handler might
-    generate a response, write data, etc.
-
-    @since NEXT_RELEASE *)
-
-val add_route_async_stream_handler :
-  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
-  ?meth:Meth.t ->
-  t ->
-  ('a, byte_stream Request.t -> (module ASYNC_HANDLER_ARG) -> unit) Route.t -> 'a ->
-  unit
-(** Like {!add_route_async_handler} but takes the request body as a stream,
-    not a string.
-    @since NEXT_RELEASE *)
-
 (** {2 Server-sent events}
 
     {b EXPERIMENTAL}: this API is not stable yet. *)
@@ -648,18 +605,6 @@ val add_route_server_sent_handler :
     See {!server_sent_generator} for more details.
 
     This handler stays on the original thread (it is synchronous).
-
-    @since NEXT_RELEASE *)
-
-val add_route_server_sent_async_handler :
-  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
-  t ->
-  ('a, string Request.t -> server_sent_generator -> unit) Route.t -> 'a ->
-  unit
-(** Similar to {!add_route_server_sent_handler}, but the thread quits immediately
-    after responding "200", and the rest of the data (the events) are made
-    from the callback from somewhere else.
-    Note that the IO are still blocking.
 
     @since NEXT_RELEASE *)
 

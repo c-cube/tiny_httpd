@@ -780,18 +780,12 @@ module Route = struct
   let pp out x = Format.pp_print_string out (to_string x)
 end
 
-module type ASYNC_HANDLER_ARG = sig
-  val write : bytes -> int -> int -> unit
-  val set_response : Response.t -> unit
-  val close : unit -> unit
-end
-
-(* a handler, either synchronous (blocks the thread),
-   or asynchronous (frees the thread and replies from another thread
-   as it goes) *)
+(* a request handler. handles a single request. *)
 type cb_path_handler =
-  | CB_sync of (byte_stream Request.t -> Response.t)
-  | CB_async of (byte_stream Request.t -> (module ASYNC_HANDLER_ARG) -> unit)
+  out_channel ->
+  byte_stream Request.t ->
+  resp:(Response.t -> unit) ->
+  unit
 
 module type SERVER_SENT_GENERATOR = sig
   val send_event :
@@ -819,7 +813,7 @@ type t = {
   mutable handler: (string Request.t -> Response.t);
   (* toplevel handler, if any *)
 
-  mutable path_handlers : (unit Request.t -> out_channel -> cb_path_handler resp_result option) list;
+  mutable path_handlers : (unit Request.t -> cb_path_handler resp_result option) list;
   (* path handlers *)
 
   mutable cb_decode_req:
@@ -844,7 +838,7 @@ let set_top_handler self f = self.handler <- f
 let add_path_handler_
     ?(accept=fun _req -> Ok ())
     ?meth ~tr_req self fmt f =
-  let ph req _oc : cb_path_handler resp_result option =
+  let ph req : cb_path_handler resp_result option =
     match meth with
     | Some m when m <> req.Request.meth -> None (* ignore *)
     | _ ->
@@ -852,7 +846,7 @@ let add_path_handler_
         | handler ->
           (* we have a handler, do we accept the request based on its headers? *)
           begin match accept req with
-            | Ok () -> Some (Ok (CB_sync (fun req -> handler @@ tr_req req)))
+            | Ok () -> Some (Ok (fun _oc req ~resp -> resp (handler (tr_req req))))
             | Error _ as e -> Some e
           end
         | exception _ ->
@@ -869,11 +863,13 @@ let add_path_handler ?accept ?meth self fmt f =
 let add_path_handler_stream ?accept ?meth self fmt f =
   add_path_handler_ ?accept ?meth ~tr_req:(fun x->x) self fmt f
 
-(* route the given handler *)
+(* route the given handler.
+   @param tr_req wraps the actual concrete function returned by the route
+   and makes it into a handler. *)
 let add_route_handler_
     ?(accept=fun _req -> Ok ())
-    ?meth self (route:_ Route.t) mk_cb f =
-  let ph req oc : cb_path_handler resp_result option =
+    ?meth ~tr_req self (route:_ Route.t) f =
+  let ph req : cb_path_handler resp_result option =
     match meth with
     | Some m when m <> req.Request.meth -> None (* ignore *)
     | _ ->
@@ -881,7 +877,7 @@ let add_route_handler_
         | Some handler ->
           (* we have a handler, do we accept the request based on its headers? *)
           begin match accept req with
-            | Ok () -> Some (Ok (mk_cb oc handler))
+            | Ok () -> Some (Ok (fun oc req ~resp -> tr_req oc req ~resp handler))
             | Error _ as e -> Some e
           end
         | None ->
@@ -891,58 +887,43 @@ let add_route_handler_
   self.path_handlers <- ph :: self.path_handlers
 
 let add_route_handler (type a) ?accept ?meth self (route:(a,_) Route.t) (f:_) : unit =
-  let mk_cb _oc f = CB_sync (fun req -> f (Request.read_body_full req)) in
-  add_route_handler_ ?accept ?meth self route mk_cb f
+  let tr_req _oc req ~resp f = resp (f (Request.read_body_full req)) in
+  add_route_handler_ ?accept ?meth self route ~tr_req f
 
 let add_route_handler_stream ?accept ?meth self route f =
-  let mk_cb _oc f = CB_sync f in
-  add_route_handler_ ?accept ?meth self route mk_cb f
+  let tr_req _oc req ~resp f = resp (f req) in
+  add_route_handler_ ?accept ?meth self route ~tr_req f
 
-(* TODO *)
-let add_route_async_stream_handler ?accept ?meth self route f =
-  let mk_cb _oc f : unit = CB_async f in
-  add_route_handler_ ?accept ?meth self route mk_cb f
-
-let add_route_async_handler ?accept ?meth self route f =
-  let f req arg _oc : unit = f (Request.read_body_full req) arg in
-  add_route_handler_ ?accept ?meth self route (CB_async f)
-
-module Make_SSGEN(Conn : sig val oc: out_channel end) = struct
-  open Conn
-
-  let initial_resp () =
-    let headers = Headers.(empty |> set "content-type" "text/event-stream") in
-    Response.make_raw ~headers ~code:200 ""
-
-  let _opt_iter ~f o = match o with
-    | None -> ()
-    | Some x -> f x
-
-  let send_event ?event ?id ?retry ~data () : unit =
-    _opt_iter event ~f:(fun e -> Printf.fprintf oc "data: %s\n" e);
-    _opt_iter id ~f:(fun e -> Printf.fprintf oc "id: %s\n" e);
-    _opt_iter retry ~f:(fun e -> Printf.fprintf oc "retry: %s\n" e);
-    let l = String.split_on_char '\n' data in
-    List.iter (fun s -> Printf.fprintf oc "data: %s\n" s) l;
-    output_string oc "\n"; (* finish group *)
-    flush oc
-end
+let[@inline] _opt_iter ~f o = match o with
+  | None -> ()
+  | Some x -> f x
 
 let add_route_server_sent_handler ?accept self route f =
-  let handle_req _req oc =
-    let module SSGEN = Make_SSGEN(struct let oc=oc end) in
-    Response.output_ oc @@ SSGEN.initial_resp();
-    f (module SSGEN : SERVER_SENT_GENERATOR)
-  in
-  add_route_handler_ self ?accept ~meth:`GET route handle_req
+  let tr_req oc req ~resp f =
+    let req = Request.read_body_full req in
 
-let add_route_server_sent_async_handler ?accept self route f =
-  let handle_req _req (module A:ASYNC_HANDLER_ARG) oc =
-    let module SSGEN = Make_SSGEN(struct let oc=oc end) in
-    A.set_response @@ SSGEN.initial_resp();
-    f (module SSGEN : SERVER_SENT_GENERATOR)
+    (* send 200 response now *)
+    let initial_resp =
+      let headers = Headers.(empty |> set "content-type" "text/event-stream") in
+      Response.make_raw ~headers ~code:200 ""
+    in
+    resp initial_resp;
+
+    let send_event ?event ?id ?retry ~data () : unit =
+      _opt_iter event ~f:(fun e -> Printf.fprintf oc "data: %s\n" e);
+      _opt_iter id ~f:(fun e -> Printf.fprintf oc "id: %s\n" e);
+      _opt_iter retry ~f:(fun e -> Printf.fprintf oc "retry: %s\n" e);
+      let l = String.split_on_char '\n' data in
+      List.iter (fun s -> Printf.fprintf oc "data: %s\n" s) l;
+      output_string oc "\n"; (* finish group *)
+      flush oc
+    in
+    let module SSG = struct
+      let send_event = send_event
+    end in
+    f req (module SSG : SERVER_SENT_GENERATOR);
   in
-  add_route_handler_ self ?accept ~meth:`GET route handle_req
+  add_route_handler_ self ?accept ~meth:`GET route ~tr_req f
 
 let create
     ?(masksigpipe=true)
@@ -997,7 +978,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
         let handler =
           match find_map (fun ph -> ph req) self.path_handlers with
           | Some f -> unwrap_resp_result f
-          | None -> CB_sync (fun req _oc -> self.handler (Request.read_body_full req))
+          | None -> (fun _oc req ~resp -> resp (self.handler (Request.read_body_full req)))
         in
 
         (* handle expect/continue *)
@@ -1031,40 +1012,18 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
             resp self.cb_encode_resp
         in
 
-        begin match handler with
-          | CB_sync h ->
-            (* compute response *)
-            let resp = h req oc |> post_process_resp in
+        (* how to reply *)
+        let resp r =
+          try
+            let r = post_process_resp r in
+            Response.output_ oc r
+          with Sys_error _ -> continue := false
+        in
 
-            (* send response back *)
-            begin
-              try Response.output_ oc resp
-              with Sys_error _ -> continue := false
-            end
-
-          | CB_async h ->
-
-            (* bundle state to be able to send reply *)
-            let is_done = ref false in
-            let module M = struct
-              let write b i len = output oc b i len
-              let set_response r =
-                if !is_done then failwith "async handler: done writing response";
-                is_done := true;
-                let r = post_process_resp r in
-                Response.output_ oc r
-              let close () = is_done := true; close_out_noerr oc
-            end in
-            let arg = (module M : ASYNC_HANDLER_ARG) in
-
-            (* last query we handle on this connection, too complicated otherwise *)
-            continue := false;
-
-            (* make sure we close the connection if it is GC'ed *)
-            let dispose (module M:ASYNC_HANDLER_ARG) = M.close() in
-            Gc.finalise dispose arg;
-
-            h req arg oc
+        (* call handler *)
+        begin
+          try handler oc req ~resp
+          with Sys_error _ -> continue := false
         end
       with
       | Sys_error _ ->
