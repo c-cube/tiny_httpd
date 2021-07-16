@@ -420,7 +420,7 @@ module Route : sig
       @since 0.7 *)
 end
 
-(** {2 Server} *)
+(** {2 Main Server type} *)
 
 type t
 (** A HTTP server. See {!create} for more details. *)
@@ -480,6 +480,8 @@ val add_encode_response_cb:
     as well as the current response.
 *)
 
+(** {2 Request handlers} *)
+
 val set_top_handler : t -> (string Request.t -> Response.t) -> unit
 (** Setup a handler called by default.
 
@@ -507,6 +509,7 @@ val add_route_handler :
     its content is too big, or for some permission error).
     See the {!http_of_dir} program for an example of how to use [accept] to
     filter uploads that are too large before the upload even starts.
+    The default always returns [Ok()], i.e. it accepts all requests.
 
     @since 0.6
 *)
@@ -553,6 +556,114 @@ val add_path_handler_stream :
     This is useful when one wants to stream the body directly into a parser,
     json decoder (such as [Jsonm]) or into a file.
     @since 0.3 *)
+
+(** {2 Async handler}
+
+    {b EXPERIMENTAL}: this API is not stable yet. *)
+
+(** Async handler arguments
+
+    Async handlers are handlers that do not block a thread.
+    Instead they receive this argument, and can call the functions
+    when they want. The functions might be registered in some event loop,
+    for example, or stashed in a table only to be called by a thread or thread
+    pool later when some event happened. *)
+module type ASYNC_HANDLER_ARG = sig
+  val write : bytes -> int -> int -> unit
+  (** Write some data on the socket.
+
+      Note that this is still done using blocking IO. *)
+
+  val set_response : Response.t -> unit
+  (** Write response. More data can still be written.
+      The writing is done using blocking IO. *)
+
+  val close : unit -> unit
+  (** Close connection. This is idempotent and failures will not be
+      reported here. *)
+end
+
+val add_route_async_handler :
+  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?meth:Meth.t ->
+  t ->
+  ('a, string Request.t -> (module ASYNC_HANDLER_ARG) -> unit) Route.t -> 'a ->
+  unit
+(** Add a route handler that replies asynchronously.
+
+    See {!ASYNC_HANDLER_ARG} for some details on how the handler might
+    generate a response, write data, etc.
+
+    @since NEXT_RELEASE *)
+
+val add_route_async_stream_handler :
+  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?meth:Meth.t ->
+  t ->
+  ('a, byte_stream Request.t -> (module ASYNC_HANDLER_ARG) -> unit) Route.t -> 'a ->
+  unit
+(** Like {!add_route_async_handler} but takes the request body as a stream,
+    not a string.
+    @since NEXT_RELEASE *)
+
+(** {2 Server-sent events}
+
+    {b EXPERIMENTAL}: this API is not stable yet. *)
+
+(** A server-side function to generate of Server-sent events.
+
+    See {{: https://html.spec.whatwg.org/multipage/server-sent-events.html} the w3c page}
+    and {{: https://jvns.ca/blog/2021/01/12/day-36--server-sent-events-are-cool--and-a-fun-bug/}
+    this blog post}.
+
+    @since NEXT_RELEASE
+  *)
+module type SERVER_SENT_GENERATOR = sig
+  val send_event :
+    ?event:string ->
+    ?id:string ->
+    ?retry:string ->
+    data:string ->
+    unit -> unit
+  (** Send an event from the server.
+      If data is a multiline string, it will be sent on separate "data:" lines. *)
+end
+
+type server_sent_generator = (module SERVER_SENT_GENERATOR)
+(** Server-sent event generator
+    @since NEXT_RELEASE *)
+
+val add_route_server_sent_handler :
+  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  t ->
+  ('a, string Request.t -> server_sent_generator -> unit) Route.t -> 'a ->
+  unit
+(** Add a handler on an endpoint, that serves server-sent events.
+
+    The callback is given a generator that can be used to send events
+    as it pleases. The connection is always closed by the client,
+    and the accepted method is always [GET].
+    This will set the header "content-type" to "text/event-stream" automatically
+    and reply with a 200 immediately.
+    See {!server_sent_generator} for more details.
+
+    This handler stays on the original thread (it is synchronous).
+
+    @since NEXT_RELEASE *)
+
+val add_route_server_sent_async_handler :
+  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  t ->
+  ('a, string Request.t -> server_sent_generator -> unit) Route.t -> 'a ->
+  unit
+(** Similar to {!add_route_server_sent_handler}, but the thread quits immediately
+    after responding "200", and the rest of the data (the events) are made
+    from the callback from somewhere else.
+    Note that the IO are still blocking.
+
+    @since NEXT_RELEASE *)
+
+(** {2 Run the server} *)
 
 val stop : t -> unit
 (** Ask the server to stop. This might not have an immediate effect
