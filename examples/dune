@@ -1,0 +1,10 @@
+
+(executable
+  (name sse_clock)
+  (modules sse_clock)
+  (libraries tiny_httpd unix ptime ptime.clock.os))
+
+(executable
+  (name sse_client)
+  (modules sse_client)
+  (libraries unix))
