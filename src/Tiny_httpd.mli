@@ -314,9 +314,9 @@ end
     the client to answer a {!Request.t}*)
 
 module Response : sig
-  type body = [`String of string | `Stream of byte_stream]
+  type body = [`String of string | `Stream of byte_stream | `Void]
   (** Body of a response, either as a simple string,
-      or a stream of bytes. *)
+      or a stream of bytes, or nothing (for server-sent events). *)
 
   type t = {
     code: Response_code.t; (** HTTP response code. See {!Response_code}. *)

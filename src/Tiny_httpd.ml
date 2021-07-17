@@ -576,7 +576,7 @@ end
 *)
 
 module Response = struct
-  type body = [`String of string | `Stream of byte_stream]
+  type body = [`String of string | `Stream of byte_stream | `Void]
   type t = {
     code: Response_code.t;
     headers: Headers.t;
@@ -595,6 +595,9 @@ module Response = struct
     let headers = Headers.set "Transfer-Encoding" "chunked" headers in
     { code; headers; body=`Stream body; }
 
+  let make_void ?(headers=[]) ~code () : t =
+    { code; headers; body=`Void; }
+
   let make_string ?headers r = match r with
     | Ok body -> make_raw ?headers ~code:200 body
     | Error (code,msg) -> make_raw ?headers ~code msg
@@ -606,6 +609,7 @@ module Response = struct
   let make ?headers r : t = match r with
     | Ok (`String body) -> make_raw ?headers ~code:200 body
     | Ok (`Stream body) -> make_raw_stream ?headers ~code:200 body
+    | Ok `Void -> make_void ?headers ~code:200 ()
     | Error (code,msg) -> make_raw ?headers ~code msg
 
   let fail ?headers ~code fmt =
@@ -617,6 +621,7 @@ module Response = struct
     let pp_body out = function
       | `String s -> Format.fprintf out "%S" s
       | `Stream _ -> Format.pp_print_string out "<stream>"
+      | `Void -> ()
     in
     Format.fprintf out "{@[code=%d;@ headers=[@[%a@]];@ body=%a@]}"
       self.code Headers.pp self.headers pp_body self.body
@@ -645,6 +650,7 @@ module Response = struct
         `Stream (Byte_stream.of_string s), true
       | `String _ as b -> b, false
       | `Stream _ as b -> b, true
+      | `Void as b -> b, false
     in
     let headers =
       if is_chunked then (
@@ -659,7 +665,7 @@ module Response = struct
     List.iter (fun (k,v) -> Printf.fprintf oc "%s: %s\r\n" k v) headers;
     output_string oc "\r\n";
     begin match body with
-      | `String "" -> ()
+      | `String "" | `Void -> ()
       | `String s -> output_string oc s;
       | `Stream str -> output_stream_chunked_ oc str;
     end;
@@ -910,7 +916,7 @@ let add_route_server_sent_handler ?accept self route f =
       if not !resp_sent then (
         resp_sent := true;
         (* send 200 response now *)
-        let initial_resp = Response.make_raw ~headers:!headers ~code:200 "" in
+        let initial_resp = Response.make_void ~headers:!headers ~code:200 () in
         resp initial_resp;
       )
     in
