@@ -14,7 +14,10 @@
   (deps (:script ./run_test.sh) ./sse_client.exe ./sse_server.exe)
   (package tiny_httpd)
   (action
-    (with-stdout-to %{targets} (run %{script}))))
+    (progn
+      (with-stdout-to %{targets} (run %{script}))
+      (run sed -i "s/\\r\\n/\\n/g" %{targets})
+      )))
 
 (rule
   (alias runtest)
