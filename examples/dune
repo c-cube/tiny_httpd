@@ -12,15 +12,15 @@
 (rule
   (targets test_output.txt)
   (deps (:script ./run_test.sh) ./sse_client.exe ./sse_server.exe)
+  (enabled_if (= %{os_type} "Unix"))
   (package tiny_httpd)
   (action
-    (progn
-      (with-stdout-to %{targets} (run %{script}))
-      )))
+    (with-stdout-to %{targets} (run %{script}))))
 
 (rule
   (alias runtest)
   (package tiny_httpd)
+  (enabled_if (= %{os_type} "Unix"))
   (deps test_output.txt)
   (action
     (diff test_output.txt.expected test_output.txt)))
