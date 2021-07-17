@@ -16,7 +16,6 @@
   (action
     (progn
       (with-stdout-to %{targets} (run %{script}))
-      (run sed -i "s/\\r\\n/\\n/g" %{targets})
       )))
 
 (rule
