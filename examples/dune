@@ -1,10 +1,21 @@
 
 (executable
-  (name sse_clock)
-  (modules sse_clock)
+  (name sse_server)
+  (modules sse_server)
   (libraries tiny_httpd unix ptime ptime.clock.os))
 
 (executable
   (name sse_client)
   (modules sse_client)
   (libraries unix))
+
+(rule
+  (targets test_output.txt)
+  (deps (:script ./run_test.sh) ./sse_client.exe ./sse_server.exe)
+  (action
+    (with-stdout-to %{targets} (run %{script}))))
+
+(rule
+  (alias runtest)
+  (action
+    (diff test_output.txt.expected test_output.txt)))

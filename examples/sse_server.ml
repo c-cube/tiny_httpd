@@ -1,5 +1,5 @@
 
-(* serves a stream of clock events *)
+(* serves some streams of events *)
 
 module S = Tiny_httpd
 
@@ -17,6 +17,7 @@ let () =
     "Access-Control-Allow-Methods", "POST, GET, OPTIONS";
   ] in
 
+  (* tick/tock goes the clock *)
   S.add_route_server_sent_handler server S.Route.(exact "clock" @/ return)
     (fun _req (module EV : S.SERVER_SENT_GENERATOR) ->
        S._debug (fun k->k"new connection");
@@ -30,6 +31,17 @@ let () =
          tick := not !tick;
 
          Unix.sleepf 1.0;
+       done;
+    );
+
+  (* just count *)
+  S.add_route_server_sent_handler server S.Route.(exact "count" @/ return)
+    (fun _req (module EV : S.SERVER_SENT_GENERATOR)  ->
+       let n = ref 0 in
+       while true do
+         EV.send_event ~data:(string_of_int !n) ();
+         incr n;
+         Unix.sleepf 0.1;
        done;
     );
 

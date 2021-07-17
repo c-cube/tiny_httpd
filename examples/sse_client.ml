@@ -1,12 +1,15 @@
 let addr = ref "127.0.0.1"
 let port = ref 8080
+let path = ref "/clock"
 
 let bufsize = 1024
 
 let () =
   Arg.parse (Arg.align [
+      "-h", Arg.Set_string addr, " address to connect to";
       "-p", Arg.Set_int port, " port to connect to";
-    ]) (fun s -> addr := s) "sse_client [opt]* [addr]?";
+      "--alarm", Arg.Int (fun i->Unix.alarm i|>ignore), " set alarm (in seconds)";
+    ]) (fun s -> path := s) "sse_client [opt]* path?";
 
   Format.printf "connect to %s:%d@." !addr !port;
   let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
@@ -15,7 +18,7 @@ let () =
 
   let ic = Unix.in_channel_of_descr sock in
   let oc = Unix.out_channel_of_descr sock in
-  output_string oc "GET /clock HTTP/1.1\r\nHost: localhost\r\n\r\n";
+  Printf.fprintf oc "GET %s HTTP/1.1\r\nHost: localhost\r\n\r\n" !path;
   flush oc;
 
   let continue = ref true in
@@ -25,4 +28,4 @@ let () =
     if n=0 then continue := false;
     output stdout buf 0 n; flush stdout
   done;
-  Format.printf "bye!@."
+  Format.printf "exit!@."
