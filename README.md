@@ -3,8 +3,10 @@
 
 Minimal HTTP server using good old threads, with stream abstractions,
 simple routing, URL encoding/decoding, and optional compression with camlzip.
+It also supports [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
+([w3c](https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation))
 
-Free from all forms of `ppx`, async monads, etc.
+Free from all forms of `ppx`, async monads, etc. 🙃
 
 **Note**: it can be useful to add the `jemalloc` opam package for long running
 server, as it does a good job at controlling memory usage.
@@ -75,11 +77,11 @@ dependencies or high scalability libraries.
 
 Use cases might include:
 
-- serve content directly from a static blog generator
-- provide a web UI to some tool (like CUPS and syncthing do)
-- implement a basic monitoring page for a service
-- provide a simple json API for a service, on top of http
-- use `http_of_dir` to serve odoc-generated docs or some assets directory
+- serve content directly from a static blog generator;
+- provide a web UI to some tool (like CUPS and syncthing do);
+- implement a basic monitoring page for a service;
+- provide a simple json API for a service, on top of http;
+- use `http_of_dir` to serve odoc-generated docs or some assets directory.
 
 ## Documentation
 
