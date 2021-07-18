@@ -573,7 +573,7 @@ val add_path_handler_stream :
     and {{: https://jvns.ca/blog/2021/01/12/day-36--server-sent-events-are-cool--and-a-fun-bug/}
     this blog post}.
 
-    @since NEXT_RELEASE
+    @since 0.9
   *)
 module type SERVER_SENT_GENERATOR = sig
   val set_headers : Headers.t -> unit
@@ -594,7 +594,7 @@ end
 
 type server_sent_generator = (module SERVER_SENT_GENERATOR)
 (** Server-sent event generator
-    @since NEXT_RELEASE *)
+    @since 0.9 *)
 
 val add_route_server_sent_handler :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
@@ -612,7 +612,7 @@ val add_route_server_sent_handler :
 
     This handler stays on the original thread (it is synchronous).
 
-    @since NEXT_RELEASE *)
+    @since 0.9 *)
 
 (** {2 Run the server} *)
 

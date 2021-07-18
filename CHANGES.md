@@ -1,4 +1,8 @@
 
+## 0.9
+
+- support handlers that stream server-sent events to client
+
 ## 0.8
 
 - bump to ocaml 4.04
