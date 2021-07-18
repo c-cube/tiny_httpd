@@ -15,15 +15,19 @@ module S = Tiny_httpd
 
 let () =
   let server = S.create () in
+
   (* say hello *)
   S.add_route_handler ~meth:`GET server
     S.Route.(exact "hello" @/ string @/ return)
     (fun name _req -> S.Response.make_string (Ok ("hello " ^name ^"!\n")));
+
   (* echo request *)
   S.add_route_handler server
     S.Route.(exact "echo" @/ return)
     (fun req -> S.Response.make_string
         (Ok (Format.asprintf "echo:@ %a@." S.Request.pp req)));
+
+  (* file upload *)
   S.add_route_handler ~meth:`PUT server
     S.Route.(exact "upload" @/ string_urlencoded @/ return)
     (fun path req ->
@@ -36,6 +40,8 @@ let () =
           S.Response.fail ~code:500 "couldn't upload file: %s"
             (Printexc.to_string e)
       );
+
+  (* run the server *)
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);
   match S.run server with
   | Ok () -> ()
@@ -308,9 +314,9 @@ end
     the client to answer a {!Request.t}*)
 
 module Response : sig
-  type body = [`String of string | `Stream of byte_stream]
+  type body = [`String of string | `Stream of byte_stream | `Void]
   (** Body of a response, either as a simple string,
-      or a stream of bytes. *)
+      or a stream of bytes, or nothing (for server-sent events). *)
 
   type t = {
     code: Response_code.t; (** HTTP response code. See {!Response_code}. *)
@@ -420,7 +426,7 @@ module Route : sig
       @since 0.7 *)
 end
 
-(** {2 Server} *)
+(** {2 Main Server type} *)
 
 type t
 (** A HTTP server. See {!create} for more details. *)
@@ -480,6 +486,8 @@ val add_encode_response_cb:
     as well as the current response.
 *)
 
+(** {2 Request handlers} *)
+
 val set_top_handler : t -> (string Request.t -> Response.t) -> unit
 (** Setup a handler called by default.
 
@@ -507,6 +515,7 @@ val add_route_handler :
     its content is too big, or for some permission error).
     See the {!http_of_dir} program for an example of how to use [accept] to
     filter uploads that are too large before the upload even starts.
+    The default always returns [Ok()], i.e. it accepts all requests.
 
     @since 0.6
 *)
@@ -553,6 +562,59 @@ val add_path_handler_stream :
     This is useful when one wants to stream the body directly into a parser,
     json decoder (such as [Jsonm]) or into a file.
     @since 0.3 *)
+
+(** {2 Server-sent events}
+
+    {b EXPERIMENTAL}: this API is not stable yet. *)
+
+(** A server-side function to generate of Server-sent events.
+
+    See {{: https://html.spec.whatwg.org/multipage/server-sent-events.html} the w3c page}
+    and {{: https://jvns.ca/blog/2021/01/12/day-36--server-sent-events-are-cool--and-a-fun-bug/}
+    this blog post}.
+
+    @since NEXT_RELEASE
+  *)
+module type SERVER_SENT_GENERATOR = sig
+  val set_headers : Headers.t -> unit
+  (** Set headers of the response.
+      This is not mandatory but if used at all, it must be called before
+      any call to {!send_event} (once events are sent the response is
+      already sent too). *)
+
+  val send_event :
+    ?event:string ->
+    ?id:string ->
+    ?retry:string ->
+    data:string ->
+    unit -> unit
+  (** Send an event from the server.
+      If data is a multiline string, it will be sent on separate "data:" lines. *)
+end
+
+type server_sent_generator = (module SERVER_SENT_GENERATOR)
+(** Server-sent event generator
+    @since NEXT_RELEASE *)
+
+val add_route_server_sent_handler :
+  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  t ->
+  ('a, string Request.t -> server_sent_generator -> unit) Route.t -> 'a ->
+  unit
+(** Add a handler on an endpoint, that serves server-sent events.
+
+    The callback is given a generator that can be used to send events
+    as it pleases. The connection is always closed by the client,
+    and the accepted method is always [GET].
+    This will set the header "content-type" to "text/event-stream" automatically
+    and reply with a 200 immediately.
+    See {!server_sent_generator} for more details.
+
+    This handler stays on the original thread (it is synchronous).
+
+    @since NEXT_RELEASE *)
+
+(** {2 Run the server} *)
 
 val stop : t -> unit
 (** Ask the server to stop. This might not have an immediate effect

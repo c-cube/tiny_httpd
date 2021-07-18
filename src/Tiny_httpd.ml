@@ -576,7 +576,7 @@ end
 *)
 
 module Response = struct
-  type body = [`String of string | `Stream of byte_stream]
+  type body = [`String of string | `Stream of byte_stream | `Void]
   type t = {
     code: Response_code.t;
     headers: Headers.t;
@@ -595,6 +595,9 @@ module Response = struct
     let headers = Headers.set "Transfer-Encoding" "chunked" headers in
     { code; headers; body=`Stream body; }
 
+  let make_void ?(headers=[]) ~code () : t =
+    { code; headers; body=`Void; }
+
   let make_string ?headers r = match r with
     | Ok body -> make_raw ?headers ~code:200 body
     | Error (code,msg) -> make_raw ?headers ~code msg
@@ -606,6 +609,7 @@ module Response = struct
   let make ?headers r : t = match r with
     | Ok (`String body) -> make_raw ?headers ~code:200 body
     | Ok (`Stream body) -> make_raw_stream ?headers ~code:200 body
+    | Ok `Void -> make_void ?headers ~code:200 ()
     | Error (code,msg) -> make_raw ?headers ~code msg
 
   let fail ?headers ~code fmt =
@@ -617,6 +621,7 @@ module Response = struct
     let pp_body out = function
       | `String s -> Format.fprintf out "%S" s
       | `Stream _ -> Format.pp_print_string out "<stream>"
+      | `Void -> ()
     in
     Format.fprintf out "{@[code=%d;@ headers=[@[%a@]];@ body=%a@]}"
       self.code Headers.pp self.headers pp_body self.body
@@ -645,6 +650,7 @@ module Response = struct
         `Stream (Byte_stream.of_string s), true
       | `String _ as b -> b, false
       | `Stream _ as b -> b, true
+      | `Void as b -> b, false
     in
     let headers =
       if is_chunked then (
@@ -659,7 +665,7 @@ module Response = struct
     List.iter (fun (k,v) -> Printf.fprintf oc "%s: %s\r\n" k v) headers;
     output_string oc "\r\n";
     begin match body with
-      | `String "" -> ()
+      | `String "" | `Void -> ()
       | `String s -> output_string oc s;
       | `Stream str -> output_stream_chunked_ oc str;
     end;
@@ -694,8 +700,6 @@ module Sem_ = struct
     Condition.broadcast t.cond;
     Mutex.unlock t.mutex
 end
-
-type cb_path_handler = byte_stream Request.t -> Response.t
 
 module Route = struct
   type path = string list (* split on '/' *)
@@ -782,18 +786,53 @@ module Route = struct
   let pp out x = Format.pp_print_string out (to_string x)
 end
 
+(* a request handler. handles a single request. *)
+type cb_path_handler =
+  out_channel ->
+  byte_stream Request.t ->
+  resp:(Response.t -> unit) ->
+  unit
+
+module type SERVER_SENT_GENERATOR = sig
+  val set_headers : Headers.t -> unit
+  val send_event :
+    ?event:string ->
+    ?id:string ->
+    ?retry:string ->
+    data:string ->
+    unit -> unit
+end
+type server_sent_generator = (module SERVER_SENT_GENERATOR)
+
 type t = {
   addr: string;
+
   port: int;
+
   sem_max_connections: Sem_.t;
+  (* semaphore to restrict the number of active concurrent connections *)
+
   new_thread: (unit -> unit) -> unit;
+  (* a function to run the given callback in a separate thread (or thread pool) *)
+
   masksigpipe: bool;
+
   mutable handler: (string Request.t -> Response.t);
+  (* toplevel handler, if any *)
+
   mutable path_handlers : (unit Request.t -> cb_path_handler resp_result option) list;
+  (* path handlers *)
+
   mutable cb_decode_req:
     (unit Request.t -> (unit Request.t * (byte_stream -> byte_stream)) option) list;
+  (* middleware to decode requests *)
+
   mutable cb_encode_resp: (unit Request.t -> Response.t -> Response.t option) list;
+  (* middleware to encode responses *)
+
   mutable running: bool;
+  (* true while the server is running. no need to protect with a mutex,
+     writes should be atomic enough. *)
 }
 
 let addr self = self.addr
@@ -814,7 +853,7 @@ let add_path_handler_
         | handler ->
           (* we have a handler, do we accept the request based on its headers? *)
           begin match accept req with
-            | Ok () -> Some (Ok (fun req -> handler @@ tr_req req))
+            | Ok () -> Some (Ok (fun _oc req ~resp -> resp (handler (tr_req req))))
             | Error _ as e -> Some e
           end
         | exception _ ->
@@ -831,6 +870,9 @@ let add_path_handler ?accept ?meth self fmt f =
 let add_path_handler_stream ?accept ?meth self fmt f =
   add_path_handler_ ?accept ?meth ~tr_req:(fun x->x) self fmt f
 
+(* route the given handler.
+   @param tr_req wraps the actual concrete function returned by the route
+   and makes it into a handler. *)
 let add_route_handler_
     ?(accept=fun _req -> Ok ())
     ?meth ~tr_req self (route:_ Route.t) f =
@@ -842,7 +884,7 @@ let add_route_handler_
         | Some handler ->
           (* we have a handler, do we accept the request based on its headers? *)
           begin match accept req with
-            | Ok () -> Some (Ok (fun req -> handler @@ tr_req req))
+            | Ok () -> Some (Ok (fun oc req ~resp -> tr_req oc req ~resp handler))
             | Error _ as e -> Some e
           end
         | None ->
@@ -851,11 +893,55 @@ let add_route_handler_
   in
   self.path_handlers <- ph :: self.path_handlers
 
-let add_route_handler ?accept ?meth self route f =
-  add_route_handler_ ?accept ?meth ~tr_req:Request.read_body_full self route f
+let add_route_handler (type a) ?accept ?meth self (route:(a,_) Route.t) (f:_) : unit =
+  let tr_req _oc req ~resp f = resp (f (Request.read_body_full req)) in
+  add_route_handler_ ?accept ?meth self route ~tr_req f
 
 let add_route_handler_stream ?accept ?meth self route f =
-  add_route_handler_ ?accept ?meth ~tr_req:(fun x->x) self route f
+  let tr_req _oc req ~resp f = resp (f req) in
+  add_route_handler_ ?accept ?meth self route ~tr_req f
+
+let[@inline] _opt_iter ~f o = match o with
+  | None -> ()
+  | Some x -> f x
+
+let add_route_server_sent_handler ?accept self route f =
+  let tr_req oc req ~resp f =
+    let req = Request.read_body_full req in
+    let headers = ref Headers.(empty |> set "content-type" "text/event-stream") in
+
+    (* send response once *)
+    let resp_sent = ref false in
+    let send_response_idempotent_ () =
+      if not !resp_sent then (
+        resp_sent := true;
+        (* send 200 response now *)
+        let initial_resp = Response.make_void ~headers:!headers ~code:200 () in
+        resp initial_resp;
+      )
+    in
+
+    let send_event ?event ?id ?retry ~data () : unit =
+      send_response_idempotent_();
+      _opt_iter event ~f:(fun e -> Printf.fprintf oc "data: %s\n" e);
+      _opt_iter id ~f:(fun e -> Printf.fprintf oc "id: %s\n" e);
+      _opt_iter retry ~f:(fun e -> Printf.fprintf oc "retry: %s\n" e);
+      let l = String.split_on_char '\n' data in
+      List.iter (fun s -> Printf.fprintf oc "data: %s\n" s) l;
+      output_string oc "\n"; (* finish group *)
+      flush oc
+    in
+    let module SSG = struct
+      let set_headers h =
+        if not !resp_sent then (
+          headers := List.rev_append h !headers;
+          send_response_idempotent_()
+        )
+      let send_event = send_event
+    end in
+    f req (module SSG : SERVER_SENT_GENERATOR);
+  in
+  add_route_handler_ self ?accept ~meth:`GET route ~tr_req f
 
 let create
     ?(masksigpipe=true)
@@ -890,67 +976,82 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
   while !continue && self.running do
     _debug (fun k->k "read next request");
     match Request.parse_req_start ~buf is with
-    | Ok None -> continue := false
+    | Ok None ->
+      continue := false (* client is done *)
+
     | Error (c,s) ->
+      (* connection error, close *)
       let res = Response.make_raw ~code:c s in
       begin
         try Response.output_ oc res
         with Sys_error _ -> ()
       end;
       continue := false
+
     | Ok (Some req) ->
       _debug (fun k->k "req: %s" (Format.asprintf "@[%a@]" Request.pp_ req));
-      let res =
-        try
-          (* is there a handler for this path? *)
-          let handler =
-            match find_map (fun ph -> ph req) self.path_handlers with
-            | Some f -> unwrap_resp_result f
-            | None -> (fun req -> self.handler @@ Request.read_body_full req)
-          in
-          (* handle expectations *)
-          begin match Request.get_header ~f:String.trim req "Expect" with
-            | Some "100-continue" ->
-              _debug (fun k->k "send back: 100 CONTINUE");
-              Response.output_ oc (Response.make_raw ~code:100 "");
-            | Some s -> bad_reqf 417 "unknown expectation %s" s
-            | None -> ()
-          end;
-          (* preprocess request's input stream *)
-          let req0, tr_stream =
-            List.fold_left
-              (fun (req,tr) cb ->
-                 match cb req with
-                 | None -> req, tr
-                 | Some (r',f) -> r', (fun is -> tr is |> f))
-              (req, (fun is->is)) self.cb_decode_req
-          in
-          (* now actually read request's body *)
-          let req =
-            Request.parse_body_ ~tr_stream ~buf {req0 with body=is}
-            |> unwrap_resp_result
-          in
-          let resp = handler req in
-          (* post-process response *)
+
+      try
+        (* is there a handler for this path? *)
+        let handler =
+          match find_map (fun ph -> ph req) self.path_handlers with
+          | Some f -> unwrap_resp_result f
+          | None -> (fun _oc req ~resp -> resp (self.handler (Request.read_body_full req)))
+        in
+
+        (* handle expect/continue *)
+        begin match Request.get_header ~f:String.trim req "Expect" with
+          | Some "100-continue" ->
+            _debug (fun k->k "send back: 100 CONTINUE");
+            Response.output_ oc (Response.make_raw ~code:100 "");
+          | Some s -> bad_reqf 417 "unknown expectation %s" s
+          | None -> ()
+        end;
+
+        (* preprocess request's input stream *)
+        let req0, tr_stream =
+          List.fold_left
+            (fun (req,tr) cb ->
+               match cb req with
+               | None -> req, tr
+               | Some (r',f) -> r', (fun is -> tr is |> f))
+            (req, (fun is->is)) self.cb_decode_req
+        in
+        (* now actually read request's body into a stream *)
+        let req =
+          Request.parse_body_ ~tr_stream ~buf {req0 with body=is}
+          |> unwrap_resp_result
+        in
+
+        (* how to post-process response accordingly *)
+        let post_process_resp resp =
           List.fold_left
             (fun resp cb -> match cb req0 resp with None -> resp | Some r' -> r')
             resp self.cb_encode_resp
-        with
-        | Bad_req (code,s) ->
-          continue := false;
-          Response.make_raw ~code s
-        | e ->
-          Response.fail ~code:500 "server error: %s" (Printexc.to_string e)
-      in
-      begin
-        try Response.output_ oc res
-        with Sys_error _ -> continue := false
-      end
-    | exception Bad_req (code,s) ->
-      Response.output_ oc (Response.make_raw ~code s);
-      continue := false
-    | exception Sys_error _ ->
-      continue := false; (* connection broken somehow *)
+        in
+
+        (* how to reply *)
+        let resp r =
+          try
+            let r = post_process_resp r in
+            Response.output_ oc r
+          with Sys_error _ -> continue := false
+        in
+
+        (* call handler *)
+        begin
+          try handler oc req ~resp
+          with Sys_error _ -> continue := false
+        end
+      with
+      | Sys_error _ ->
+        continue := false; (* connection broken somehow *)
+      | Bad_req (code,s) ->
+        continue := false;
+        Response.output_ oc @@ Response.make_raw ~code s
+      | e ->
+        continue := false;
+        Response.output_ oc @@ Response.fail ~code:500 "server error: %s" (Printexc.to_string e)
   done;
   _debug (fun k->k "done with client, exiting");
   (try Unix.close client_sock
