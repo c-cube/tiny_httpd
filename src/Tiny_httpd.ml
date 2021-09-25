@@ -1069,7 +1069,7 @@ let run (self:t) : (unit,_) result =
     );
     let sock, should_bind = match self.sock with
       | Some s ->
-        s, false (* Because we're getting a socket from systemd *)
+        s, false (* Because we're getting a socket from the caller (e.g. systemd) *)
       | None ->
         Unix.socket
           (if is_ipv6 self then Unix.PF_INET6 else Unix.PF_INET)
