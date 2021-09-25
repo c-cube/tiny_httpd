@@ -459,7 +459,8 @@ val create :
     @param sock an existing socket given to the server to listen on, e.g. by
       systemd on Linux (or launchd on macOS). If passed in, this socket will be
       used instead of the [addr] and [port]. If not passed in, those will be
-      used. *)
+      used. This parameter exists since 0.10.
+*)
 
 val addr : t -> string
 (** Address on which the server listens. *)
