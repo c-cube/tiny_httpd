@@ -809,6 +809,8 @@ type t = {
 
   port: int;
 
+  sock: Unix.file_descr option;
+
   sem_max_connections: Sem_.t;
   (* semaphore to restrict the number of active concurrent connections *)
 
@@ -947,10 +949,10 @@ let create
     ?(masksigpipe=true)
     ?(max_connections=32)
     ?(new_thread=(fun f -> ignore (Thread.create f () : Thread.t)))
-    ?(addr="127.0.0.1") ?(port=8080) () : t =
+    ?(addr="127.0.0.1") ?(port=8080) ?sock () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let max_connections = max 4 max_connections in
-  { new_thread; addr; port; masksigpipe; handler;
+  { new_thread; addr; port; sock; masksigpipe; handler;
     running= true; sem_max_connections=Sem_.create max_connections;
     path_handlers=[];
     cb_encode_resp=[]; cb_decode_req=[];
@@ -1065,16 +1067,24 @@ let run (self:t) : (unit,_) result =
     if self.masksigpipe then (
       ignore (Unix.sigprocmask Unix.SIG_BLOCK [Sys.sigpipe] : _ list);
     );
-    let sock =
-      Unix.socket (if is_ipv6 self then Unix.PF_INET6 else Unix.PF_INET)
-        Unix.SOCK_STREAM 0
+    let sock, should_bind = match self.sock with
+      | Some s ->
+        s, false (* Because we're getting a socket from the caller (e.g. systemd) *)
+      | None ->
+        Unix.socket
+          (if is_ipv6 self then Unix.PF_INET6 else Unix.PF_INET)
+          Unix.SOCK_STREAM
+          0,
+        true (* Because we're creating the socket ourselves *)
     in
     Unix.clear_nonblock sock;
-    Unix.setsockopt sock Unix.SO_REUSEADDR true;
     Unix.setsockopt_optint sock Unix.SO_LINGER None;
-    let inet_addr = Unix.inet_addr_of_string self.addr in
-    Unix.bind sock (Unix.ADDR_INET (inet_addr, self.port));
-    Unix.listen sock (2 * self.sem_max_connections.Sem_.n);
+    begin if should_bind then
+      let inet_addr = Unix.inet_addr_of_string self.addr in
+      Unix.setsockopt sock Unix.SO_REUSEADDR true;
+      Unix.bind sock (Unix.ADDR_INET (inet_addr, self.port));
+      Unix.listen sock (2 * self.sem_max_connections.Sem_.n)
+    end;
     while self.running do
       (* limit concurrency *)
       Sem_.acquire 1 self.sem_max_connections;

@@ -437,6 +437,7 @@ val create :
   ?new_thread:((unit -> unit) -> unit) ->
   ?addr:string ->
   ?port:int ->
+  ?sock:Unix.file_descr ->
   unit ->
   t
 (** Create a new webserver.
@@ -455,7 +456,10 @@ val create :
     @param max_connections maximum number of simultaneous connections.
     @param addr address (IPv4 or IPv6) to listen on. Default ["127.0.0.1"].
     @param port to listen on. Default [8080].
-    *)
+    @param sock an existing socket given to the server to listen on, e.g. by
+      systemd on Linux (or launchd on macOS). If passed in, this socket will be
+      used instead of the [addr] and [port]. If not passed in, those will be
+      used. *)
 
 val addr : t -> string
 (** Address on which the server listens. *)
