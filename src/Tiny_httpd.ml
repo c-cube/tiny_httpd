@@ -1078,10 +1078,10 @@ let run (self:t) : (unit,_) result =
         true (* Because we're creating the socket ourselves *)
     in
     Unix.clear_nonblock sock;
-    Unix.setsockopt sock Unix.SO_REUSEADDR true;
     Unix.setsockopt_optint sock Unix.SO_LINGER None;
-    let inet_addr = Unix.inet_addr_of_string self.addr in
     begin if should_bind then
+      let inet_addr = Unix.inet_addr_of_string self.addr in
+      Unix.setsockopt sock Unix.SO_REUSEADDR true;
       Unix.bind sock (Unix.ADDR_INET (inet_addr, self.port));
       Unix.listen sock (2 * self.sem_max_connections.Sem_.n)
     end;
