@@ -1101,8 +1101,9 @@ let run (self:t) : (unit,_) result =
               raise e
           );
       with e ->
-        Printf.eprintf "accept raised an exception: %s"
-           (Printexc.to_string e)
+        _debug (fun k -> k
+                  "Unix.accept or Thread.create raised an exception: %s"
+                  (Printexc.to_string e))
     done;
     Ok ()
   with e -> Error e
