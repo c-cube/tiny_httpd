@@ -1088,17 +1088,21 @@ let run (self:t) : (unit,_) result =
     while self.running do
       (* limit concurrency *)
       Sem_.acquire 1 self.sem_max_connections;
-      let client_sock, _ = Unix.accept sock in
-      self.new_thread
-        (fun () ->
-           try
-             handle_client_ self client_sock;
-             Sem_.release 1 self.sem_max_connections;
-           with e ->
-             (try Unix.close client_sock with _ -> ());
-             Sem_.release 1 self.sem_max_connections;
-             raise e
-        );
+      try
+        let client_sock, _ = Unix.accept sock in
+        self.new_thread
+          (fun () ->
+            try
+              handle_client_ self client_sock;
+              Sem_.release 1 self.sem_max_connections;
+            with e ->
+              (try Unix.close client_sock with _ -> ());
+              Sem_.release 1 self.sem_max_connections;
+              raise e
+          );
+      with e ->
+        Printf.eprintf "accept raised an exception: %s"
+           (Printexc.to_string e)
     done;
     Ok ()
   with e -> Error e
