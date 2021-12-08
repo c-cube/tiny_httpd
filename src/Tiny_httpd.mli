@@ -434,6 +434,7 @@ type t
 val create :
   ?masksigpipe:bool ->
   ?max_connections:int ->
+  ?max_keep_alive:float ->
   ?new_thread:((unit -> unit) -> unit) ->
   ?addr:string ->
   ?port:int ->
@@ -453,7 +454,10 @@ val create :
     new client connection. By default it is {!Thread.create} but one
     could use a thread pool instead.
 
-    @param max_connections maximum number of simultaneous connections.
+    @param max_connections maximum number of simultaneous connections. Default 32.
+    @param max_keep_alive maximum number of seconds a thread in maintened for
+      a client with nothing to read. Default: -1.0, meaning threads are maintened
+      until client close the socket.
     @param addr address (IPv4 or IPv6) to listen on. Default ["127.0.0.1"].
     @param port to listen on. Default [8080].
     @param sock an existing socket given to the server to listen on, e.g. by
@@ -639,4 +643,3 @@ val _debug : ((('a, out_channel, unit, unit, unit, unit) format6 -> 'a) -> unit)
 val _enable_debug: bool -> unit
 
 (**/**)
-
