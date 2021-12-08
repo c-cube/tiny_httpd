@@ -1000,8 +1000,9 @@ let find_map f l =
   in aux f l
 
 let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
+  let write_sock = Unix.dup client_sock in
   let _ = Unix.set_nonblock client_sock in
-  let oc = Unix.out_channel_of_descr client_sock in
+  let oc = Unix.out_channel_of_descr write_sock in
   let buf = Buf_.create() in
   let is = Byte_stream.of_descr ~timeout:self.max_keep_alive client_sock in
   let continue = ref true in
