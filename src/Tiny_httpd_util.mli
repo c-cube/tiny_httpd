@@ -59,5 +59,8 @@ type (_,_) to_read =
   | Grp     : int * ('a, 'b) to_read -> (string -> 'a, 'b) to_read
   | OptGrp  : int * ('a, 'b) to_read -> (string option -> 'a, 'b) to_read
 
+val string_match : Str.regexp -> string -> ?from:int
+                     -> ('a,'b) to_read -> 'a -> 'b
+
 val search_forward : Str.regexp -> string -> ?from:int
                      -> ('a,'b) to_read -> 'a -> 'b

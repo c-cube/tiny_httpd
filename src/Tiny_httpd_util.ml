@@ -171,25 +171,36 @@ type (_,_) to_read =
   | Grp     : int * ('a, 'b) to_read -> (string -> 'a, 'b) to_read
   | OptGrp  : int * ('a, 'b) to_read -> (string option -> 'a, 'b) to_read
 
-let search_forward regexp_ str ?(from=0) groups cont =
-  let rec read_groups : type a b. (a,b) to_read -> a -> b =
-    let open Str in
+let read_groups str groups cont =
+  let open Str in
+  let rec fn : type a b. (a,b) to_read -> a -> b =
     fun groups cont ->
     match groups,cont with
     | Nothing , cont -> cont
-    | Begin r , cont -> read_groups r (cont (match_beginning ()))
-    | End   r , cont -> read_groups r (cont (match_end ()))
-    | Grp(i,r), cont -> read_groups r (cont (matched_group i str))
+    | Begin r , cont -> fn r (cont (match_beginning ()))
+    | End   r , cont -> fn r (cont (match_end ()))
+    | Grp(i,r), cont -> fn r (cont (matched_group i str))
     | OptGrp(i,r), cont ->
        let str = try Some(matched_group i str)
                  with Not_found -> None
        in
-       read_groups r (cont str)
+       fn r (cont str)
   in
+  fn groups cont
+
+let search_forward regexp_ str ?(from=0) groups cont =
   let open Str in
   Mutex.lock str_mutex;
   let _ = search_forward regexp_ str from in
-  let cont = read_groups groups cont  in
+  let cont = read_groups str groups cont  in
+  Mutex.unlock str_mutex;
+  cont
+
+let string_match regexp_ str ?(from=0) groups cont =
+  let open Str in
+  Mutex.lock str_mutex;
+  let _ = string_match regexp_ str from in
+  let cont = read_groups str groups cont  in
   Mutex.unlock str_mutex;
   cont
 
