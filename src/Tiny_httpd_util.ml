@@ -191,18 +191,26 @@ let read_groups str groups cont =
 let search_forward regexp_ str ?(from=0) groups cont =
   let open Str in
   Mutex.lock str_mutex;
-  let _ = search_forward regexp_ str from in
-  let cont = read_groups str groups cont  in
-  Mutex.unlock str_mutex;
-  cont
+  try
+    let _ = search_forward regexp_ str from in
+    let cont = read_groups str groups cont  in
+    Mutex.unlock str_mutex;
+    cont
+  with e ->
+    Mutex.unlock str_mutex;
+    raise e
 
 let string_match regexp_ str ?(from=0) groups cont =
   let open Str in
   Mutex.lock str_mutex;
-  let _ = string_match regexp_ str from in
-  let cont = read_groups str groups cont  in
-  Mutex.unlock str_mutex;
-  cont
+  try
+    let _ = string_match regexp_ str from in
+    let cont = read_groups str groups cont  in
+    Mutex.unlock str_mutex;
+    cont
+  with e ->
+    Mutex.unlock str_mutex;
+    raise e
 
 let first_line str =
   let pos = String.index str '\n' in
