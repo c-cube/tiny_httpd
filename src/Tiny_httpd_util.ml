@@ -161,3 +161,119 @@ let parse_query s : (_ list, string) result=
             (List.map (fun (x,y) -> percent_encode x ^"="^percent_encode y) l) in
         eq_sorted (Ok l) (parse_query s))
 *)
+
+let str_mutex = Mutex.create ()
+
+type (_,_) to_read =
+  | Nothing : ('a, 'a) to_read
+  | Begin   : ('a, 'b) to_read -> (int -> 'a, 'b) to_read
+  | End     : ('a, 'b) to_read -> (int -> 'a, 'b) to_read
+  | Grp     : int * ('a, 'b) to_read -> (string -> 'a, 'b) to_read
+  | OptGrp  : int * ('a, 'b) to_read -> (string option -> 'a, 'b) to_read
+
+let search_forward regexp_ str ?(from=0) groups cont =
+  let rec read_groups : type a b. (a,b) to_read -> a -> b =
+    let open Str in
+    fun groups cont ->
+    match groups,cont with
+    | Nothing , cont -> cont
+    | Begin r , cont -> read_groups r (cont (match_beginning ()))
+    | End   r , cont -> read_groups r (cont (match_end ()))
+    | Grp(i,r), cont -> read_groups r (cont (matched_group i str))
+    | OptGrp(i,r), cont ->
+       let str = try Some(matched_group i str)
+                 with Not_found -> None
+       in
+       read_groups r (cont str)
+  in
+  let open Str in
+  Mutex.lock str_mutex;
+  let _ = search_forward regexp_ str from in
+  let cont = read_groups groups cont  in
+  Mutex.unlock str_mutex;
+  cont
+
+let first_line str =
+  let pos = String.index str '\n' in
+  let pos = if str.[pos] = '\r' then pos-1 else pos in
+  String.sub str 0 (pos-1)
+
+
+(* Decoding of multipart encoded post forms according to rfc7578 *)
+type multipart_part =
+  { disposition : string
+  ; mime_type   : string option
+  ; charset     : string option
+  ; filename    : string option
+  ; content     : string }
+
+let content_disposition_regexp =
+  Str.regexp "Content-Disposition: \\([^;\r\n]*\\)\\(;[ ]*\\)?\\([^\r\n]*\\)"
+
+let content_type_regexp =
+  Str.regexp "Content-Type: \\([^\r\n]*\\)\\(;[ ]*charset=\\([^ \n\r]+\\)\\)"
+
+let empty_line_re =
+  Str.regexp "\r?\n\r?\n"
+
+let decode_parts str =
+  try
+    let groups = Begin (End Nothing) in
+    let (header_end, content_begin) =
+      search_forward empty_line_re str groups (fun b e -> (b,e))
+    in
+    let header = String.sub str 0 header_end in
+    let len = String.length str in
+    let rm = if str.[len-1] = '\n' then
+               if str.[len-2] = '\r' then 2 else 1 else 0
+    in
+    let len = len - content_begin - rm in
+    let content = String.sub str content_begin len in
+    let (disposition, values) =
+      search_forward content_disposition_regexp header
+        (Grp(1,Grp (3,Nothing))) (fun x y -> (x,y))
+    in
+    let values =
+      match parse_query values with
+      | Ok l -> List.map (fun (k,v) ->
+                    let open String in
+                    let k = trim k in
+                    let v = trim v in
+                    let len = String.length v in
+                    let v =
+                      if v.[0] = '"' && v.[len-1] = '"' && len > 1 then
+                        String.sub v 1 (len-2)
+                      else v
+                    in
+                    (k,v)) l
+      | _ -> []
+    in
+    let mime_type, charset =
+      try
+        search_forward content_type_regexp header (OptGrp (1,OptGrp (3,Nothing)))
+          (fun x y -> (x,y))
+      with
+        Not_found -> (None, None)
+    in
+    let name = List.assoc "name" values in
+    let filename = try percent_decode (List.assoc "filename" values)
+                   with Not_found -> None
+    in
+    Some(name,{disposition; mime_type; charset; filename; content})
+  with Not_found -> None
+
+let decode_multipart str =
+  let sep = first_line str in
+  let parts = Str.(split (regexp (sep ^ "\\(--\\)?\r?\n")) str) in
+  let res = List.filter_map decode_parts parts in
+  let default_charset, res =
+    List.partition (fun (name,_) -> name = "_charset_") res
+  in
+  match default_charset with
+  | (_,{content=charset; _})::_ ->
+     List.map (function
+           (name, part as c) ->
+           if part.charset = None then
+             (name, {part with charset = Some charset})
+           else c) res
+  | [] -> res
