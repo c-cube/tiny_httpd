@@ -721,8 +721,13 @@ module Sem_ = struct
   let release m t =
     Mutex.lock t.mutex;
     t.n <- t.n + m;
-    let r = t.n in
     Condition.broadcast t.cond;
+    Mutex.unlock t.mutex
+
+  let available_connection t =
+    (* locking necessary unless we have atomic read/write for int.*)
+    Mutex.lock t.mutex;
+    let r = t.n in
     Mutex.unlock t.mutex;
     r
 end
@@ -1125,13 +1130,17 @@ let run (self:t) : (unit,_) result =
           (fun () ->
             try
               handle_client_ self client_sock;
-              let avail = Sem_.release 1 self.sem_max_connections in
-              _debug (fun k -> k"closing inactive connections (%d connections available)" avail)
+              Sem_.release 1 self.sem_max_connections;
+              _debug (fun k -> k
+                "closing inactive connections (%d connections available)"
+                (Sem_.available_connection self.sem_max_connections))
             with
             | e ->
               (try Unix.close client_sock with _ -> ());
-              let avail = Sem_.release 1 self.sem_max_connections in
-              _debug (fun k -> k"closing connections on error (%d connections available)" avail);
+              Sem_.release 1 self.sem_max_connections;
+              _debug (fun k -> k
+                "closing connections on error (%d connections available)"
+                (Sem_.available_connection self.sem_max_connections));
               raise e
           );
       with e ->
