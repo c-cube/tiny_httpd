@@ -870,6 +870,9 @@ type t = {
 let addr self = self.addr
 let port self = self.port
 
+let available_connections self =
+  Sem_.available_connections self.sem_max_connections
+
 let add_decode_request_cb self f =  self.cb_decode_req <- f :: self.cb_decode_req
 let add_encode_response_cb self f = self.cb_encode_resp <- f :: self.cb_encode_resp
 let set_top_handler self f = self.handler <- f
