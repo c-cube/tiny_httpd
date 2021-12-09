@@ -458,6 +458,7 @@ val create :
     @param max_keep_alive maximum number of seconds a thread in maintened for
       a client with nothing to read. Default: -1.0, meaning threads are maintened
       until client close the socket.
+      This parameter exists since 0.11.
     @param addr address (IPv4 or IPv6) to listen on. Default ["127.0.0.1"].
     @param port to listen on. Default [8080].
     @param sock an existing socket given to the server to listen on, e.g. by
