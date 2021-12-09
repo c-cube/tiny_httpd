@@ -2,7 +2,7 @@
 module S = Tiny_httpd
 module BS = Tiny_httpd.Byte_stream
 
-let mk_decode_deflate_stream_ ~buf_size () (is:S.byte_stream) : S.byte_stream =
+let decode_deflate_stream_ ~buf_size () (is:S.byte_stream) : S.byte_stream =
   S._debug (fun k->k "wrap stream with deflate.decode");
   let buf = Bytes.make buf_size ' ' in
   let buf_len = ref 0 in
@@ -156,7 +156,7 @@ let cb_decode_compressed_stream ~buf_size (req:unit S.Request.t) : _ option =
     begin match Scanf.sscanf s "deflate, %s" (fun s -> s) with
       | tr' ->
         let req' = S.Request.set_header req "Transfer-Encoding" tr' in
-        Some (req', mk_decode_deflate_stream_ ~buf_size ())
+        Some (req', decode_deflate_stream_ ~buf_size ())
       | exception _ -> None
     end
   | _ -> None
@@ -191,6 +191,8 @@ let cb_encode_compressed_stream
       }
     | `String _ | `Void -> None
   ) else None
+
+(* TODO: as middleware *)
 
 let setup
     ?(compress_above=500*1024)

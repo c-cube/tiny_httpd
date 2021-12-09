@@ -507,6 +507,7 @@ val active_connections : t -> int
 val add_decode_request_cb :
   t ->
   (unit Request.t -> (unit Request.t * (byte_stream -> byte_stream)) option) -> unit
+[@@deprecated "use add_middleware"]
 (** Add a callback for every request.
     The callback can provide a stream transformer and a new request (with
     modified headers, typically).
@@ -518,6 +519,7 @@ val add_decode_request_cb :
 
 val add_encode_response_cb:
   t -> (unit Request.t -> Response.t -> Response.t option) -> unit
+[@@deprecated "use add_middleware"]
 (** Add a callback for every request/response pair.
     Similarly to {!add_encode_response_cb} the callback can return a new
     response, for example to compress it.
