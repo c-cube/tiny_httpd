@@ -426,6 +426,31 @@ module Route : sig
       @since 0.7 *)
 end
 
+(** {2 Middlewares}
+
+    A middleware can be inserted in a handler to modify or observe
+    its behavior.
+
+    @since NEXT_RELEASE
+*)
+module Middleware : sig
+  type handler = byte_stream Request.t -> resp:(Response.t -> unit) -> unit
+  (** Handlers are functions returning a response to a request.
+      The response can be delayed, hence the use of a continuation
+      as the [resp] parameter. *)
+
+  type t = handler -> handler
+  (** A middleware is a handler transformation.
+
+      It takes the existing handler [h],
+      and returns a new one which, given a query, modify it or log it
+      before passing it to [h], or fail. It can also log or modify or drop
+      the response. *)
+
+  val nil : t
+  (** Trivial middleware that does nothing. *)
+end
+
 (** {2 Main Server type} *)
 
 type t
@@ -487,6 +512,8 @@ val add_decode_request_cb :
     modified headers, typically).
     A possible use is to handle decompression by looking for a [Transfer-Encoding]
     header and returning a stream transformer that decompresses on the fly.
+
+    @deprecated use {!add_middleware} instead
 *)
 
 val add_encode_response_cb:
@@ -496,6 +523,18 @@ val add_encode_response_cb:
     response, for example to compress it.
     The callback is given the query with only its headers,
     as well as the current response.
+
+    @deprecated use {!add_middleware} instead
+*)
+
+val add_middleware :
+  stage:[`Encoding | `Stage of int] ->
+  t -> Middleware.t -> unit
+(** Add a middleware to every request/response pair.
+    @param stage specify when middleware applies.
+      Encoding comes first (outermost layer), then stages in increasing order.
+    @raise Invalid_argument if stage is [`Stage n] where [n < 1]
+    @since NEXT_RELEASE
 *)
 
 (** {2 Request handlers} *)
@@ -509,6 +548,7 @@ val set_top_handler : t -> (string Request.t -> Response.t) -> unit
 
 val add_route_handler :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?middlewares:Middleware.t list ->
   ?meth:Meth.t ->
   t ->
   ('a, string Request.t -> Response.t) Route.t -> 'a ->
@@ -534,6 +574,7 @@ val add_route_handler :
 
 val add_route_handler_stream :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?middlewares:Middleware.t list ->
   ?meth:Meth.t ->
   t ->
   ('a, byte_stream Request.t -> Response.t) Route.t -> 'a ->
