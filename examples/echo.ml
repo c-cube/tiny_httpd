@@ -11,7 +11,7 @@ let () =
       "-j", Arg.Set_int j, " maximum number of connections";
     ]) (fun _ -> raise (Arg.Bad "")) "echo [option]*";
   let server = S.create ~port:!port_ ~max_connections:!j () in
-  Tiny_httpd_camlzip.setup ~compress_above:1024 ~buf_size:(1024*1024) server;
+  Tiny_httpd_camlzip.setup ~compress_above:1024 ~buf_size:(16*1024) server;
   (* say hello *)
   S.add_route_handler ~meth:`GET server
     S.Route.(exact "hello" @/ string @/ return)

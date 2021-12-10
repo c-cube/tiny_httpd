@@ -129,10 +129,10 @@ module Byte_stream : sig
 
   val empty : t
 
-  val of_chan : in_channel -> t
+  val of_chan : ?buf_size:int -> in_channel -> t
   (** Make a buffered stream from the given channel. *)
 
-  val of_chan_close_noerr : in_channel -> t
+  val of_chan_close_noerr : ?buf_size:int -> in_channel -> t
   (** Same as {!of_chan} but the [close] method will never fail. *)
 
   val of_bytes : ?i:int -> ?len:int -> bytes -> t
@@ -149,7 +149,7 @@ module Byte_stream : sig
   (** Write the stream to the channel.
       @since 0.3 *)
 
-  val with_file : string -> (t -> 'a) -> 'a
+  val with_file : ?buf_size:int -> string -> (t -> 'a) -> 'a
   (** Open a file with given name, and obtain an input stream
       on its content. When the function returns, the stream (and file) are closed. *)
 
@@ -277,8 +277,10 @@ module Request : sig
       @since 0.3
   *)
 
-  val read_body_full : byte_stream t -> string t
-  (** Read the whole body into a string. Potentially blocking. *)
+  val read_body_full : ?buf_size:int -> byte_stream t -> string t
+  (** Read the whole body into a string. Potentially blocking.
+
+      @param buf_size initial size of underlying buffer (since NEXT_RELEASE) *)
 
   (**/**)
   (* for testing purpose, do not use *)
@@ -460,6 +462,7 @@ val create :
   ?masksigpipe:bool ->
   ?max_connections:int ->
   ?timeout:float ->
+  ?buf_size:int ->
   ?new_thread:((unit -> unit) -> unit) ->
   ?addr:string ->
   ?port:int ->
@@ -474,6 +477,8 @@ val create :
 
     @param masksigpipe if true, block the signal {!Sys.sigpipe} which otherwise
     tends to kill client threads when they try to write on broken sockets. Default: [true].
+
+    @param buf_size size for buffers (since NEXT_RELEASE)
 
     @param new_thread a function used to spawn a new thread to handle a
     new client connection. By default it is {!Thread.create} but one

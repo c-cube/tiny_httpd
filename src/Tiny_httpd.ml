@@ -66,10 +66,10 @@ module Byte_stream = struct
     bs_close=(fun () -> ());
   }
 
-  let of_chan_ ~close ic : t =
+  let of_chan_ ?(buf_size=16 * 1024) ~close ic : t =
     let i = ref 0 in
     let len = ref 0 in
-    let buf = Bytes.make 4096 ' ' in
+    let buf = Bytes.make buf_size ' ' in
     { bs_fill_buf=(fun () ->
       if !i >= !len then (
         i := 0;
@@ -116,10 +116,10 @@ module Byte_stream = struct
   let of_string s : t =
     of_bytes (Bytes.unsafe_of_string s)
 
-  let with_file file f =
+  let with_file ?buf_size file f =
     let ic = open_in file in
     try
-      let x = f (of_chan ic) in
+      let x = f (of_chan ?buf_size ic) in
       close_in ic;
       x
     with e ->
@@ -542,9 +542,10 @@ module Request = struct
     | e ->
       Error (400, Printexc.to_string e)
 
-  let read_body_full (self:byte_stream t) : string t =
+  let read_body_full ?buf_size (self:byte_stream t) : string t =
     try
-      let body = Byte_stream.read_all self.body in
+      let buf = Buf_.create ?size:buf_size () in
+      let body = Byte_stream.read_all ~buf self.body in
       { self with body }
     with
     | Bad_req _ as e -> raise e
@@ -834,6 +835,8 @@ type t = {
 
   masksigpipe: bool;
 
+  buf_size: int;
+
   mutable handler: (string Request.t -> Response.t);
   (* toplevel handler, if any *)
 
@@ -921,7 +924,7 @@ let add_route_handler_
 
 let add_route_handler (type a) ?accept ?middlewares ?meth
     self (route:(a,_) Route.t) (f:_) : unit =
-  let tr_req _oc req ~resp f = resp (f (Request.read_body_full req)) in
+  let tr_req _oc req ~resp f = resp (f (Request.read_body_full ~buf_size:self.buf_size req)) in
   add_route_handler_ ?accept ?middlewares ?meth self route ~tr_req f
 
 let add_route_handler_stream ?accept ?middlewares ?meth self route f =
@@ -934,7 +937,7 @@ let[@inline] _opt_iter ~f o = match o with
 
 let add_route_server_sent_handler ?accept self route f =
   let tr_req oc req ~resp f =
-    let req = Request.read_body_full req in
+    let req = Request.read_body_full ~buf_size:self.buf_size req in
     let headers = ref Headers.(empty |> set "content-type" "text/event-stream") in
 
     (* send response once *)
@@ -976,11 +979,12 @@ let create
     ?(masksigpipe=true)
     ?(max_connections=32)
     ?(timeout=0.0)
+    ?(buf_size=16 * 1_024)
     ?(new_thread=(fun f -> ignore (Thread.create f () : Thread.t)))
     ?(addr="127.0.0.1") ?(port=8080) ?sock () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let max_connections = max 4 max_connections in
-  { new_thread; addr; port; sock; masksigpipe; handler;
+  { new_thread; addr; port; sock; masksigpipe; handler; buf_size;
     running= true; sem_max_connections=Sem_.create max_connections;
     path_handlers=[]; timeout;
     middlewares=[]; middlewares_sorted=lazy [];
@@ -1002,8 +1006,8 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
   let _ = Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout) in
   let ic = Unix.in_channel_of_descr client_sock in
   let oc = Unix.out_channel_of_descr client_sock in
-  let buf = Buf_.create() in
-  let is = Byte_stream.of_chan ic in
+  let buf = Buf_.create ~size:self.buf_size () in
+  let is = Byte_stream.of_chan ~buf_size:self.buf_size ic in
   let continue = ref true in
   while !continue && self.running do
     _debug (fun k->k "read next request");
@@ -1030,7 +1034,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
           | Some f -> unwrap_resp_result f
           | None ->
             (fun _oc req ~resp ->
-               let body_str = Request.read_body_full req in
+               let body_str = Request.read_body_full ~buf_size:self.buf_size req in
                resp (self.handler body_str))
         in
 
