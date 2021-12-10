@@ -724,7 +724,8 @@ module Sem_ = struct
     Condition.broadcast t.cond;
     Mutex.unlock t.mutex
 
-  let available_connections t = t.n
+  (* +1 because we decrease the semaphore before Unix.accept *)
+  let available_connections t = t.n + 1
 
 end
 
@@ -1123,8 +1124,8 @@ let run (self:t) : (unit,_) result =
     while self.running do
       (* limit concurrency *)
       try
-        let client_sock, _ = Unix.accept sock in
         Sem_.acquire 1 self.sem_max_connections;
+        let client_sock, _ = Unix.accept sock in
         self.new_thread
           (fun () ->
             try
