@@ -196,7 +196,7 @@ let cb_encode_compressed_stream
 
 let setup
     ?(compress_above=500*1024)
-    ?(buf_size=48 * 1_024) (server:S.t) : unit =
+    ?(buf_size=16 * 1_024) (server:S.t) : unit =
   let buf_size = max buf_size 1_024 in
   S._debug (fun k->k "setup gzip support (buf-size %d)" buf_size);
   S.add_decode_request_cb server (cb_decode_compressed_stream ~buf_size);
