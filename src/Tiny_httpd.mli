@@ -253,7 +253,16 @@ module Request : sig
 
   val get_header_int : _ t -> string -> int option
 
-  val set_header : 'a t -> string -> string -> 'a t
+  val set_header : string -> string -> 'a t -> 'a t
+  (** [set_header k v req] sets [k: v] in the request [req]'s headers. *)
+
+  val update_headers : (Headers.t -> Headers.t) -> 'a t -> 'a t
+  (** Modify headers
+      @since 0.11 *)
+
+  val set_body : 'a -> _ t -> 'a t
+  (** [set_body b req] returns a new query whose body is [b].
+      @since 0.11 *)
 
   val host : _ t -> string
   (** Host field of the request. It also appears in the headers. *)
@@ -320,12 +329,32 @@ module Response : sig
   (** Body of a response, either as a simple string,
       or a stream of bytes, or nothing (for server-sent events). *)
 
-  type t = {
+  type t = private {
     code: Response_code.t; (** HTTP response code. See {!Response_code}. *)
     headers: Headers.t; (** Headers of the reply. Some will be set by [Tiny_httpd] automatically. *)
     body: body; (** Body of the response. Can be empty. *)
   }
   (** A response to send back to a client. *)
+
+  val set_body : body -> t -> t
+  (** Set the body of the response.
+      @since 0.11 *)
+
+  val set_header : string -> string -> t -> t
+  (** Set a header.
+      @since 0.11 *)
+
+  val update_headers : (Headers.t -> Headers.t) -> t -> t
+  (** Modify headers
+      @since 0.11 *)
+
+  val set_headers : Headers.t -> t -> t
+  (** Set all headers.
+      @since 0.11 *)
+
+  val set_code : Response_code.t -> t -> t
+  (** Set the response code.
+      @since 0.11 *)
 
   val make_raw :
     ?headers:Headers.t ->

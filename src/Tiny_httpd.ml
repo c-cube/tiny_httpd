@@ -382,7 +382,9 @@ module Request = struct
   let get_header_int self h = match get_header self h with
     | Some x -> (try Some (int_of_string x) with _ -> None)
     | None -> None
-  let set_header self k v = {self with headers=Headers.set k v self.headers}
+  let set_header k v self = {self with headers=Headers.set k v self.headers}
+  let update_headers f self = {self with headers=f self.headers}
+  let set_body b self = {self with body=b}
 
   let pp_comp_ out comp =
     Format.fprintf out "[%s]"
@@ -583,6 +585,12 @@ module Response = struct
     headers: Headers.t;
     body: body;
   }
+
+  let set_body body self = {self with body}
+  let set_headers headers self = {self with headers}
+  let update_headers f self = {self with headers=f self.headers}
+  let set_header k v self = {self with headers = Headers.set k v self.headers}
+  let set_code code self = {self with code}
 
   let make_raw ?(headers=[]) ~code body : t =
     (* add content length to response *)
