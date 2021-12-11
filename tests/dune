@@ -3,6 +3,7 @@
   (targets echo1.out)
   (deps (:bin ../examples/echo.exe))
   (locks /port)
+  (enabled_if (= %{system} "linux"))
   (action (with-stdout-to %{targets} (run ./echo1.sh %{bin}))))
 
 (rule
@@ -13,6 +14,7 @@
   (targets sse_count.out)
   (deps (:bin ../examples/sse_server.exe))
   (locks /port)
+  (enabled_if (= %{system} "linux"))
   (action (with-stdout-to %{targets} (run ./sse_count.sh %{bin}))))
 
 (rule
@@ -23,6 +25,7 @@
   (targets upload-out)
   (deps (:bin ../src/bin/http_of_dir.exe) foo_50)
   (locks /port)
+  (enabled_if (= %{system} "linux"))
   (action (with-stdout-to %{targets}
                           (run ./upload_chunked.sh %{bin}))))
 
@@ -34,6 +37,7 @@
   (targets dl-out)
   (deps (:bin ../src/bin/http_of_dir.exe) foo_50)
   (locks /port)
+  (enabled_if (= %{system} "linux"))
   (action (with-stdout-to %{targets}
                           (run ./download_chunked.sh %{bin}))))
 
