@@ -92,10 +92,20 @@ module Byte_stream = struct
     { bs_fill_buf=(fun () ->
       if !i >= !len then (
         i := 0;
-        let (to_read,_,_) = Unix.select [ic] [] [] timeout in
-        if to_read = [] then raise Timeout;
-        try len := Unix.read ic buf 0 (Bytes.length buf)
-        with Unix.Unix_error ((EAGAIN | EWOULDBLOCK), _, _) -> ();
+
+        let rec wait() =
+          let to_read,_,_ = Unix.select [ic] [] [] timeout in
+          if to_read = [] then raise Timeout;
+          read()
+        and read() =
+          try len := Unix.read ic buf 0 (Bytes.length buf)
+          with
+          | Unix.Unix_error (EAGAIN, _, _) -> read()
+          | Unix.Unix_error (EWOULDBLOCK, _, _) ->
+            (* FIXME: we should decrease the timeout by however long was spent in [select] *)
+            wait()
+        in
+        wait()
       );
       buf, !i,!len - !i);
       bs_consume=(fun n -> i := !i + n);
