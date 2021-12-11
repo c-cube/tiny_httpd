@@ -989,14 +989,19 @@ let create
     ?(timeout=0.0)
     ?(buf_size=16 * 1_024)
     ?(new_thread=(fun f -> ignore (Thread.create f () : Thread.t)))
-    ?(addr="127.0.0.1") ?(port=8080) ?sock () : t =
+    ?(addr="127.0.0.1") ?(port=8080) ?sock
+    ?(middlewares=[])
+    () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let max_connections = max 4 max_connections in
-  { new_thread; addr; port; sock; masksigpipe; handler; buf_size;
+  let self = {
+    new_thread; addr; port; sock; masksigpipe; handler; buf_size;
     running= true; sem_max_connections=Sem_.create max_connections;
     path_handlers=[]; timeout;
     middlewares=[]; middlewares_sorted=lazy [];
-  }
+  } in
+  List.iter (fun (stage,m) -> add_middleware self ~stage m) middlewares;
+  self
 
 let stop s = s.running <- false
 

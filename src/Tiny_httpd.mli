@@ -496,6 +496,7 @@ val create :
   ?addr:string ->
   ?port:int ->
   ?sock:Unix.file_descr ->
+  ?middlewares:([`Encoding | `Stage of int] * Middleware.t) list ->
   unit ->
   t
 (** Create a new webserver.
@@ -512,6 +513,8 @@ val create :
     @param new_thread a function used to spawn a new thread to handle a
     new client connection. By default it is {!Thread.create} but one
     could use a thread pool instead.
+
+    @param middlewares see {!add_middleware} for more details.
 
     @param max_connections maximum number of simultaneous connections.
     @param timeout connection is closed if the socket does not do read or
