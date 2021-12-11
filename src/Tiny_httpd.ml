@@ -66,41 +66,27 @@ module Byte_stream = struct
     bs_close=(fun () -> ());
   }
 
-  let of_chan_ ~close ic : t =
-    let i = ref 0 in
-    let len = ref 0 in
-    let buf = Bytes.make 4096 ' ' in
-    { bs_fill_buf=(fun () ->
-      if !i >= !len then (
-        i := 0;
-        len := input ic buf 0 (Bytes.length buf);
-      );
-      buf, !i,!len - !i);
-      bs_consume=(fun n -> i := !i + n);
-      bs_close=(fun () -> close ic)
-    }
-
-  let of_chan = of_chan_ ~close:close_in
-  let of_chan_close_noerr = of_chan_ ~close:close_in_noerr
-
   exception Timeout
 
-  let of_descr_ ?(timeout=(-1.0)) ~close ic : t =
+  let of_descr_ ?(timeout=(-1.0)) ~close fd : t =
     let i = ref 0 in
     let len = ref 0 in
     let buf = Bytes.make 4096 ' ' in
+
+    Unix.set_nonblock fd;
     { bs_fill_buf=(fun () ->
       if !i >= !len then (
         i := 0;
 
         let rec wait() =
-          let to_read,_,_ = Unix.select [ic] [] [] timeout in
+          let to_read,_,_ = Unix.select [fd] [] [] timeout in
           if to_read = [] then raise Timeout;
           read()
         and read() =
-          try len := Unix.read ic buf 0 (Bytes.length buf)
+          try len := Unix.read fd buf 0 (Bytes.length buf)
           with
           | Unix.Unix_error (EAGAIN, _, _) -> read()
+          | Sys_blocked_io
           | Unix.Unix_error (EWOULDBLOCK, _, _) ->
             (* FIXME: we should decrease the timeout by however long was spent in [select] *)
             wait()
@@ -109,10 +95,18 @@ module Byte_stream = struct
       );
       buf, !i,!len - !i);
       bs_consume=(fun n -> i := !i + n);
-      bs_close=(fun () -> close ic)
+      bs_close=close
     }
 
-  let of_descr = of_descr_ ~close:Unix.close
+  let of_descr ?timeout fd = of_descr_ ?timeout ~close:(fun() -> Unix.close fd) fd
+
+  let of_chan ic =
+    let fd = Unix.descr_of_in_channel ic in
+    of_descr_ ~timeout:(-1.0) ~close:(fun() -> close_in ic) fd
+
+  let of_chan_close_noerr ic =
+    let fd = Unix.descr_of_in_channel ic in
+    of_descr_ ~timeout:(-1.0) ~close:(fun() -> close_in_noerr ic) fd
 
   let rec iter f (self:t) : unit =
     let s, i, len = self.bs_fill_buf () in

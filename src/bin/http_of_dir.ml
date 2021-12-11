@@ -6,6 +6,7 @@ type config = {
   mutable addr: string;
   mutable port: int;
   mutable upload: bool;
+  mutable max_keep_alive: float; (* per connection timeout *)
   mutable max_upload_size: int;
   mutable auto_index_html: bool;
   mutable delete: bool;
@@ -17,6 +18,7 @@ let default_config () : config = {
   port=8080;
   delete=false;
   upload=false;
+  max_keep_alive=10.;
   max_upload_size = 10 * 1024 * 1024;
   auto_index_html=true;
   j=32;
@@ -111,7 +113,10 @@ let date_of_time (f:float) : string =
    *)
 
 let serve ~config (dir:string) : _ result =
-  let server = S.create ~max_connections:config.j ~addr:config.addr ~port:config.port () in
+  let server =
+    S.create ~max_connections:config.j
+      ~max_keep_alive:config.max_keep_alive
+      ~addr:config.addr ~port:config.port () in
   Printf.printf "serve directory %s on http://%(%s%):%d\n%!"
     dir (if S.is_ipv6 server then "[%s]" else "%s") config.addr config.port;
   if config.delete then (
