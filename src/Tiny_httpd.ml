@@ -700,13 +700,14 @@ end
 module Sem_ = struct
   type t = {
     mutable n : int;
+    max: int;
     mutex : Mutex.t;
     cond : Condition.t;
   }
 
   let create n =
     if n <= 0 then invalid_arg "Semaphore.create";
-    { n; mutex=Mutex.create(); cond=Condition.create(); }
+    { n; max=n; mutex=Mutex.create(); cond=Condition.create(); }
 
   let acquire m t =
     Mutex.lock t.mutex;
@@ -724,9 +725,7 @@ module Sem_ = struct
     Condition.broadcast t.cond;
     Mutex.unlock t.mutex
 
-  (* +1 because we decrease the semaphore before Unix.accept *)
-  let available_connections t = t.n + 1
-
+  let num_acquired self = self.max - self.n
 end
 
 module Route = struct
@@ -871,8 +870,9 @@ type t = {
 let addr self = self.addr
 let port self = self.port
 
-let available_connections self =
-  Sem_.available_connections self.sem_max_connections
+let active_connections self =
+  (* -1 because we decrease the semaphore before Unix.accept *)
+  Sem_.num_acquired self.sem_max_connections - 1
 
 let add_decode_request_cb self f =  self.cb_decode_req <- f :: self.cb_decode_req
 let add_encode_response_cb self f = self.cb_encode_resp <- f :: self.cb_encode_resp
@@ -1132,15 +1132,15 @@ let run (self:t) : (unit,_) result =
               handle_client_ self client_sock;
               Sem_.release 1 self.sem_max_connections;
               _debug (fun k -> k
-                "closing inactive connections (%d connections available)"
-                (Sem_.available_connections self.sem_max_connections))
+                "closing inactive connections (%d connections active)"
+                (active_connections self))
             with
             | e ->
               (try Unix.close client_sock with _ -> ());
               Sem_.release 1 self.sem_max_connections;
               _debug (fun k -> k
-                "closing connections on error (%d connections available)"
-                (Sem_.available_connections self.sem_max_connections));
+                "closing connections on error (%d connections active)"
+                (active_connections self));
               raise e
           );
       with e ->
