@@ -18,3 +18,4 @@ jobs:
     - run: opam install -t . --deps-only
     - run: opam exec -- dune build
     - run: opam exec -- dune runtest
+      if: ${{ matrix.operating-system == 'unbuntu-latest' }}
