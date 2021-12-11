@@ -18,3 +18,14 @@
 (rule
   (alias runtest)
   (action (diff sse_count.expect sse_count.out)))
+
+(rule
+  (targets upload-out)
+  (deps (:bin ../src/bin/http_of_dir.exe) foo_50)
+  (locks /port)
+  (action (with-stdout-to %{targets}
+                          (run ./upload_chunked.sh %{bin}))))
+
+(rule
+  (alias runtest)
+  (action (diff upload-out.expect upload-out)))
