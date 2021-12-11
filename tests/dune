@@ -1,0 +1,20 @@
+
+(rule
+  (targets echo1.out)
+  (deps (:bin ../examples/echo.exe))
+  (locks /port)
+  (action (with-stdout-to %{targets} (run ./echo1.sh %{bin}))))
+
+(rule
+  (alias runtest)
+  (action (diff echo1.expect echo1.out)))
+
+(rule
+  (targets sse_count.out)
+  (deps (:bin ../examples/sse_server.exe))
+  (locks /port)
+  (action (with-stdout-to %{targets} (run ./sse_count.sh %{bin}))))
+
+(rule
+  (alias runtest)
+  (action (diff sse_count.expect sse_count.out)))
