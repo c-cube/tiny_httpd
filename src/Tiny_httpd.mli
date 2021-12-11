@@ -595,6 +595,10 @@ module type SERVER_SENT_GENERATOR = sig
     unit -> unit
   (** Send an event from the server.
       If data is a multiline string, it will be sent on separate "data:" lines. *)
+
+  val close : unit -> unit
+  (** Close connection.
+      @since 0.11 *)
 end
 
 type server_sent_generator = (module SERVER_SENT_GENERATOR)

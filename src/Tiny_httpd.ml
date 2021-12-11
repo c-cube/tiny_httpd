@@ -801,6 +801,7 @@ module type SERVER_SENT_GENERATOR = sig
     ?retry:string ->
     data:string ->
     unit -> unit
+  val close : unit -> unit
 end
 type server_sent_generator = (module SERVER_SENT_GENERATOR)
 
@@ -940,8 +941,10 @@ let add_route_server_sent_handler ?accept self route f =
           send_response_idempotent_()
         )
       let send_event = send_event
+      let close () = raise Exit
     end in
-    f req (module SSG : SERVER_SENT_GENERATOR);
+    try f req (module SSG : SERVER_SENT_GENERATOR);
+    with Exit -> close_out oc
   in
   add_route_handler_ self ?accept ~meth:`GET route ~tr_req f
 
