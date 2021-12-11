@@ -40,3 +40,9 @@
 (rule
   (alias runtest)
   (action (diff dl-out.expect dl-out)))
+
+
+(rule
+  (targets foo_50)
+  (action
+    (bash "dd if=/dev/zero of=%{targets} bs=1M count=50")))
