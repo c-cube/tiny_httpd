@@ -44,6 +44,14 @@ let () =
          Unix.sleepf 0.1;
        done;
     );
+  S.add_route_server_sent_handler server S.Route.(exact "count" @/ int @/ return)
+    (fun n _req (module EV : S.SERVER_SENT_GENERATOR)  ->
+       for i=0 to n do
+         EV.send_event ~data:(string_of_int i) ();
+         Unix.sleepf 0.1;
+       done;
+       EV.close();
+    );
 
   Printf.printf "listening on http://localhost:%d/\n%!" (S.port server);
   match S.run server with

@@ -1,2 +1,2 @@
 #!/bin/sh
-exec dune exec "src/examples/echo.exe" -- $@
+exec dune exec "examples/echo.exe" -- $@
