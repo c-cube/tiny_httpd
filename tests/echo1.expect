@@ -1,0 +1,9 @@
+listening on http://127.0.0.1:8083
+echo:
+{meth=GET; host=localhost:8083;
+ headers=[user-agent: test
+          accept: */*
+          host: localhost:8083];
+ path="/echo/?a=b&c=d"; body=""; path_components=["echo"];
+ query=["c","d";"a","b"]}
+(query: "c" = "d";"a" = "b")
