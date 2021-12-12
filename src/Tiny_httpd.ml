@@ -852,34 +852,6 @@ let add_decode_request_cb self f =  self.cb_decode_req <- f :: self.cb_decode_re
 let add_encode_response_cb self f = self.cb_encode_resp <- f :: self.cb_encode_resp
 let set_top_handler self f = self.handler <- f
 
-let add_path_handler_
-    ?(accept=fun _req -> Ok ())
-    ?meth ~tr_req self fmt f =
-  let ph req : cb_path_handler resp_result option =
-    match meth with
-    | Some m when m <> req.Request.meth -> None (* ignore *)
-    | _ ->
-      begin match Scanf.sscanf (Request.non_query_path req) fmt f with
-        | handler ->
-          (* we have a handler, do we accept the request based on its headers? *)
-          begin match accept req with
-            | Ok () -> Some (Ok (fun _oc req ~resp -> resp (handler (tr_req req))))
-            | Error _ as e -> Some e
-          end
-        | exception _ ->
-          None (* path didn't match *)
-      end
-  in
-  self.path_handlers <- ph :: self.path_handlers
-
-(* TODO: remove *)
-let add_path_handler ?accept ?meth self fmt f =
-  add_path_handler_ ?accept ?meth ~tr_req:Request.read_body_full self fmt f
-
-(* TODO: remove *)
-let add_path_handler_stream ?accept ?meth self fmt f =
-  add_path_handler_ ?accept ?meth ~tr_req:(fun x->x) self fmt f
-
 (* route the given handler.
    @param tr_req wraps the actual concrete function returned by the route
    and makes it into a handler. *)

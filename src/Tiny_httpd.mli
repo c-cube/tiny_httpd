@@ -544,37 +544,6 @@ val add_route_handler_stream :
     json decoder (such as [Jsonm]) or into a file.
     @since 0.6 *)
 
-val add_path_handler :
-  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
-  ?meth:Meth.t ->
-  t ->
-  ('a, Scanf.Scanning.in_channel,
-   'b, 'c -> string Request.t -> Response.t, 'a -> 'd, 'd) format6 ->
-  'c -> unit
-[@@ocaml.deprecated "use add_route_handler instead"]
-(** Similar to {!add_route_handler} but based on scanf.
-
-    This uses {!Scanf}'s splitting, which has some gotchas (in particular,
-    ["%s"] is eager, so it's generally necessary to delimit its
-    scope with a ["@/"] delimiter. The "@" before a character indicates it's
-    a separator.
-
-    @deprecated use {!add_route_handler} instead. *)
-
-val add_path_handler_stream :
-  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
-  ?meth:Meth.t ->
-  t ->
-  ('a, Scanf.Scanning.in_channel,
-   'b, 'c -> byte_stream Request.t -> Response.t, 'a -> 'd, 'd) format6 ->
-  'c -> unit
-[@@ocaml.deprecated "use add_route_handler_stream instead"]
-(** Similar to {!add_path_handler}, but where the body of the request
-    is a stream of bytes that has not been read yet.
-    This is useful when one wants to stream the body directly into a parser,
-    json decoder (such as [Jsonm]) or into a file.
-    @since 0.3 *)
-
 (** {2 Server-sent events}
 
     {b EXPERIMENTAL}: this API is not stable yet. *)
