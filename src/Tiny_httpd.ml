@@ -536,9 +536,6 @@ module Request = struct
                 headers; body=()})
     with
     | End_of_file | Sys_error _ -> Ok None
-    | Byte_stream.Timeout ->
-       _debug (fun k -> k"Timeout");
-       Ok None
     | Bad_req (c,s) -> Error (c,s)
     | e ->
       Error (400, Printexc.to_string e)
@@ -704,14 +701,13 @@ end
 module Sem_ = struct
   type t = {
     mutable n : int;
-    max: int;
     mutex : Mutex.t;
     cond : Condition.t;
   }
 
   let create n =
     if n <= 0 then invalid_arg "Semaphore.create";
-    { n; max=n; mutex=Mutex.create(); cond=Condition.create(); }
+    { n; mutex=Mutex.create(); cond=Condition.create(); }
 
   let acquire m t =
     Mutex.lock t.mutex;
@@ -728,8 +724,6 @@ module Sem_ = struct
     t.n <- t.n + m;
     Condition.broadcast t.cond;
     Mutex.unlock t.mutex
-
-  let num_acquired self = self.max - self.n
 end
 
 module Route = struct
@@ -832,6 +826,7 @@ module type SERVER_SENT_GENERATOR = sig
     ?retry:string ->
     data:string ->
     unit -> unit
+  val close : unit -> unit
 end
 type server_sent_generator = (module SERVER_SENT_GENERATOR)
 
@@ -844,9 +839,6 @@ type t = {
 
   sem_max_connections: Sem_.t;
   (* semaphore to restrict the number of active concurrent connections *)
-
-  max_keep_alive: float;
-  (* maximum time in second before closing the client connections *)
 
   new_thread: (unit -> unit) -> unit;
   (* a function to run the given callback in a separate thread (or thread pool) *)
@@ -873,10 +865,6 @@ type t = {
 
 let addr self = self.addr
 let port self = self.port
-
-let active_connections self =
-  (* -1 because we decrease the semaphore before Unix.accept *)
-  Sem_.num_acquired self.sem_max_connections - 1
 
 let add_decode_request_cb self f =  self.cb_decode_req <- f :: self.cb_decode_req
 let add_encode_response_cb self f = self.cb_encode_resp <- f :: self.cb_encode_resp
@@ -978,22 +966,23 @@ let add_route_server_sent_handler ?accept self route f =
           send_response_idempotent_()
         )
       let send_event = send_event
+      let close () = raise Exit
     end in
-    f req (module SSG : SERVER_SENT_GENERATOR);
+    try f req (module SSG : SERVER_SENT_GENERATOR);
+    with Exit -> close_out oc
   in
   add_route_handler_ self ?accept ~meth:`GET route ~tr_req f
 
 let create
     ?(masksigpipe=true)
     ?(max_connections=32)
-    ?(max_keep_alive=(-1.0))
     ?(new_thread=(fun f -> ignore (Thread.create f () : Thread.t)))
     ?(addr="127.0.0.1") ?(port=8080) ?sock () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let max_connections = max 4 max_connections in
   { new_thread; addr; port; sock; masksigpipe; handler;
     running= true; sem_max_connections=Sem_.create max_connections;
-    path_handlers=[]; max_keep_alive;
+    path_handlers=[];
     cb_encode_resp=[]; cb_decode_req=[];
   }
 
@@ -1009,11 +998,10 @@ let find_map f l =
   in aux f l
 
 let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
-  let write_sock = Unix.dup client_sock in
-  let _ = Unix.set_nonblock client_sock in
-  let oc = Unix.out_channel_of_descr write_sock in
+  let ic = Unix.in_channel_of_descr client_sock in
+  let oc = Unix.out_channel_of_descr client_sock in
   let buf = Buf_.create() in
-  let is = Byte_stream.of_descr ~timeout:self.max_keep_alive client_sock in
+  let is = Byte_stream.of_chan ic in
   let continue = ref true in
   while !continue && self.running do
     _debug (fun k->k "read next request");
@@ -1127,24 +1115,17 @@ let run (self:t) : (unit,_) result =
     end;
     while self.running do
       (* limit concurrency *)
+      Sem_.acquire 1 self.sem_max_connections;
       try
-        Sem_.acquire 1 self.sem_max_connections;
         let client_sock, _ = Unix.accept sock in
         self.new_thread
           (fun () ->
             try
               handle_client_ self client_sock;
               Sem_.release 1 self.sem_max_connections;
-              _debug (fun k -> k
-                "closing inactive connections (%d connections active)"
-                (active_connections self))
-            with
-            | e ->
+            with e ->
               (try Unix.close client_sock with _ -> ());
               Sem_.release 1 self.sem_max_connections;
-              _debug (fun k -> k
-                "closing connections on error (%d connections active)"
-                (active_connections self));
               raise e
           );
       with e ->
