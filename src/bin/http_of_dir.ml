@@ -115,7 +115,6 @@ let date_of_time (f:float) : string =
 let serve ~config (dir:string) : _ result =
   let server =
     S.create ~max_connections:config.j
-      ~max_keep_alive:config.max_keep_alive
       ~addr:config.addr ~port:config.port () in
   Printf.printf "serve directory %s on http://%(%s%):%d\n%!"
     dir (if S.is_ipv6 server then "[%s]" else "%s") config.addr config.port;
