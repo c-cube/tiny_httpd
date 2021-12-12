@@ -812,6 +812,8 @@ type t = {
 
   sock: Unix.file_descr option;
 
+  timeout: float;
+
   sem_max_connections: Sem_.t;
   (* semaphore to restrict the number of active concurrent connections *)
 
@@ -951,13 +953,14 @@ let add_route_server_sent_handler ?accept self route f =
 let create
     ?(masksigpipe=true)
     ?(max_connections=32)
+    ?(timeout=0.0)
     ?(new_thread=(fun f -> ignore (Thread.create f () : Thread.t)))
     ?(addr="127.0.0.1") ?(port=8080) ?sock () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let max_connections = max 4 max_connections in
   { new_thread; addr; port; sock; masksigpipe; handler;
     running= true; sem_max_connections=Sem_.create max_connections;
-    path_handlers=[];
+    path_handlers=[]; timeout;
     cb_encode_resp=[]; cb_decode_req=[];
   }
 
@@ -973,6 +976,8 @@ let find_map f l =
   in aux f l
 
 let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
+  let _ = Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout) in
+  let _ = Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout) in
   let ic = Unix.in_channel_of_descr client_sock in
   let oc = Unix.out_channel_of_descr client_sock in
   let buf = Buf_.create() in
