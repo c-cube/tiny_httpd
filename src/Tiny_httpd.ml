@@ -676,13 +676,14 @@ end
 module Sem_ = struct
   type t = {
     mutable n : int;
+    max : int;
     mutex : Mutex.t;
     cond : Condition.t;
   }
 
   let create n =
     if n <= 0 then invalid_arg "Semaphore.create";
-    { n; mutex=Mutex.create(); cond=Condition.create(); }
+    { n; max=n; mutex=Mutex.create(); cond=Condition.create(); }
 
   let acquire m t =
     Mutex.lock t.mutex;
@@ -699,6 +700,8 @@ module Sem_ = struct
     t.n <- t.n + m;
     Condition.broadcast t.cond;
     Mutex.unlock t.mutex
+
+  let num_acquired t = t.max - t.n
 end
 
 module Route = struct
@@ -842,6 +845,8 @@ type t = {
 
 let addr self = self.addr
 let port self = self.port
+
+let active_connections self = Sem_.num_acquired self.sem_max_connections - 1
 
 let add_decode_request_cb self f =  self.cb_decode_req <- f :: self.cb_decode_req
 let add_encode_response_cb self f = self.cb_encode_resp <- f :: self.cb_encode_resp

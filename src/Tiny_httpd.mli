@@ -476,6 +476,9 @@ val is_ipv6 : t -> bool
 val port : t -> int
 (** Port on which the server listens. *)
 
+val active_connections : t -> int
+(** Number of active connections *)
+
 val add_decode_request_cb :
   t ->
   (unit Request.t -> (unit Request.t * (byte_stream -> byte_stream)) option) -> unit
