@@ -71,7 +71,8 @@ module Byte_stream = struct
   let of_descr_ ?(timeout=(-1.0)) ~close fd : t =
     let i = ref 0 in
     let len = ref 0 in
-    let buf = Bytes.make 4096 ' ' in
+    let size = Unix.(getsockopt_int fd SO_RCVBUF) in
+    let buf = Bytes.make size ' ' in
 
     Unix.set_nonblock fd;
     { bs_fill_buf=(fun () ->
@@ -81,14 +82,12 @@ module Byte_stream = struct
         let rec wait() =
           let to_read,_,_ = Unix.select [fd] [] [] timeout in
           if to_read = [] then raise Timeout;
-          read()
-        and read() =
-          try len := Unix.read fd buf 0 (Bytes.length buf)
+          try len := Unix.read fd buf 0 (Bytes.length buf);
           with
-          | Unix.Unix_error (EAGAIN, _, _) -> read()
           | Sys_blocked_io
-          | Unix.Unix_error (EWOULDBLOCK, _, _) ->
-            (* FIXME: we should decrease the timeout by however long was spent in [select] *)
+          | Unix.Unix_error ((EAGAIN|EWOULDBLOCK), _, _) ->
+             (* FIXME: we should decrease the timeout by however long was spent in [select] *)
+            Printf.eprintf "EXCEPTION\n%!";
             wait()
         in
         wait()
@@ -998,10 +997,12 @@ let find_map f l =
   in aux f l
 
 let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
-  let ic = Unix.in_channel_of_descr client_sock in
-  let oc = Unix.out_channel_of_descr client_sock in
+  let write_sock = Unix.dup client_sock in
+  let _ = Unix.set_nonblock client_sock in
+  let _ = Unix.clear_nonblock write_sock in
+  let oc = Unix.out_channel_of_descr write_sock in
   let buf = Buf_.create() in
-  let is = Byte_stream.of_chan ic in
+  let is = Byte_stream.of_descr client_sock in
   let continue = ref true in
   while !continue && self.running do
     _debug (fun k->k "read next request");
