@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 echo upload_chunked 1>&2
 
-rm data
+rm -f data
 
 SERVER=$1
 PORT=8087
