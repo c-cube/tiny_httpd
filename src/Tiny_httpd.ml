@@ -1185,9 +1185,9 @@ let run (self:t) : (unit,_) result =
     end;
     while self.running do
       (* limit concurrency *)
+      Sem_.acquire 1 self.sem_max_connections;
       try
         let client_sock, _ = Unix.accept sock in
-        Sem_.acquire 1 self.sem_max_connections;
         self.new_thread
           (fun () ->
             try
@@ -1199,8 +1199,9 @@ let run (self:t) : (unit,_) result =
               raise e
           );
       with e ->
+        Sem_.release 1 self.sem_max_connections;
         _debug (fun k -> k
-                  "Unix.accept or Thread.create raised an exception: %s"
+                  "Unix.accept raised an exception: %s"
                   (Printexc.to_string e))
     done;
     Ok ()
