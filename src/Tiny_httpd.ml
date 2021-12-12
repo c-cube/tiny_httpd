@@ -1104,6 +1104,7 @@ let run (self:t) : (unit,_) result =
               raise e
           );
       with e ->
+        Sem_.release 1 self.sem_max_connections;
         _debug (fun k -> k
                   "Unix.accept or Thread.create raised an exception: %s"
                   (Printexc.to_string e))
