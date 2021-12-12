@@ -11,7 +11,6 @@ build: [
 ]
 depends: [
   "dune" { >= "2.0" }
-  "stdlib-shims"
   "base-threads"
   "ocaml" { >= "4.04.0" }
   "odoc" {with-doc}

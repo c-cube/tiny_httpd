@@ -181,7 +181,7 @@ module Byte_stream = struct
     )
 
   let to_chan (oc:out_channel) (self:t) =
-    iter (fun s i len -> Stdlib.output oc s i len) self
+    iter (fun s i len -> output oc s i len) self
 
   let of_bytes ?(i=0) ?len s : t =
     (* invariant: !i+!len is constant *)
@@ -762,14 +762,15 @@ end
 (* semaphore, for limiting concurrency. *)
 module Sem_ = struct
   type t = {
-    mutable n : int;
-    mutex : Mutex.t;
-    cond : Condition.t;
-  }
+      mutable n : int;
+      max:int;
+      mutex : Mutex.t;
+      cond : Condition.t;
+    }
 
   let create n =
     if n <= 0 then invalid_arg "Semaphore.create";
-    { n; mutex=Mutex.create(); cond=Condition.create(); }
+    { n; max=n; mutex=Mutex.create(); cond=Condition.create(); }
 
   let acquire m t =
     Mutex.lock t.mutex;
@@ -786,6 +787,9 @@ module Sem_ = struct
     t.n <- t.n + m;
     Condition.broadcast t.cond;
     Mutex.unlock t.mutex
+
+  let num_acquired self = self.max - self.n
+
 end
 
 module Route = struct
@@ -927,6 +931,10 @@ type t = {
 
 let addr self = self.addr
 let port self = self.port
+
+let active_connections self =
+  (* -1 because we decrease the semaphore before Unix.accept *)
+  Sem_.num_acquired self.sem_max_connections - 1
 
 let add_decode_request_cb self f =  self.cb_decode_req <- f :: self.cb_decode_req
 let add_encode_response_cb self f = self.cb_encode_resp <- f :: self.cb_encode_resp
