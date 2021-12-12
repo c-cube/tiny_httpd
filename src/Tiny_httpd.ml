@@ -951,7 +951,7 @@ let add_path_handler_
         | handler ->
           (* we have a handler, do we accept the request based on its headers? *)
           begin match accept req with
-            | Ok () -> Some (Ok (fun (_oc:Out.t) req ~resp -> resp (handler (tr_req req))))
+            | Ok () -> Some (Ok (fun _oc req ~resp -> resp (handler (tr_req req))))
             | Error _ as e -> Some e
           end
         | exception _ ->
@@ -982,7 +982,7 @@ let add_route_handler_
         | Some handler ->
           (* we have a handler, do we accept the request based on its headers? *)
           begin match accept req with
-            | Ok () -> Some (Ok (fun (oc:Out.t) req ~resp -> tr_req oc req ~resp handler))
+            | Ok () -> Some (Ok (fun oc req ~resp -> tr_req oc req ~resp handler))
             | Error _ as e -> Some e
           end
         | None ->
@@ -1004,7 +1004,7 @@ let[@inline] _opt_iter ~f o = match o with
   | Some x -> f x
 
 let add_route_server_sent_handler ?accept self route f =
-  let tr_req (oc:Out.t) req ~resp f =
+  let tr_req oc req ~resp f =
     let req = Request.read_body_full req in
     let headers = ref Headers.(empty |> set "content-type" "text/event-stream") in
 
@@ -1185,9 +1185,9 @@ let run (self:t) : (unit,_) result =
     end;
     while self.running do
       (* limit concurrency *)
-      Sem_.acquire 1 self.sem_max_connections;
       try
         let client_sock, _ = Unix.accept sock in
+        Sem_.acquire 1 self.sem_max_connections;
         self.new_thread
           (fun () ->
             try
