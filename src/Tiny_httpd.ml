@@ -39,8 +39,12 @@ let rec write_out ({buf;fd;_} as oc) i len =
   with Sys_blocked_io
      | Unix.Unix_error((EAGAIN|EWOULDBLOCK),_,_) ->
         write_out oc i len
-     | Unix.Unix_error(EPIPE,_,_) ->
+     | Unix.Unix_error((EPIPE|EBADF),_,_) ->
         raise (Sys_error "broken pipe")
+     | e ->
+        Printf.eprintf "unexpected exception in write_out: %s\n%!"
+          (Printexc.to_string e);
+        assert false
 
 let rec output ({buf;pos;_} as oc) s i len =
   let buf_len = Bytes.length buf in
