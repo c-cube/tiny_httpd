@@ -434,6 +434,7 @@ type t
 val create :
   ?masksigpipe:bool ->
   ?max_connections:int ->
+  ?timeout:float ->
   ?new_thread:((unit -> unit) -> unit) ->
   ?addr:string ->
   ?port:int ->
@@ -454,6 +455,9 @@ val create :
     could use a thread pool instead.
 
     @param max_connections maximum number of simultaneous connections.
+    @param timeout connection is closed if the socket does not do read or
+      write for the amount of second. Default: 0.0 which means no timeout.
+      timeout is not recommended when using proxy.
     @param addr address (IPv4 or IPv6) to listen on. Default ["127.0.0.1"].
     @param port to listen on. Default [8080].
     @param sock an existing socket given to the server to listen on, e.g. by
@@ -471,6 +475,9 @@ val is_ipv6 : t -> bool
 
 val port : t -> int
 (** Port on which the server listens. *)
+
+val active_connections : t -> int
+(** Number of active connections *)
 
 val add_decode_request_cb :
   t ->
@@ -643,4 +650,3 @@ val _debug : ((('a, out_channel, unit, unit, unit, unit) format6 -> 'a) -> unit)
 val _enable_debug: bool -> unit
 
 (**/**)
-

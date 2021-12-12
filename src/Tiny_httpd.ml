@@ -676,13 +676,14 @@ end
 module Sem_ = struct
   type t = {
     mutable n : int;
+    max : int;
     mutex : Mutex.t;
     cond : Condition.t;
   }
 
   let create n =
     if n <= 0 then invalid_arg "Semaphore.create";
-    { n; mutex=Mutex.create(); cond=Condition.create(); }
+    { n; max=n; mutex=Mutex.create(); cond=Condition.create(); }
 
   let acquire m t =
     Mutex.lock t.mutex;
@@ -699,6 +700,8 @@ module Sem_ = struct
     t.n <- t.n + m;
     Condition.broadcast t.cond;
     Mutex.unlock t.mutex
+
+  let num_acquired t = t.max - t.n
 end
 
 module Route = struct
@@ -812,6 +815,8 @@ type t = {
 
   sock: Unix.file_descr option;
 
+  timeout: float;
+
   sem_max_connections: Sem_.t;
   (* semaphore to restrict the number of active concurrent connections *)
 
@@ -840,6 +845,8 @@ type t = {
 
 let addr self = self.addr
 let port self = self.port
+
+let active_connections self = Sem_.num_acquired self.sem_max_connections - 1
 
 let add_decode_request_cb self f =  self.cb_decode_req <- f :: self.cb_decode_req
 let add_encode_response_cb self f = self.cb_encode_resp <- f :: self.cb_encode_resp
@@ -951,13 +958,14 @@ let add_route_server_sent_handler ?accept self route f =
 let create
     ?(masksigpipe=true)
     ?(max_connections=32)
+    ?(timeout=0.0)
     ?(new_thread=(fun f -> ignore (Thread.create f () : Thread.t)))
     ?(addr="127.0.0.1") ?(port=8080) ?sock () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let max_connections = max 4 max_connections in
   { new_thread; addr; port; sock; masksigpipe; handler;
     running= true; sem_max_connections=Sem_.create max_connections;
-    path_handlers=[];
+    path_handlers=[]; timeout;
     cb_encode_resp=[]; cb_decode_req=[];
   }
 
@@ -973,6 +981,8 @@ let find_map f l =
   in aux f l
 
 let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
+  let _ = Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout) in
+  let _ = Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout) in
   let ic = Unix.in_channel_of_descr client_sock in
   let oc = Unix.out_channel_of_descr client_sock in
   let buf = Buf_.create() in
@@ -1104,6 +1114,7 @@ let run (self:t) : (unit,_) result =
               raise e
           );
       with e ->
+        Sem_.release 1 self.sem_max_connections;
         _debug (fun k -> k
                   "Unix.accept or Thread.create raised an exception: %s"
                   (Printexc.to_string e))
