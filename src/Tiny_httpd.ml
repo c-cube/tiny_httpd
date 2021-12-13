@@ -363,6 +363,7 @@ module Request = struct
     meth: Meth.t;
     host: string;
     headers: Headers.t;
+    http_version: int*int;
     path: string;
     path_components: string list;
     query: (string*string) list;
@@ -385,6 +386,13 @@ module Request = struct
   let set_header k v self = {self with headers=Headers.set k v self.headers}
   let update_headers f self = {self with headers=f self.headers}
   let set_body b self = {self with body=b}
+
+  (** Should we close the connection after this request? *)
+  let close_after_req (self:_ t) : bool =
+    match self.http_version with
+    | 1, 1 -> get_header self "connection" =Some"close"
+    | 1, 0 -> not (get_header self "connection"=Some"keep-alive")
+    | _ -> false
 
   let pp_comp_ out comp =
     Format.fprintf out "[%s]"
@@ -486,11 +494,11 @@ module Request = struct
     try
       let line = Byte_stream.read_line ~buf bs in
       let start_time = Unix.gettimeofday () in
-      let meth, path =
+      let meth, path, version =
         try
-          let m, p, v = Scanf.sscanf line "%s %s HTTP/1.%d\r" (fun x y z->x,y,z) in
-          if v != 0 && v != 1 then raise Exit;
-          m, p
+          let meth, path, version = Scanf.sscanf line "%s %s HTTP/1.%d\r" (fun x y z->x,y,z) in
+          if version != 0 && version != 1 then raise Exit;
+          meth, path, version
         with _ ->
           _debug (fun k->k "invalid request line: `%s`" line);
           raise (Bad_req (400, "Invalid request line"))
@@ -510,8 +518,11 @@ module Request = struct
         | Ok l -> l
         | Error e -> bad_reqf 400 "invalid query: %s" e
       in
-      Ok (Some {meth; query; host; path; path_components;
-                headers; body=(); start_time; })
+      let req = {
+        meth; query; host; path; path_components;
+        headers; http_version=(1, version); body=(); start_time;
+      } in
+      Ok (Some req)
     with
     | End_of_file | Sys_error _ -> Ok None
     | Bad_req (c,s) -> Error (c,s)
@@ -1040,6 +1051,8 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
 
     | Ok (Some req) ->
       _debug (fun k->k "req: %s" (Format.asprintf "@[%a@]" Request.pp_ req));
+
+      if Request.close_after_req req then continue := false;
 
       try
         (* is there a handler for this path? *)
