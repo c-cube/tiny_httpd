@@ -964,8 +964,8 @@ let find_map f l =
   in aux f l
 
 let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
-  let _ = Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout) in
-  let _ = Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout) in
+  Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout);
+  Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout);
   let ic = Unix.in_channel_of_descr client_sock in
   let oc = Unix.out_channel_of_descr client_sock in
   let buf = Buf_.create() in
