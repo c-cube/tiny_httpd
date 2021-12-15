@@ -375,8 +375,6 @@ module Request = struct
   let path self = self.path
   let body self = self.body
 
-  let non_query_path self = Tiny_httpd_util.get_non_query_path self.path
-
   let query self = self.query
   let get_header ?f self h = Headers.get ?f h self.headers
   let get_header_int self h = match get_header self h with
