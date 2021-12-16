@@ -162,7 +162,7 @@ let decompress_req_stream_ ~buf_size (req:BS.t S.Request.t) : _ S.Request.t =
         |> S.Request.set_body body'
       | exception _ -> req
     end
- | _ -> req
+  | _ -> req
 
 let compress_resp_stream_
     ~compress_above
