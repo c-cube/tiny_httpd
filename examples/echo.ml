@@ -7,18 +7,29 @@ let now_ = Unix.gettimeofday
 let middleware_stat () : S.Middleware.t * (unit -> string) =
   let n_req = ref 0 in
   let total_time_ = ref 0. in
+  let parse_time_ = ref 0. in
+  let build_time_ = ref 0. in
+  let write_time_ = ref 0. in
 
   let m h req ~resp =
     incr n_req;
     let t1 = S.Request.time req in
+    let t2 = now_ () in
     h req ~resp:(fun response ->
+        let t3 = now_ () in
         resp response;
-        let t2 = now_ () in
-        total_time_ := !total_time_ +. (t2 -. t1);
+        let t4 = now_ () in
+        total_time_ := !total_time_ +. (t4 -. t1);
+        parse_time_ := !parse_time_ +. (t2 -. t1);
+        build_time_ := !build_time_ +. (t3 -. t2);
+        write_time_ := !write_time_ +. (t4 -. t3);
       )
   and get_stat () =
-    Printf.sprintf "%d requests (average response time: %.3fms)"
+    Printf.sprintf "%d requests (average response time: %.3fms = %.3fms + %.3fms + %.3fms)"
       !n_req (!total_time_ /. float !n_req *. 1e3)
+             (!parse_time_ /. float !n_req *. 1e3)
+             (!build_time_ /. float !n_req *. 1e3)
+             (!write_time_ /. float !n_req *. 1e3)
   in
   m, get_stat
 
