@@ -66,10 +66,10 @@ module Byte_stream = struct
     bs_close=(fun () -> ());
   }
 
-  let of_chan_ ~close ic : t =
+  let of_chan_ ?(buf_size=16 * 1024) ~close ic : t =
     let i = ref 0 in
     let len = ref 0 in
-    let buf = Bytes.make 4096 ' ' in
+    let buf = Bytes.make buf_size ' ' in
     { bs_fill_buf=(fun () ->
       if !i >= !len then (
         i := 0;
@@ -116,10 +116,10 @@ module Byte_stream = struct
   let of_string s : t =
     of_bytes (Bytes.unsafe_of_string s)
 
-  let with_file file f =
+  let with_file ?buf_size file f =
     let ic = open_in file in
     try
-      let x = f (of_chan ic) in
+      let x = f (of_chan ?buf_size ic) in
       close_in ic;
       x
     with e ->
@@ -367,6 +367,7 @@ module Request = struct
     path_components: string list;
     query: (string*string) list;
     body: 'body;
+    start_time: float;
   }
 
   let headers self = self.headers
@@ -374,13 +375,16 @@ module Request = struct
   let meth self = self.meth
   let path self = self.path
   let body self = self.body
+  let start_time self = self.start_time
 
   let query self = self.query
   let get_header ?f self h = Headers.get ?f h self.headers
   let get_header_int self h = match get_header self h with
     | Some x -> (try Some (int_of_string x) with _ -> None)
     | None -> None
-  let set_header self k v = {self with headers=Headers.set k v self.headers}
+  let set_header k v self = {self with headers=Headers.set k v self.headers}
+  let update_headers f self = {self with headers=f self.headers}
+  let set_body b self = {self with body=b}
 
   let pp_comp_ out comp =
     Format.fprintf out "[%s]"
@@ -481,6 +485,7 @@ module Request = struct
   let parse_req_start ~buf (bs:byte_stream) : unit t option resp_result =
     try
       let line = Byte_stream.read_line ~buf bs in
+      let start_time = Unix.gettimeofday () in
       let meth, path =
         try
           let m, p, v = Scanf.sscanf line "%s %s HTTP/1.%d\r" (fun x y z->x,y,z) in
@@ -506,7 +511,7 @@ module Request = struct
         | Error e -> bad_reqf 400 "invalid query: %s" e
       in
       Ok (Some {meth; query; host; path; path_components;
-                headers; body=()})
+                headers; body=(); start_time; })
     with
     | End_of_file | Sys_error _ -> Ok None
     | Bad_req (c,s) -> Error (c,s)
@@ -540,9 +545,10 @@ module Request = struct
     | e ->
       Error (400, Printexc.to_string e)
 
-  let read_body_full (self:byte_stream t) : string t =
+  let read_body_full ?buf_size (self:byte_stream t) : string t =
     try
-      let body = Byte_stream.read_all self.body in
+      let buf = Buf_.create ?size:buf_size () in
+      let body = Byte_stream.read_all ~buf self.body in
       { self with body }
     with
     | Bad_req _ as e -> raise e
@@ -580,6 +586,12 @@ module Response = struct
     headers: Headers.t;
     body: body;
   }
+
+  let set_body body self = {self with body}
+  let set_headers headers self = {self with headers}
+  let update_headers f self = {self with headers=f self.headers}
+  let set_header k v self = {self with headers = Headers.set k v self.headers}
+  let set_code code self = {self with code}
 
   let make_raw ?(headers=[]) ~code body : t =
     (* add content length to response *)
@@ -787,12 +799,21 @@ module Route = struct
   let pp out x = Format.pp_print_string out (to_string x)
 end
 
+module Middleware = struct
+  type handler = byte_stream Request.t -> resp:(Response.t -> unit) -> unit
+  type t = handler -> handler
+
+  (** Apply a list of middlewares to [h] *)
+  let apply_l (l:t list) (h:handler) : handler =
+    List.fold_right (fun m h -> m h) l h
+
+  let[@inline] nil : t = fun h -> h
+end
+
 (* a request handler. handles a single request. *)
 type cb_path_handler =
   out_channel ->
-  byte_stream Request.t ->
-  resp:(Response.t -> unit) ->
-  unit
+  Middleware.handler
 
 module type SERVER_SENT_GENERATOR = sig
   val set_headers : Headers.t -> unit
@@ -823,18 +844,19 @@ type t = {
 
   masksigpipe: bool;
 
+  buf_size: int;
+
   mutable handler: (string Request.t -> Response.t);
   (* toplevel handler, if any *)
 
+  mutable middlewares : (int * Middleware.t) list;
+  (** Global middlewares *)
+
+  mutable middlewares_sorted : (int * Middleware.t) list lazy_t;
+  (* sorted version of {!middlewares} *)
+
   mutable path_handlers : (unit Request.t -> cb_path_handler resp_result option) list;
   (* path handlers *)
-
-  mutable cb_decode_req:
-    (unit Request.t -> (unit Request.t * (byte_stream -> byte_stream)) option) list;
-  (* middleware to decode requests *)
-
-  mutable cb_encode_resp: (unit Request.t -> Response.t -> Response.t option) list;
-  (* middleware to encode responses *)
 
   mutable running: bool;
   (* true while the server is running. no need to protect with a mutex,
@@ -846,15 +868,48 @@ let port self = self.port
 
 let active_connections self = Sem_.num_acquired self.sem_max_connections - 1
 
-let add_decode_request_cb self f =  self.cb_decode_req <- f :: self.cb_decode_req
-let add_encode_response_cb self f = self.cb_encode_resp <- f :: self.cb_encode_resp
+let add_middleware ~stage self m =
+  let stage = match stage with
+    | `Encoding -> 0
+    | `Stage n when n < 1 -> invalid_arg "add_middleware: bad stage"
+    | `Stage n -> n
+  in
+  self.middlewares <- (stage,m) :: self.middlewares;
+  self.middlewares_sorted <- lazy (
+    List.stable_sort (fun (s1,_) (s2,_) -> compare s1 s2) self.middlewares
+  )
+
+let add_decode_request_cb self f =
+  (* turn it into a middleware *)
+  let m h req ~resp =
+    (* see if [f] modifies the stream *)
+    let req0 = {req with Request.body=()} in
+    match f req0 with
+    | None -> h req ~resp (* pass through *)
+    | Some (req1, tr_stream) ->
+      let req = {req1 with Request.body=tr_stream req.Request.body} in
+      h req ~resp
+  in
+  add_middleware self ~stage:`Encoding m
+
+let add_encode_response_cb self f =
+  let m h req ~resp =
+    h req ~resp:(fun r ->
+        let req0 = {req with Request.body=()} in
+        (* now transform [r] if we want to *)
+        match f req0 r with
+        | None -> resp r
+        | Some r' -> resp r')
+  in
+  add_middleware self ~stage:`Encoding m
+
 let set_top_handler self f = self.handler <- f
 
 (* route the given handler.
    @param tr_req wraps the actual concrete function returned by the route
    and makes it into a handler. *)
 let add_route_handler_
-    ?(accept=fun _req -> Ok ())
+    ?(accept=fun _req -> Ok ()) ?(middlewares=[])
     ?meth ~tr_req self (route:_ Route.t) f =
   let ph req : cb_path_handler resp_result option =
     match meth with
@@ -864,7 +919,10 @@ let add_route_handler_
         | Some handler ->
           (* we have a handler, do we accept the request based on its headers? *)
           begin match accept req with
-            | Ok () -> Some (Ok (fun oc req ~resp -> tr_req oc req ~resp handler))
+            | Ok () ->
+              Some (Ok (fun oc ->
+                  Middleware.apply_l middlewares @@
+                  fun req ~resp -> tr_req oc req ~resp handler))
             | Error _ as e -> Some e
           end
         | None ->
@@ -873,13 +931,14 @@ let add_route_handler_
   in
   self.path_handlers <- ph :: self.path_handlers
 
-let add_route_handler (type a) ?accept ?meth self (route:(a,_) Route.t) (f:_) : unit =
-  let tr_req _oc req ~resp f = resp (f (Request.read_body_full req)) in
-  add_route_handler_ ?accept ?meth self route ~tr_req f
+let add_route_handler (type a) ?accept ?middlewares ?meth
+    self (route:(a,_) Route.t) (f:_) : unit =
+  let tr_req _oc req ~resp f = resp (f (Request.read_body_full ~buf_size:self.buf_size req)) in
+  add_route_handler_ ?accept ?middlewares ?meth self route ~tr_req f
 
-let add_route_handler_stream ?accept ?meth self route f =
+let add_route_handler_stream ?accept ?middlewares ?meth self route f =
   let tr_req _oc req ~resp f = resp (f req) in
-  add_route_handler_ ?accept ?meth self route ~tr_req f
+  add_route_handler_ ?accept ?middlewares ?meth self route ~tr_req f
 
 let[@inline] _opt_iter ~f o = match o with
   | None -> ()
@@ -887,7 +946,7 @@ let[@inline] _opt_iter ~f o = match o with
 
 let add_route_server_sent_handler ?accept self route f =
   let tr_req oc req ~resp f =
-    let req = Request.read_body_full req in
+    let req = Request.read_body_full ~buf_size:self.buf_size req in
     let headers = ref Headers.(empty |> set "content-type" "text/event-stream") in
 
     (* send response once *)
@@ -929,15 +988,21 @@ let create
     ?(masksigpipe=true)
     ?(max_connections=32)
     ?(timeout=0.0)
+    ?(buf_size=16 * 1_024)
     ?(new_thread=(fun f -> ignore (Thread.create f () : Thread.t)))
-    ?(addr="127.0.0.1") ?(port=8080) ?sock () : t =
+    ?(addr="127.0.0.1") ?(port=8080) ?sock
+    ?(middlewares=[])
+    () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let max_connections = max 4 max_connections in
-  { new_thread; addr; port; sock; masksigpipe; handler;
+  let self = {
+    new_thread; addr; port; sock; masksigpipe; handler; buf_size;
     running= true; sem_max_connections=Sem_.create max_connections;
     path_handlers=[]; timeout;
-    cb_encode_resp=[]; cb_decode_req=[];
-  }
+    middlewares=[]; middlewares_sorted=lazy [];
+  } in
+  List.iter (fun (stage,m) -> add_middleware self ~stage m) middlewares;
+  self
 
 let stop s = s.running <- false
 
@@ -955,8 +1020,8 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
   let _ = Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout) in
   let ic = Unix.in_channel_of_descr client_sock in
   let oc = Unix.out_channel_of_descr client_sock in
-  let buf = Buf_.create() in
-  let is = Byte_stream.of_chan ic in
+  let buf = Buf_.create ~size:self.buf_size () in
+  let is = Byte_stream.of_chan ~buf_size:self.buf_size ic in
   let continue = ref true in
   while !continue && self.running do
     _debug (fun k->k "read next request");
@@ -981,7 +1046,10 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
         let handler =
           match find_map (fun ph -> ph req) self.path_handlers with
           | Some f -> unwrap_resp_result f
-          | None -> (fun _oc req ~resp -> resp (self.handler (Request.read_body_full req)))
+          | None ->
+            (fun _oc req ~resp ->
+               let body_str = Request.read_body_full ~buf_size:self.buf_size req in
+               resp (self.handler body_str))
         in
 
         (* handle expect/continue *)
@@ -993,33 +1061,22 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
           | None -> ()
         end;
 
-        (* preprocess request's input stream *)
-        let req0, tr_stream =
-          List.fold_left
-            (fun (req,tr) cb ->
-               match cb req with
-               | None -> req, tr
-               | Some (r',f) -> r', (fun is -> tr is |> f))
-            (req, (fun is->is)) self.cb_decode_req
-        in
-        (* now actually read request's body into a stream *)
-        let req =
-          Request.parse_body_ ~tr_stream ~buf {req0 with body=is}
-          |> unwrap_resp_result
+        (* apply middlewares *)
+        let handler =
+          fun oc ->
+            List.fold_right (fun (_, m) h -> m h)
+              (Lazy.force self.middlewares_sorted) (handler oc)
         in
 
-        (* how to post-process response accordingly *)
-        let post_process_resp resp =
-          List.fold_left
-            (fun resp cb -> match cb req0 resp with None -> resp | Some r' -> r')
-            resp self.cb_encode_resp
+        (* now actually read request's body into a stream *)
+        let req =
+          Request.parse_body_ ~tr_stream:(fun s->s) ~buf {req with body=is}
+          |> unwrap_resp_result
         in
 
         (* how to reply *)
         let resp r =
-          try
-            let r = post_process_resp r in
-            Response.output_ oc r
+          try Response.output_ oc r
           with Sys_error _ -> continue := false
         in
 

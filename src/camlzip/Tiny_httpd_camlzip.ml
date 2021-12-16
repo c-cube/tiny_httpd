@@ -2,7 +2,7 @@
 module S = Tiny_httpd
 module BS = Tiny_httpd.Byte_stream
 
-let mk_decode_deflate_stream_ ~buf_size () (is:S.byte_stream) : S.byte_stream =
+let decode_deflate_stream_ ~buf_size (is:S.byte_stream) : S.byte_stream =
   S._debug (fun k->k "wrap stream with deflate.decode");
   let buf = Bytes.make buf_size ' ' in
   let buf_len = ref 0 in
@@ -145,7 +145,8 @@ let has_deflate s =
   try Scanf.sscanf s "deflate, %s" (fun _ -> true)
   with _ -> false
 
-let cb_decode_compressed_stream ~buf_size (req:unit S.Request.t) : _ option =
+(* decompress [req]'s body if needed *)
+let decompress_req_stream_ ~buf_size (req:BS.t S.Request.t) : _ S.Request.t =
   match S.Request.get_header ~f:String.trim req "Transfer-Encoding" with
   (* TODO
     | Some "gzip" ->
@@ -155,49 +156,63 @@ let cb_decode_compressed_stream ~buf_size (req:unit S.Request.t) : _ option =
   | Some s when has_deflate s ->
     begin match Scanf.sscanf s "deflate, %s" (fun s -> s) with
       | tr' ->
-        let req' = S.Request.set_header req "Transfer-Encoding" tr' in
-        Some (req', mk_decode_deflate_stream_ ~buf_size ())
-      | exception _ -> None
+        let body' = S.Request.body req |> decode_deflate_stream_ ~buf_size in
+        req
+        |> S.Request.set_header "Transfer-Encoding" tr'
+        |> S.Request.set_body body'
+      | exception _ -> req
     end
-  | _ -> None
+ | _ -> req
 
-let cb_encode_compressed_stream
+let compress_resp_stream_
     ~compress_above
-    ~buf_size (req:_ S.Request.t) (resp:S.Response.t) : _ option =
+    ~buf_size
+    (req:_ S.Request.t) (resp:S.Response.t) : S.Response.t =
+
+  (* headers for compressed stream *)
+  let update_headers h =
+    h
+    |> S.Headers.remove "Content-Length"
+    |> S.Headers.set "Content-Encoding" "deflate"
+  in
+
   if accept_deflate req then (
-    let set_headers h =
-      h
-      |> S.Headers.remove "Content-Length"
-      |> S.Headers.set "Content-Encoding" "deflate"
-      in
     match resp.body with
     | `String s when String.length s > compress_above ->
+      (* big string, we compress *)
       S._debug
         (fun k->k "encode str response with deflate (size %d, threshold %d)"
              (String.length s) compress_above);
       let body =
         encode_deflate_stream_ ~buf_size @@ S.Byte_stream.of_string s
       in
-      Some {
-        resp with
-        headers=set_headers resp.headers; body=`Stream body;
-      }
+      resp
+      |> S.Response.update_headers update_headers
+      |> S.Response.set_body (`Stream body)
+
     | `Stream str ->
       S._debug (fun k->k "encode stream response with deflate");
-      Some {
-        resp with
-        headers= set_headers resp.headers;
-        body=`Stream (encode_deflate_stream_ ~buf_size str);
-      }
-    | `String _ | `Void -> None
-  ) else None
+      resp
+      |> S.Response.update_headers update_headers
+      |> S.Response.set_body (`Stream (encode_deflate_stream_ ~buf_size str))
+
+    | `String _ | `Void -> resp
+  ) else resp
+
+let middleware
+    ?(compress_above=16 * 1024)
+    ?(buf_size=16 * 1_024)
+    () : S.Middleware.t =
+  let buf_size = max buf_size 1_024 in
+  fun h req ~resp ->
+    let req = decompress_req_stream_ ~buf_size req in
+    h req
+      ~resp:(fun response ->
+          resp @@ compress_resp_stream_ ~buf_size ~compress_above req response)
 
 let setup
-    ?(compress_above=500*1024)
-    ?(buf_size=48 * 1_024) (server:S.t) : unit =
-  let buf_size = max buf_size 1_024 in
-  S._debug (fun k->k "setup gzip support (buf-size %d)" buf_size);
-  S.add_decode_request_cb server (cb_decode_compressed_stream ~buf_size);
-  S.add_encode_response_cb server (cb_encode_compressed_stream ~compress_above ~buf_size);
-  ()
+    ?compress_above ?buf_size server =
+  let m = middleware ?compress_above ?buf_size () in
+  S._debug (fun k->k "setup gzip support");
+  S.add_middleware ~stage:`Encoding server m
 

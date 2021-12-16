@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-rm data
+if [ -f data ]; then rm data ; fi
 
 SERVER=$1
 PORT=8087

@@ -129,10 +129,10 @@ module Byte_stream : sig
 
   val empty : t
 
-  val of_chan : in_channel -> t
+  val of_chan : ?buf_size:int -> in_channel -> t
   (** Make a buffered stream from the given channel. *)
 
-  val of_chan_close_noerr : in_channel -> t
+  val of_chan_close_noerr : ?buf_size:int -> in_channel -> t
   (** Same as {!of_chan} but the [close] method will never fail. *)
 
   val of_bytes : ?i:int -> ?len:int -> bytes -> t
@@ -149,7 +149,7 @@ module Byte_stream : sig
   (** Write the stream to the channel.
       @since 0.3 *)
 
-  val with_file : string -> (t -> 'a) -> 'a
+  val with_file : ?buf_size:int -> string -> (t -> 'a) -> 'a
   (** Open a file with given name, and obtain an input stream
       on its content. When the function returns, the stream (and file) are closed. *)
 
@@ -227,6 +227,7 @@ module Request : sig
     path_components: string list;
     query: (string*string) list;
     body: 'body;
+    start_time: float; (** @since NEXT_RELEASE *)
   }
   (** A request with method, path, host, headers, and a body, sent by a client.
 
@@ -253,7 +254,16 @@ module Request : sig
 
   val get_header_int : _ t -> string -> int option
 
-  val set_header : 'a t -> string -> string -> 'a t
+  val set_header : string -> string -> 'a t -> 'a t
+  (** [set_header k v req] sets [k: v] in the request [req]'s headers. *)
+
+  val update_headers : (Headers.t -> Headers.t) -> 'a t -> 'a t
+  (** Modify headers
+      @since 0.11 *)
+
+  val set_body : 'a -> _ t -> 'a t
+  (** [set_body b req] returns a new query whose body is [b].
+      @since 0.11 *)
 
   val host : _ t -> string
   (** Host field of the request. It also appears in the headers. *)
@@ -271,14 +281,20 @@ module Request : sig
   val body : 'b t -> 'b
   (** Request body, possibly empty. *)
 
+  val start_time : _ t -> float
+  (** time stamp (from {!Unix.gettimeofday}) after parsing the first line of the request
+      @since NEXT_RELEASE *)
+
   val limit_body_size : max_size:int -> byte_stream t -> byte_stream t
   (** Limit the body size to [max_size] bytes, or return
       a [413] error.
       @since 0.3
   *)
 
-  val read_body_full : byte_stream t -> string t
-  (** Read the whole body into a string. Potentially blocking. *)
+  val read_body_full : ?buf_size:int -> byte_stream t -> string t
+  (** Read the whole body into a string. Potentially blocking.
+
+      @param buf_size initial size of underlying buffer (since NEXT_RELEASE) *)
 
   (**/**)
   (* for testing purpose, do not use *)
@@ -318,12 +334,32 @@ module Response : sig
   (** Body of a response, either as a simple string,
       or a stream of bytes, or nothing (for server-sent events). *)
 
-  type t = {
+  type t = private {
     code: Response_code.t; (** HTTP response code. See {!Response_code}. *)
     headers: Headers.t; (** Headers of the reply. Some will be set by [Tiny_httpd] automatically. *)
     body: body; (** Body of the response. Can be empty. *)
   }
   (** A response to send back to a client. *)
+
+  val set_body : body -> t -> t
+  (** Set the body of the response.
+      @since 0.11 *)
+
+  val set_header : string -> string -> t -> t
+  (** Set a header.
+      @since 0.11 *)
+
+  val update_headers : (Headers.t -> Headers.t) -> t -> t
+  (** Modify headers
+      @since 0.11 *)
+
+  val set_headers : Headers.t -> t -> t
+  (** Set all headers.
+      @since 0.11 *)
+
+  val set_code : Response_code.t -> t -> t
+  (** Set the response code.
+      @since 0.11 *)
 
   val make_raw :
     ?headers:Headers.t ->
@@ -426,6 +462,31 @@ module Route : sig
       @since 0.7 *)
 end
 
+(** {2 Middlewares}
+
+    A middleware can be inserted in a handler to modify or observe
+    its behavior.
+
+    @since NEXT_RELEASE
+*)
+module Middleware : sig
+  type handler = byte_stream Request.t -> resp:(Response.t -> unit) -> unit
+  (** Handlers are functions returning a response to a request.
+      The response can be delayed, hence the use of a continuation
+      as the [resp] parameter. *)
+
+  type t = handler -> handler
+  (** A middleware is a handler transformation.
+
+      It takes the existing handler [h],
+      and returns a new one which, given a query, modify it or log it
+      before passing it to [h], or fail. It can also log or modify or drop
+      the response. *)
+
+  val nil : t
+  (** Trivial middleware that does nothing. *)
+end
+
 (** {2 Main Server type} *)
 
 type t
@@ -435,10 +496,12 @@ val create :
   ?masksigpipe:bool ->
   ?max_connections:int ->
   ?timeout:float ->
+  ?buf_size:int ->
   ?new_thread:((unit -> unit) -> unit) ->
   ?addr:string ->
   ?port:int ->
   ?sock:Unix.file_descr ->
+  ?middlewares:([`Encoding | `Stage of int] * Middleware.t) list ->
   unit ->
   t
 (** Create a new webserver.
@@ -450,9 +513,13 @@ val create :
     @param masksigpipe if true, block the signal {!Sys.sigpipe} which otherwise
     tends to kill client threads when they try to write on broken sockets. Default: [true].
 
+    @param buf_size size for buffers (since NEXT_RELEASE)
+
     @param new_thread a function used to spawn a new thread to handle a
     new client connection. By default it is {!Thread.create} but one
     could use a thread pool instead.
+
+    @param middlewares see {!add_middleware} for more details.
 
     @param max_connections maximum number of simultaneous connections.
     @param timeout connection is closed if the socket does not do read or
@@ -482,20 +549,36 @@ val active_connections : t -> int
 val add_decode_request_cb :
   t ->
   (unit Request.t -> (unit Request.t * (byte_stream -> byte_stream)) option) -> unit
+[@@deprecated "use add_middleware"]
 (** Add a callback for every request.
     The callback can provide a stream transformer and a new request (with
     modified headers, typically).
     A possible use is to handle decompression by looking for a [Transfer-Encoding]
     header and returning a stream transformer that decompresses on the fly.
+
+    @deprecated use {!add_middleware} instead
 *)
 
 val add_encode_response_cb:
   t -> (unit Request.t -> Response.t -> Response.t option) -> unit
+[@@deprecated "use add_middleware"]
 (** Add a callback for every request/response pair.
     Similarly to {!add_encode_response_cb} the callback can return a new
     response, for example to compress it.
     The callback is given the query with only its headers,
     as well as the current response.
+
+    @deprecated use {!add_middleware} instead
+*)
+
+val add_middleware :
+  stage:[`Encoding | `Stage of int] ->
+  t -> Middleware.t -> unit
+(** Add a middleware to every request/response pair.
+    @param stage specify when middleware applies.
+      Encoding comes first (outermost layer), then stages in increasing order.
+    @raise Invalid_argument if stage is [`Stage n] where [n < 1]
+    @since NEXT_RELEASE
 *)
 
 (** {2 Request handlers} *)
@@ -509,6 +592,7 @@ val set_top_handler : t -> (string Request.t -> Response.t) -> unit
 
 val add_route_handler :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?middlewares:Middleware.t list ->
   ?meth:Meth.t ->
   t ->
   ('a, string Request.t -> Response.t) Route.t -> 'a ->
@@ -534,6 +618,7 @@ val add_route_handler :
 
 val add_route_handler_stream :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?middlewares:Middleware.t list ->
   ?meth:Meth.t ->
   t ->
   ('a, byte_stream Request.t -> Response.t) Route.t -> 'a ->
