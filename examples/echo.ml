@@ -10,15 +10,15 @@ let middleware_stat () : S.Middleware.t * (unit -> string) =
 
   let m h req ~resp =
     incr n_req;
-    let t1 = now_ () in
+    let t1 = S.Request.time req in
     h req ~resp:(fun response ->
         resp response;
         let t2 = now_ () in
         total_time_ := !total_time_ +. (t2 -. t1);
       )
   and get_stat () =
-    Printf.sprintf "%d requests (average response time: %.3fs)"
-      !n_req (!total_time_ /. float !n_req)
+    Printf.sprintf "%d requests (average response time: %.3fms)"
+      !n_req (!total_time_ /. float !n_req *. 1e3)
   in
   m, get_stat
 
