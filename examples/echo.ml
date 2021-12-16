@@ -13,7 +13,7 @@ let middleware_stat () : S.Middleware.t * (unit -> string) =
 
   let m h req ~resp =
     incr n_req;
-    let t1 = S.Request.time req in
+    let t1 = S.Request.time_start req in
     let t2 = now_ () in
     h req ~resp:(fun response ->
         let t3 = now_ () in
