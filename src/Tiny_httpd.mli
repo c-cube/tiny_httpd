@@ -227,6 +227,7 @@ module Request : sig
     path_components: string list;
     query: (string*string) list;
     body: 'body;
+    start_time: float; (** @since NEXT_RELEASE *)
   }
   (** A request with method, path, host, headers, and a body, sent by a client.
 
@@ -279,6 +280,10 @@ module Request : sig
 
   val body : 'b t -> 'b
   (** Request body, possibly empty. *)
+
+  val start_time : _ t -> float
+  (** time stamp (from {!Unix.gettimeofday}) after parsing the first line of the request
+      @since NEXT_RELEASE *)
 
   val limit_body_size : max_size:int -> byte_stream t -> byte_stream t
   (** Limit the body size to [max_size] bytes, or return
