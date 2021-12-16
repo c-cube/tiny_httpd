@@ -227,7 +227,7 @@ module Request : sig
     path_components: string list;
     query: (string*string) list;
     body: 'body;
-    time: float;
+    start_time: float; (** @since NEXT_RELEASE *)
   }
   (** A request with method, path, host, headers, and a body, sent by a client.
 
