@@ -281,8 +281,9 @@ module Request : sig
   val body : 'b t -> 'b
   (** Request body, possibly empty. *)
 
-  val time : 'b t -> float
-  (** time (from [Unix.gettimeofday] after parsing the first line*)
+  val start_time : _ t -> float
+  (** time stamp (from {!Unix.gettimeofday}) after parsing the first line of the request
+      @since NEXT_RELEASE *)
 
   val limit_body_size : max_size:int -> byte_stream t -> byte_stream t
   (** Limit the body size to [max_size] bytes, or return

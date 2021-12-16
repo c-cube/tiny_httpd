@@ -367,7 +367,7 @@ module Request = struct
     path_components: string list;
     query: (string*string) list;
     body: 'body;
-    time: float;
+    start_time: float;
   }
 
   let headers self = self.headers
@@ -375,7 +375,7 @@ module Request = struct
   let meth self = self.meth
   let path self = self.path
   let body self = self.body
-  let time self = self.time
+  let start_time self = self.start_time
 
   let non_query_path self = Tiny_httpd_util.get_non_query_path self.path
 
@@ -487,7 +487,7 @@ module Request = struct
   let parse_req_start ~buf (bs:byte_stream) : unit t option resp_result =
     try
       let line = Byte_stream.read_line ~buf bs in
-      let time = Unix.gettimeofday () in
+      let start_time = Unix.gettimeofday () in
       let meth, path =
         try
           let m, p, v = Scanf.sscanf line "%s %s HTTP/1.%d\r" (fun x y z->x,y,z) in
@@ -513,7 +513,7 @@ module Request = struct
         | Error e -> bad_reqf 400 "invalid query: %s" e
       in
       Ok (Some {meth; query; host; path; path_components;
-                headers; body=(); time})
+                headers; body=(); start_time; })
     with
     | End_of_file | Sys_error _ -> Ok None
     | Bad_req (c,s) -> Error (c,s)
