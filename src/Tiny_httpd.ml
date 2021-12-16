@@ -1089,7 +1089,10 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
 
         (* how to reply *)
         let resp r =
-          try Response.output_ oc r
+          try
+            if Headers.get "connection" r.Response.headers = Some"close" then
+              continue := false;
+            Response.output_ oc r
           with Sys_error _ -> continue := false
         in
 
