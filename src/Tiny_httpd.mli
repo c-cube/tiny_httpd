@@ -219,10 +219,11 @@ end
     Requests are sent by a client, e.g. a web browser or cURL. *)
 
 module Request : sig
-  type 'body t = {
+  type 'body t = private {
     meth: Meth.t;
     host: string;
     headers: Headers.t;
+    http_version: int*int;
     path: string;
     path_components: string list;
     query: (string*string) list;
