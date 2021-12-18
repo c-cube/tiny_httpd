@@ -749,7 +749,12 @@ module Route = struct
   let string_urlencoded = String_urlencoded
   let int = Int
   let exact (s:string) = Exact s
-
+  let exact_path (s:string) tail =
+    let rec fn = function
+      | [] -> tail
+      | s::ls -> exact s @/ fn ls
+    in
+    fn (String.split_on_char '/' s)
   let rec eval :
     type a b. path -> (a,b) t -> a -> b option =
     fun path route f ->
