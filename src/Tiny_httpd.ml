@@ -752,6 +752,7 @@ module Route = struct
   let exact_path (s:string) tail =
     let rec fn = function
       | [] -> tail
+      | ""::ls -> fn ls
       | s::ls -> exact s @/ fn ls
     in
     fn (String.split_on_char '/' s)
