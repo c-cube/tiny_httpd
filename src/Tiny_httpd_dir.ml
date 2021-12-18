@@ -164,6 +164,8 @@ let add_dir_path ~config ~dir ~prefix server =
            (fun _ _  -> S.Response.make_raw ~code:405 "upload not allowed");
   );
 
+  let cache = Hashtbl.create 101 in
+
   if config.download then (
     S.add_route_handler server ~meth:`GET
       S.Route.(exact_path prefix (rest_of_path_urlencoded))
@@ -173,6 +175,13 @@ let add_dir_path ~config ~dir ~prefix server =
                         try Printf.sprintf "mtime: %f" (Unix.stat full_path).Unix.st_mtime
                         with _ -> S.Response.fail_raise ~code:403 "Cannot access file"
                       ) in
+        try
+          if not config.mem_cache then raise Not_found;
+          let (ans, mtime0) = Hashtbl.find cache path in
+          if mtime <> mtime0 then raise Not_found;
+          ans
+        with Not_found ->
+        let ans =
         if contains_dot_dot full_path then (
           S.Response.fail ~code:403 "Path is forbidden";
         ) else if not (Sys.file_exists full_path) then (
@@ -221,7 +230,11 @@ let add_dir_path ~config ~dir ~prefix server =
               ~headers:(mime_type@["Etag", Lazy.force mtime])
               ~code:200 (S.Byte_stream.of_chan ic)
           with e ->
-            S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e)))
+            S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e))
+        in
+        Hashtbl.replace cache path (ans,mtime);
+        ans
+      )
   ) else (
     S.add_route_handler server ~meth:`GET
       S.Route.(exact_path prefix (string @/ return))
