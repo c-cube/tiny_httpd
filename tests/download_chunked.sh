@@ -8,16 +8,16 @@ PID=$!
 sleep 0.1
 
 echo download1 1>&2
-curl -N "http://localhost:${PORT}/foo_50" -o data21 \
+curl -N "http://localhost:${PORT}/foo_50" -o data2 \
   -H 'Tranfer-encoding: chunked'
 
 echo download2 1>&2
-curl -N "http://localhost:${PORT}/foo_50" -o data22 \
+curl -N "http://localhost:${PORT}/foo_50" -o data2 \
   -H 'Tranfer-encoding: chunked'
 
 echo download3 1>&2
-curl -N "http://localhost:${PORT}/foo_50" -o data23 \
+curl -N "http://localhost:${PORT}/foo_50" -o data2 \
   -H 'Tranfer-encoding: chunked'
 
 kill $PID
-wc data21 data22 data23
+wc data2

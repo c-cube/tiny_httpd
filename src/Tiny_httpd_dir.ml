@@ -204,10 +204,9 @@ let add_dir_path ~config ~dir ~prefix server =
              S.Response.make_raw ~code:405 "listing dir not allowed"
         ) else (
           try
-            let fd = Unix.(openfile full_path [O_RDONLY] 0) in
-            let len = stat.Unix.st_size in
-            let bs = Bigstring_unix.map_file_descr fd len in
-            Gc.finalise (fun _ -> Unix.close fd) bs;
+            let bs = Bigstring_unix.with_map_file ~flags:[Open_rdonly] full_path
+                       (fun s -> s)
+            in
             let mime_type =
               if Filename.extension full_path = ".css" then (
                 ["Content-Type", "text/css"]
@@ -225,8 +224,10 @@ let add_dir_path ~config ~dir ~prefix server =
               ~headers:(mime_type@["Etag", mtime_str])
               ~code:200 bs
           with e ->
-            S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e)))) else (
+            S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e))
+      )
+  ) else (
     S.add_route_handler server ~meth:`GET
       S.Route.(exact_path prefix (string @/ return))
            (fun _ _  -> S.Response.make_raw ~code:405 "download not allowed");
-       );
+  );
