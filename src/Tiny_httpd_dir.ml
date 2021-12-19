@@ -7,7 +7,6 @@ type dir_behavior =
 
 type config = {
   mutable download: bool;
-  mutable mem_cache: bool;
   mutable dir_behavior: dir_behavior;
   mutable delete: bool;
   mutable upload: bool;
@@ -16,7 +15,6 @@ type config = {
 
 let default_config () : config =
   { download=true
-  ; mem_cache=false
   ; dir_behavior=Forbidden
   ; delete=false
   ; upload=false
@@ -43,7 +41,7 @@ let header_html = "Content-Type", "text/html"
 let (//) = Filename.concat
 
 let encode_path s = U.percent_encode ~skip:(function '/' -> true|_->false) s
-let decode_path s = match U.percent_decode s with Some s->s | None -> s
+let _decode_path s = match U.percent_decode s with Some s->s | None -> s
 
 let is_hidden s = String.length s>0 && s.[0] = '.'
 
@@ -164,8 +162,6 @@ let add_dir_path ~config ~dir ~prefix server =
            (fun _ _  -> S.Response.make_raw ~code:405 "upload not allowed");
   );
 
-  let cache = Hashtbl.create 101 in
-
   if config.download then (
     S.add_route_handler server ~meth:`GET
       S.Route.(exact_path prefix (rest_of_path_urlencoded))
@@ -175,13 +171,6 @@ let add_dir_path ~config ~dir ~prefix server =
                         try Printf.sprintf "mtime: %f" (Unix.stat full_path).Unix.st_mtime
                         with _ -> S.Response.fail_raise ~code:403 "Cannot access file"
                       ) in
-        try
-          if not config.mem_cache then raise Not_found;
-          let (ans, mtime0) = Hashtbl.find cache path in
-          if mtime <> mtime0 then raise Not_found;
-          ans
-        with Not_found ->
-        let ans =
         if contains_dot_dot full_path then (
           S.Response.fail ~code:403 "Path is forbidden";
         ) else if not (Sys.file_exists full_path) then (
@@ -231,9 +220,6 @@ let add_dir_path ~config ~dir ~prefix server =
               ~code:200 (S.Byte_stream.of_chan ic)
           with e ->
             S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e))
-        in
-        Hashtbl.replace cache path (ans,mtime);
-        ans
       )
   ) else (
     S.add_route_handler server ~meth:`GET
