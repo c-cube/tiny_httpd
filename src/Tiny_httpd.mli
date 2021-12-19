@@ -141,9 +141,6 @@ module Byte_stream : sig
 
   val of_string : string -> t
 
-  val of_big_string : ?buf_size:int -> ?i:int -> ?len:int -> Bigstring.t -> t
-  (** Make a buffered stream from the given big string. *)
-
   val iter : (bytes -> int -> int -> unit) -> t -> unit
   (** Iterate on the chunks of the stream
       @since 0.3 *)
@@ -334,9 +331,7 @@ end
     the client to answer a {!Request.t}*)
 
 module Response : sig
-  type body =
-    | String of string | BigString of Bigstring.t
-    | Stream of byte_stream | Void
+  type body = [`String of string | `Stream of byte_stream | `Void]
   (** Body of a response, either as a simple string,
       or a stream of bytes, or nothing (for server-sent events). *)
 
@@ -373,14 +368,6 @@ module Response : sig
     string ->
     t
   (** Make a response from its raw components, with a string body.
-      Use [""] to not send a body at all. *)
-
-  val make_raw_big :
-    ?headers:Headers.t ->
-    code:Response_code.t ->
-    Bigstring.t ->
-    t
-  (** Make a response from its raw components, with a big string body.
       Use [""] to not send a body at all. *)
 
   val make_raw_stream :

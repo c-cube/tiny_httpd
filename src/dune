@@ -2,6 +2,6 @@
 (library
   (name tiny_httpd)
   (public_name tiny_httpd)
-  (libraries threads bigstring bigstring-unix)
+  (libraries threads)
   (flags :standard -safe-string -warn-error -a+8)
   (wrapped false))
