@@ -4,7 +4,6 @@ type dir_behavior =
 
 type config = {
   mutable download: bool;
-  mutable mem_cache: bool;
   mutable dir_behavior: dir_behavior;
   mutable delete: bool;
   mutable upload: bool;

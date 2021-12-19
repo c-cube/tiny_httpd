@@ -178,7 +178,7 @@ let compress_resp_stream_
 
   if accept_deflate req then (
     match resp.body with
-    | `String s when String.length s > compress_above ->
+    | String s when String.length s > compress_above ->
       (* big string, we compress *)
       S._debug
         (fun k->k "encode str response with deflate (size %d, threshold %d)"
@@ -188,15 +188,27 @@ let compress_resp_stream_
       in
       resp
       |> S.Response.update_headers update_headers
-      |> S.Response.set_body (`Stream body)
+      |> S.Response.set_body (Stream body)
 
-    | `Stream str ->
+    | BigString s when Bigstring.length s > compress_above ->
+      (* big string, we compress *)
+      S._debug
+        (fun k->k "encode str response with deflate (size %d, threshold %d)"
+             (Bigstring.length s) compress_above);
+      let body =
+        encode_deflate_stream_ ~buf_size @@ S.Byte_stream.of_big_string s
+      in
+      resp
+      |> S.Response.update_headers update_headers
+      |> S.Response.set_body (Stream body)
+
+    | Stream str ->
       S._debug (fun k->k "encode stream response with deflate");
       resp
       |> S.Response.update_headers update_headers
-      |> S.Response.set_body (`Stream (encode_deflate_stream_ ~buf_size str))
+      |> S.Response.set_body (Stream (encode_deflate_stream_ ~buf_size str))
 
-    | `String _ | `Void -> resp
+    | String _ | BigString _ | Void -> resp
   ) else resp
 
 let middleware
@@ -215,4 +227,3 @@ let setup
   let m = middleware ?compress_above ?buf_size () in
   S._debug (fun k->k "setup gzip support");
   S.add_middleware ~stage:`Encoding server m
-

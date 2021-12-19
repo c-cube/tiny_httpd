@@ -107,6 +107,7 @@ module Byte_stream = struct
         | None -> Bytes.length s - i
       )
     in
+
     let i = ref i in
     { bs_fill_buf=(fun () -> s, !i, !len);
       bs_close=(fun () -> len := 0);
@@ -115,6 +116,29 @@ module Byte_stream = struct
 
   let of_string s : t =
     of_bytes (Bytes.unsafe_of_string s)
+
+  let of_big_string ?(buf_size=16 * 1024) ?(i=0) ?len s : t =
+    let len =
+      ref (
+        match len with
+        | Some n ->
+          if n > Bigstring.length s - i then invalid_arg "Byte_stream.of_bytes";
+          n
+        | None -> Bigstring.length s - i
+      )
+    in
+    let buf = Bytes.make buf_size ' ' in
+    let i = ref i in
+    let len_buf = ref 0 in
+    { bs_fill_buf=(fun () ->
+        if !i >= !len_buf then (
+          i := 0; len_buf := min buf_size !len;
+          Bigstring.blit_to_bytes s !i buf 0 !len_buf;
+        );
+      buf, !i,!len_buf - !i);
+      bs_consume=(fun n -> i := !i + n; len := !len - n);
+      bs_close=(fun () -> len_buf := 0)
+    }
 
   let with_file ?buf_size file f =
     let ic = open_in file in
@@ -591,7 +615,9 @@ end
 *)
 
 module Response = struct
-  type body = [`String of string | `Stream of byte_stream | `Void]
+  type body =
+    | String of string | BigString of Bigstring.t
+    | Stream of byte_stream | Void
   type t = {
     code: Response_code.t;
     headers: Headers.t;
@@ -609,15 +635,22 @@ module Response = struct
     let headers =
       Headers.set "Content-Length" (string_of_int (String.length body)) headers
     in
-    { code; headers; body=`String body; }
+    { code; headers; body=String body; }
+
+  let make_raw_big ?(headers=[]) ~code body : t =
+    (* add content length to response *)
+    let headers =
+      Headers.set "Content-Length" (string_of_int (Bigstring.length body)) headers
+    in
+    { code; headers; body=BigString body; }
 
   let make_raw_stream ?(headers=[]) ~code body : t =
     (* add content length to response *)
     let headers = Headers.set "Transfer-Encoding" "chunked" headers in
-    { code; headers; body=`Stream body; }
+    { code; headers; body=Stream body; }
 
   let make_void ?(headers=[]) ~code () : t =
-    { code; headers; body=`Void; }
+    { code; headers; body=Void; }
 
   let make_string ?headers r = match r with
     | Ok body -> make_raw ?headers ~code:200 body
@@ -628,9 +661,10 @@ module Response = struct
     | Error (code,msg) -> make_raw ?headers ~code msg
 
   let make ?headers r : t = match r with
-    | Ok (`String body) -> make_raw ?headers ~code:200 body
-    | Ok (`Stream body) -> make_raw_stream ?headers ~code:200 body
-    | Ok `Void -> make_void ?headers ~code:200 ()
+    | Ok (String body) -> make_raw ?headers ~code:200 body
+    | Ok (BigString body) -> make_raw_big ?headers ~code:200 body
+    | Ok (Stream body) -> make_raw_stream ?headers ~code:200 body
+    | Ok Void -> make_void ?headers ~code:200 ()
     | Error (code,msg) -> make_raw ?headers ~code msg
 
   let fail ?headers ~code fmt =
@@ -640,9 +674,10 @@ module Response = struct
 
   let pp out self : unit =
     let pp_body out = function
-      | `String s -> Format.fprintf out "%S" s
-      | `Stream _ -> Format.pp_print_string out "<stream>"
-      | `Void -> ()
+      | String s -> Format.fprintf out "%S" s
+      | BigString _ -> Format.pp_print_string out "<bigstring>"
+      | Stream _ -> Format.pp_print_string out "<stream>"
+      | Void -> ()
     in
     Format.fprintf out "{@[code=%d;@ headers=[@[%a@]];@ body=%a@]}"
       self.code Headers.pp self.headers pp_body self.body
@@ -666,12 +701,16 @@ module Response = struct
   let output_ (oc:out_channel) (self:t) : unit =
     Printf.fprintf oc "HTTP/1.1 %d %s\r\n" self.code (Response_code.descr self.code);
     let body, is_chunked = match self.body with
-      | `String s when String.length s > 1024 * 500 ->
+      | String s when String.length s > 1024 * 500 ->
         (* chunk-encode large bodies *)
-        `Stream (Byte_stream.of_string s), true
-      | `String _ as b -> b, false
-      | `Stream _ as b -> b, true
-      | `Void as b -> b, false
+        Stream (Byte_stream.of_string s), true
+      | BigString s when Bigstring.length s > 1024 * 500 ->
+        (* chunk-encode large bodies *)
+        Stream (Byte_stream.of_big_string s), true
+      | String _ as b -> b, false
+      | BigString _ as b -> b, false
+      | Stream _ as b -> b, true
+      | Void as b -> b, false
     in
     let headers =
       if is_chunked then (
@@ -682,13 +721,15 @@ module Response = struct
     in
     let self = {self with headers; body} in
     _debug (fun k->k "output response: %s"
-               (Format.asprintf "%a" pp {self with body=`String "<…>"}));
+               (Format.asprintf "%a" pp {self with body=String "<…>"}));
     List.iter (fun (k,v) -> Printf.fprintf oc "%s: %s\r\n" k v) headers;
     output_string oc "\r\n";
     begin match body with
-      | `String "" | `Void -> ()
-      | `String s -> output_string oc s;
-      | `Stream str -> output_stream_chunked_ oc str;
+      | String "" | Void -> ()
+      | String s -> output_string oc s;
+      | BigString s -> Format.fprintf (Format.formatter_of_out_channel oc)
+                         "%a%!" Bigstring.print s
+      | Stream str -> output_stream_chunked_ oc str;
     end;
     flush oc
 end

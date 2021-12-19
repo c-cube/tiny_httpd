@@ -7,7 +7,6 @@ type dir_behavior =
 
 type config = {
   mutable download: bool;
-  mutable mem_cache: bool;
   mutable dir_behavior: dir_behavior;
   mutable delete: bool;
   mutable upload: bool;
@@ -16,7 +15,6 @@ type config = {
 
 let default_config () : config =
   { download=true
-  ; mem_cache=false
   ; dir_behavior=Forbidden
   ; delete=false
   ; upload=false
@@ -43,7 +41,7 @@ let header_html = "Content-Type", "text/html"
 let (//) = Filename.concat
 
 let encode_path s = U.percent_encode ~skip:(function '/' -> true|_->false) s
-let decode_path s = match U.percent_decode s with Some s->s | None -> s
+let _decode_path s = match U.percent_decode s with Some s->s | None -> s
 
 let is_hidden s = String.length s>0 && s.[0] = '.'
 
@@ -164,30 +162,24 @@ let add_dir_path ~config ~dir ~prefix server =
            (fun _ _  -> S.Response.make_raw ~code:405 "upload not allowed");
   );
 
-  let cache = Hashtbl.create 101 in
-
   if config.download then (
     S.add_route_handler server ~meth:`GET
       S.Route.(exact_path prefix (rest_of_path_urlencoded))
       (fun path req ->
         let full_path = dir // path in
-        let mtime = lazy (
-                        try Printf.sprintf "mtime: %f" (Unix.stat full_path).Unix.st_mtime
-                        with _ -> S.Response.fail_raise ~code:403 "Cannot access file"
-                      ) in
-        try
-          if not config.mem_cache then raise Not_found;
-          let (ans, mtime0) = Hashtbl.find cache path in
-          if mtime <> mtime0 then raise Not_found;
-          ans
-        with Not_found ->
-        let ans =
+        let stat =
+          try Unix.stat full_path
+          with _ -> S.Response.fail_raise ~code:403 "Cannot access file"
+        in
+        let mtime = stat.Unix.st_mtime in
+        let mtime_str = Printf.sprintf "mtime: %f" mtime in
         if contains_dot_dot full_path then (
           S.Response.fail ~code:403 "Path is forbidden";
         ) else if not (Sys.file_exists full_path) then (
           S.Response.fail ~code:404 "File not found";
-        ) else if S.Request.get_header req "If-None-Match" = Some (Lazy.force mtime) then (
-          S._debug (fun k->k "cached object %S (etag: %S)" path (Lazy.force mtime));
+        ) else
+          if S.Request.get_header req "If-None-Match" = Some mtime_str then (
+          S._debug (fun k->k "cached object %S (etag: %S)" path mtime_str);
           S.Response.make_raw ~code:304 ""
         ) else if Sys.is_directory full_path then (
           S._debug (fun k->k "list dir %S (topdir %S)"  full_path dir);
@@ -206,13 +198,15 @@ let add_dir_path ~config ~dir ~prefix server =
           | Lists ->
              let body = html_list_dir ~top:dir path ~parent in
              S.Response.make_string
-               ~headers:[header_html; "ETag", Lazy.force mtime]
+               ~headers:[header_html; "ETag", mtime_str]
                (Ok body)
           | Forbidden ->
              S.Response.make_raw ~code:405 "listing dir not allowed"
         ) else (
           try
-            let ic = open_in full_path in
+            let bs = Bigstring_unix.with_map_file ~flags:[Open_rdonly] full_path
+                       (fun s -> s)
+            in
             let mime_type =
               if Filename.extension full_path = ".css" then (
                 ["Content-Type", "text/css"]
@@ -226,14 +220,11 @@ let add_dir_path ~config ~dir ~prefix server =
                         with _ -> [])
                   with _ -> []
             in
-            S.Response.make_raw_stream
-              ~headers:(mime_type@["Etag", Lazy.force mtime])
-              ~code:200 (S.Byte_stream.of_chan ic)
+            S.Response.make_raw_big
+              ~headers:(mime_type@["Etag", mtime_str])
+              ~code:200 bs
           with e ->
             S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e))
-        in
-        Hashtbl.replace cache path (ans,mtime);
-        ans
       )
   ) else (
     S.add_route_handler server ~meth:`GET
