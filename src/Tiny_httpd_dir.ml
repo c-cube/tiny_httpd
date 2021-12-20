@@ -34,7 +34,7 @@ let contains_dot_dot s =
 let human_size (x:int) : string =
   if x >= 1_000_000_000 then Printf.sprintf "%d.%dG" (x / 1_000_000_000) ((x/1_000_000) mod 1_000_000)
   else if x >= 1_000_000 then Printf.sprintf "%d.%dM" (x / 1_000_000) ((x/1000) mod 1_000)
-  else if x >= 1_000 then Printf.sprintf "%d.%dk" (x/1000) ((x/100) mod 10)
+  else if x >= 1_000 then Printf.sprintf "%d.%dk" (x/1000) ((x/100) mod 100)
   else Printf.sprintf "%db" x
 
 let header_html = "Content-Type", "text/html"
