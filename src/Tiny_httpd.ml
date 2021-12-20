@@ -302,6 +302,37 @@ module Meth = struct
     | s -> bad_reqf 400 "unknown method %S" s
 end
 
+
+module SetCookie = struct
+  type sameSite = Strict | Lax | None
+  type t =
+    | MaxAge of int
+    | Expires of Unix.tm
+    | Domain of string
+    | Path of string
+    | Secure
+    | HttpOnly
+    | SameSite of sameSite
+
+  let pp fmt = function
+    | MaxAge s -> Format.fprintf fmt "Max-Age=%d" s
+    | Expires d -> Format.fprintf fmt "Expires=%a" U.pp_date d
+    | Domain d -> Format.fprintf fmt "Domain=%s" d
+    | Path p -> Format.fprintf fmt "Path=%s" p
+    | Secure -> Format.fprintf fmt "Secure"
+    | HttpOnly -> Format.fprintf fmt "HttpOnly"
+    | SameSite Strict -> Format.fprintf fmt "Same=Strict"
+    | SameSite Lax -> Format.fprintf fmt "Same=Lax"
+    | SameSite None -> Format.fprintf fmt "Same=None"
+
+  let rec pps fmt = function
+    | [] -> ()
+    | prop::ls -> Format.fprintf fmt "; %a%a" pp prop pps ls
+
+  let set props key value =
+    Format.asprintf "%s=%s%a" key value pps props
+end
+
 module Headers = struct
   type t = (string * string) list
   let empty = []
@@ -376,36 +407,11 @@ module Headers = struct
     in
     loop [] []
 
-end
+  let set_cookie ?(props=[]) k v h =
+      set "Set-Cookie" (SetCookie.set props k v) h
+  let unset_cookie k h =
+      set_cookie ~props:[MaxAge 0] k "UNSET" h
 
-module SetCookie = struct
-  type sameSite = Strict | Lax | None
-  type t =
-    | MaxAge of int
-    | Expires of Unix.tm
-    | Domain of string
-    | Path of string
-    | Secure
-    | HttpOnly
-    | SameSite of sameSite
-
-  let pp fmt = function
-    | MaxAge s -> Format.fprintf fmt "Max-Age=%d" s
-    | Expires d -> Format.fprintf fmt "Expires=%a" U.pp_date d
-    | Domain d -> Format.fprintf fmt "Domain=%s" d
-    | Path p -> Format.fprintf fmt "Path=%s" p
-    | Secure -> Format.fprintf fmt "Secure"
-    | HttpOnly -> Format.fprintf fmt "HttpOnly"
-    | SameSite Strict -> Format.fprintf fmt "Same=Strict"
-    | SameSite Lax -> Format.fprintf fmt "Same=Lax"
-    | SameSite None -> Format.fprintf fmt "Same=None"
-
-  let rec pps fmt = function
-    | [] -> ()
-    | prop::ls -> Format.fprintf fmt "; %a%a" pp prop pps ls
-
-  let set props key value =
-    Format.asprintf "%s=%s%a" key value pps props
 end
 
 module Request = struct
@@ -659,10 +665,6 @@ module Response = struct
   let update_headers f self = {self with headers=f self.headers}
   let set_header k v self = {self with headers = Headers.set k v self.headers}
   let set_code code self = {self with code}
-  let set_cookie ?(props=[]) k v self =
-      set_header "Set-Cookie" (SetCookie.set props k v) self
-  let unset_cookie k self =
-      set_cookie ~props:[MaxAge 0] k "UNSET" self
 
   let make_raw ?(headers=[]) ~code body : t =
     (* add content length to response *)
