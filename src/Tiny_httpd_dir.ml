@@ -3,7 +3,7 @@ module U = Tiny_httpd_util
 module Pf = Printf
 
 type dir_behavior =
-  Index | Forbidden | Lists
+  Index | Lists | IndexAndLists | Forbidden
 
 type config = {
   mutable download: bool;
@@ -183,21 +183,19 @@ let add_dir_path ~config ~dir ~prefix server =
           let parent = Filename.(dirname path) in
           let parent = if parent <> path then Some parent else None in
           match config.dir_behavior with
-          | Index ->
-             if Sys.file_exists (full_path // "index.html")  then (
-               (* redirect using path, not full path *)
-               let new_path = "/" // path // "index.html" in
-               S._debug (fun k->k "redirect to `%s`" new_path);
-               S.Response.make_raw ~code:301 ""
-                 ~headers:S.Headers.(empty |> set "location" new_path))
-             else
-               S.Response.fail_raise ~code:403 "Cannot access file"
-          | Lists ->
+          | Index | IndexAndLists when
+                 Sys.file_exists (full_path // "index.html") ->
+             (* redirect using path, not full path *)
+             let new_path = "/" // path // "index.html" in
+             S._debug (fun k->k "redirect to `%s`" new_path);
+             S.Response.make_raw ~code:301 ""
+               ~headers:S.Headers.(empty |> set "location" new_path)
+          | Lists | IndexAndLists ->
              let body = html_list_dir ~top:dir path ~parent in
              S.Response.make_string
                ~headers:[header_html; "ETag", Lazy.force mtime]
                (Ok body)
-          | Forbidden ->
+          | Forbidden | Index ->
              S.Response.make_raw ~code:405 "listing dir not allowed"
         ) else (
           try

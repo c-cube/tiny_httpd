@@ -34,10 +34,16 @@ let main () =
       "--debug", Unit (fun () -> S._enable_debug true), " debug mode";
       "--upload", Unit (fun () -> config.upload <- true), " enable file uploading";
       "--no-upload", Unit (fun () -> config.upload <- false), " disable file uploading";
+      "--download", Unit (fun () -> config.download <- true), " enable file downloading";
+      "--no-download", Unit (fun () -> config.download <- false), " disable file downloading";
       "--max-upload", String (fun i -> config.max_upload_size <- parse_size i),
         " maximum size of files that can be uploaded";
       "--auto-index", Unit (fun () -> config.dir_behavior <- Index),
       " automatically redirect to index.html if present";
+      "--list-dir", Unit (fun () -> config.dir_behavior <- Lists),
+      " automatically lists directory";
+      "--index-and-list", Unit (fun () -> config.dir_behavior <- IndexAndLists),
+      " automatically redirect to index.html or lists directory";
       "--delete", Unit (fun () -> config.delete <- true), " enable `delete` on files";
       "--no-delete", Unit (fun () -> config.delete <- false), " disable `delete` on files";
       "-j", Set_int j, " maximum number of simultaneous connections";
