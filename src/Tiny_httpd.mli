@@ -232,8 +232,8 @@ module Headers : sig
   (** Set a cookie in the header
       @since 0.12 *)
 
-  val unset_cookie : string -> t -> t
-  (** Unset a cookie in the header
+  val unset_cookie : string -> string -> t -> t
+  (** Unset a cookie in the header (needs key and values)
       @since 0.12 *)
 
 end

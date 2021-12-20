@@ -409,8 +409,8 @@ module Headers = struct
 
   let set_cookie ?(props=[]) k v h =
       set "Set-Cookie" (SetCookie.set props k v) h
-  let unset_cookie k h =
-      set_cookie ~props:[MaxAge 0] k "UNSET" h
+  let unset_cookie k v h =
+      set_cookie ~props:[MaxAge 0] k v h
 
 end
 
@@ -442,7 +442,9 @@ module Request = struct
     | Some x -> (try Some (int_of_string x) with _ -> None)
     | None -> None
   let set_header k v self = {self with headers=Headers.set k v self.headers}
-  let get_cookie ?f self h = Headers.get ?f h self.cookies
+  let get_cookie ?(f=fun x -> x) self h =
+    try Some (f (List.assoc h self.cookies))
+    with Not_found -> None
   let get_cookie_int self h = match get_cookie self h with
     | Some x -> (try Some (int_of_string x) with _ -> None)
     | None -> None
