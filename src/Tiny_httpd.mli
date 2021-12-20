@@ -491,6 +491,11 @@ module Route : sig
   (** [comp / route] matches ["foo/bar/…"] iff [comp] matches ["foo"],
       and [route] matches ["bar/…"]. *)
 
+  val exact_path : string -> ('a,'b) t -> ('a,'b) t
+  (** [exact_path "foo/bar/..." r] is equivalent to
+      [exact "foo" @/ exact "bar" @/ ... @/ r]
+      @since NEXT_RELEASE **)
+
   val pp : Format.formatter -> _ t -> unit
   (** Print the route.
       @since 0.7 *)
