@@ -214,6 +214,22 @@ module Headers : sig
   (** Pretty print the headers. *)
 end
 
+(** {Set Cookie}
+
+    A module to set new cookies in the header *)
+module SetCookie : sig
+  type sameSite = Strict | Lax | None
+  type t =
+    | MaxAge of int
+    | Expires of string (** FIXME: format date, but need computation
+                            of days of week *)
+    | Domain of string
+    | Path of string
+    | Secure
+    | HttpOnly
+    | SameSite of sameSite
+end
+
 (** {2 Requests}
 
     Requests are sent by a client, e.g. a web browser or cURL. *)
@@ -223,6 +239,7 @@ module Request : sig
     meth: Meth.t;
     host: string;
     headers: Headers.t;
+    cookies: Headers.t;
     http_version: int*int;
     path: string;
     path_components: string list;
@@ -254,6 +271,18 @@ module Request : sig
   val get_header : ?f:(string->string) -> _ t -> string -> string option
 
   val get_header_int : _ t -> string -> int option
+
+  val cookies : _ t -> Headers.t
+  (** List of cookies of the request
+      @since 0.12 *)
+
+  val get_cookie : ?f:(string->string) -> _ t -> string -> string option
+  (** get a cookie
+      @since 0.12 *)
+
+  val get_cookie_int : _ t -> string -> int option
+  (** get a cookie as int
+      @since 0.12 *)
 
   val set_header : string -> string -> 'a t -> 'a t
   (** [set_header k v req] sets [k: v] in the request [req]'s headers. *)
@@ -349,6 +378,14 @@ module Response : sig
   val set_header : string -> string -> t -> t
   (** Set a header.
       @since 0.11 *)
+
+  val set_cookie : ?props:SetCookie.t list -> string -> string -> t -> t
+  (** Set a cookie in the header
+      @since 0.12 *)
+
+  val unset_cookie : string -> t -> t
+  (** Unset a cookie in the header
+      @since 0.12 *)
 
   val update_headers : (Headers.t -> Headers.t) -> t -> t
   (** Modify headers
