@@ -40,3 +40,7 @@ val pp_date : Format.formatter -> Unix.tm -> unit
     for expiration date of cookies.
     @since 0.12
 *)
+
+val filter_map : ('a -> 'b option) -> 'a list -> 'b list
+(** filter_map, now in Stdlib
+    @since 0.12 *)

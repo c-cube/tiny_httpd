@@ -102,6 +102,18 @@ let split_on_slash s : _ list =
   done;
   List.rev !l
 
+let filter_map f l =
+  let rec fn = function
+    | [] -> []
+    | x::l ->
+       begin
+         match f x with
+         | None -> fn l
+         | Some x -> x::fn l
+       end
+  in
+  fn l
+
 (*$= & ~printer:Q.Print.(list string)
   ["a"; "b"] (split_on_slash "/a/b")
   ["coucou"; "lol"] (split_on_slash "/coucou/lol")

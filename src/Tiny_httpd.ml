@@ -396,7 +396,7 @@ module Headers = struct
                 | _       -> None
               in
               let cookies =
-                List.filter_map fn_eq (String.split_on_char ';' v) @ cookies
+                U.filter_map fn_eq (String.split_on_char ';' v) @ cookies
               in
               (headers, cookies)
             end
