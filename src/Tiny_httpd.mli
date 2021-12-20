@@ -456,7 +456,8 @@ module Route : sig
 
   val exact_path : string -> ('a,'b) t -> ('a,'b) t
   (** [exact_path "foo/bar/..." r] is equivalent to
-      [exact "foo" @/ exact "bar" @/ ... @/ r] **)
+      [exact "foo" @/ exact "bar" @/ ... @/ r]
+      @since NEXT_RELEASE **)
 
   val pp : Format.formatter -> _ t -> unit
   (** Print the route.

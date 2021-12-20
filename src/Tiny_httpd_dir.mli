@@ -5,7 +5,7 @@ type dir_behavior =
   (** Redirect to index.html if present *)
   | Lists
   (** Lists content of directory *)
-  | IndexAndLists
+  | Index_or_lists
   (** Redirect to index.html if present and Lists content otherwise *)
   | Forbidden
   (** Forbid access to directory *)

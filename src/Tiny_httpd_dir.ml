@@ -14,11 +14,11 @@ type config = {
 }
 
 let default_config () : config =
-  { download=true
-  ; dir_behavior=Forbidden
-  ; delete=false
-  ; upload=false
-  ; max_upload_size = 10 * 1024 * 1024
+  { download=true;
+    dir_behavior=Forbidden;
+    delete=false;
+    upload=false;
+    max_upload_size = 10 * 1024 * 1024;
   }
 
 let contains_dot_dot s =
