@@ -20,7 +20,8 @@ let parse_size s : int =
   with _ -> raise (Arg.Bad "invalid size (expected <int>[kM]?)")
 
 let main () =
-  let config = D.default_config () in
+  let config = D.default_config() in
+  config.dir_behavior <- Index_or_lists; (* keep old behavior *)
   let dir_ = ref "." in
   let addr = ref "127.0.0.1" in
   let port = ref 8080 in
@@ -38,12 +39,10 @@ let main () =
       "--no-download", Unit (fun () -> config.download <- false), " disable file downloading";
       "--max-upload", String (fun i -> config.max_upload_size <- parse_size i),
         " maximum size of files that can be uploaded";
-      "--auto-index", Unit (fun () -> config.dir_behavior <- Index),
-      " automatically redirect to index.html if present";
-      "--list-dir", Unit (fun () -> config.dir_behavior <- Lists),
-      " automatically lists directory";
-      "--index-and-list", Unit (fun () -> config.dir_behavior <- Index_or_lists),
-      " automatically redirect to index.html or lists directory";
+      "--auto-index",
+      Bool (fun b -> config.dir_behavior <-
+               (if b then Index_or_lists else Lists)),
+      " <bool> automatically redirect to index.html if present";
       "--delete", Unit (fun () -> config.delete <- true), " enable `delete` on files";
       "--no-delete", Unit (fun () -> config.delete <- false), " disable `delete` on files";
       "-j", Set_int j, " maximum number of simultaneous connections";
