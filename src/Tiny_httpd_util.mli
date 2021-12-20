@@ -34,3 +34,9 @@ val parse_query : string -> ((string*string) list, string) result
     The order might not be preserved.
     @since 0.3
 *)
+
+val pp_date : Format.formatter -> Unix.tm -> unit
+(** Print date (given in GMT) in the expected format for http (for instance
+    for expiration date of cookies.
+    @since 0.12
+*)

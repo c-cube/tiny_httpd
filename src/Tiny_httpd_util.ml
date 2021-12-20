@@ -161,3 +161,33 @@ let parse_query s : (_ list, string) result=
             (List.map (fun (x,y) -> percent_encode x ^"="^percent_encode y) l) in
         eq_sorted (Ok l) (parse_query s))
 *)
+
+let pp_date fmt date =
+  let open Unix in
+  let day = match date.tm_wday with
+    | 0 -> "Sun"
+    | 1 -> "Mon"
+    | 2 -> "Tue"
+    | 3 -> "Wed"
+    | 4 -> "Thu"
+    | 5 -> "Fri"
+    | 6 -> "Sat"
+    | _ -> invalid_arg "print_date"
+  in
+  let month = match date.tm_mon with
+    | 0 -> "Jan"
+    | 1 -> "Feb"
+    | 2 -> "Mar"
+    | 3 -> "Apr"
+    | 4 -> "May"
+    | 5 -> "Jun"
+    | 6 -> "Jul"
+    | 7 -> "Aug"
+    | 8 -> "Sep"
+    | 9 -> "Oct"
+    |10 -> "Nov"
+    |11 -> "Dec"
+    | _ -> invalid_arg "print_date"
+  in
+  Format.fprintf fmt "%s, %02d %s %04d %02d:%02d:%02d GMT"
+    day date.tm_mday month (date.tm_year+1900) date.tm_hour date.tm_min date.tm_sec

@@ -221,8 +221,7 @@ module SetCookie : sig
   type sameSite = Strict | Lax | None
   type t =
     | MaxAge of int
-    | Expires of string (** FIXME: format date, but need computation
-                            of days of week *)
+    | Expires of Unix.tm (** assume UTC/GMT *)
     | Domain of string
     | Path of string
     | Secure

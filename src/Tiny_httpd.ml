@@ -1,3 +1,5 @@
+module U = Tiny_httpd_util
+
 type byte_stream = {
   bs_fill_buf: unit -> (bytes * int * int);
   bs_consume: int -> unit;
@@ -380,8 +382,7 @@ module SetCookie = struct
   type sameSite = Strict | Lax | None
   type t =
     | MaxAge of int
-    | Expires of string (** FIXME: format date, but need computation
-                            of days of week *)
+    | Expires of Unix.tm
     | Domain of string
     | Path of string
     | Secure
@@ -390,7 +391,7 @@ module SetCookie = struct
 
   let pp fmt = function
     | MaxAge s -> Format.fprintf fmt "Max-Age=%d" s
-    | Expires d -> Format.fprintf fmt "Expires=%s" d
+    | Expires d -> Format.fprintf fmt "Expires=%a" U.pp_date d
     | Domain d -> Format.fprintf fmt "Domain=%s" d
     | Path p -> Format.fprintf fmt "Path=%s" p
     | Secure -> Format.fprintf fmt "Secure"
@@ -566,10 +567,10 @@ module Request = struct
         | None -> bad_reqf 400 "No 'Host' header in request"
         | Some h -> h
       in
-      let path_components, query = Tiny_httpd_util.split_query path in
-      let path_components = Tiny_httpd_util.split_on_slash path_components in
+      let path_components, query = U.split_query path in
+      let path_components = U.split_on_slash path_components in
       let query =
-        match Tiny_httpd_util.(parse_query query) with
+        match U.(parse_query query) with
         | Ok l -> l
         | Error e -> bad_reqf 400 "invalid query: %s" e
       in
@@ -819,7 +820,7 @@ module Route = struct
         let whole_path = String.concat "/" path in
         begin match
             if url_encoded
-            then match Tiny_httpd_util.percent_decode whole_path with
+            then match U.percent_decode whole_path with
               | Some s -> s
               | None -> raise_notrace Exit
             else whole_path
@@ -838,7 +839,7 @@ module Route = struct
           | String ->
             eval path' route' (f c1)
           | String_urlencoded ->
-            begin match Tiny_httpd_util.percent_decode c1 with
+            begin match U.percent_decode c1 with
               | None -> None
               | Some s -> eval path' route' (f s)
             end
