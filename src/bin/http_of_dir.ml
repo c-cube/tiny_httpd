@@ -42,7 +42,7 @@ let main () =
       " automatically redirect to index.html if present";
       "--list-dir", Unit (fun () -> config.dir_behavior <- Lists),
       " automatically lists directory";
-      "--index-and-list", Unit (fun () -> config.dir_behavior <- IndexAndLists),
+      "--index-and-list", Unit (fun () -> config.dir_behavior <- Index_or_lists),
       " automatically redirect to index.html or lists directory";
       "--delete", Unit (fun () -> config.delete <- true), " enable `delete` on files";
       "--no-delete", Unit (fun () -> config.delete <- false), " disable `delete` on files";

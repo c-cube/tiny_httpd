@@ -3,7 +3,7 @@ module U = Tiny_httpd_util
 module Pf = Printf
 
 type dir_behavior =
-  Index | Lists | IndexAndLists | Forbidden
+  | Index | Lists | Index_or_lists | Forbidden
 
 type config = {
   mutable download: bool;
@@ -25,7 +25,7 @@ let contains_dot_dot s =
   try
     String.iteri
       (fun i c ->
-        if c='.' && i+1 < String.length s && String.get s (i+1) = '.' then raise Exit)
+         if c='.' && i+1 < String.length s && String.get s (i+1) = '.' then raise Exit)
       s;
     false
   with Exit -> true
@@ -100,29 +100,20 @@ let finally_ ~h x f =
     h x;
     raise e
 
-(* TODO
-let wdays = [|"Sun"; "Mon"; "Tue"; "Wed"; "Thu"; "Fri"; "Sat"|]
-let date_of_time (f:float) : string =
-  let open Unix in
-  let t = Unix.gmtime f in
-  Printf.sprintf "%s, %02d %d %d %d:%d:%d GMT"
-    wdays.(t.tm_yday) t.tm_mday t.tm_mon t.tm_year t.tm_hour t.tm_min t.tm_sec
-   *)
-
 let add_dir_path ~config ~dir ~prefix server =
 
   if config.delete then (
     S.add_route_handler server ~meth:`DELETE
       S.Route.(exact_path prefix (rest_of_path_urlencoded))
       (fun path _req ->
-        if contains_dot_dot path then (
-          S.Response.fail_raise ~code:403 "invalid path in delete"
-        ) else (
-          S.Response.make_string
-            (try
-               Sys.remove (dir // path); Ok "file deleted successfully"
-             with e -> Error (500, Printexc.to_string e))
-        )
+         if contains_dot_dot path then (
+           S.Response.fail_raise ~code:403 "invalid path in delete"
+         ) else (
+           S.Response.make_string
+             (try
+                Sys.remove (dir // path); Ok "file deleted successfully"
+              with e -> Error (500, Printexc.to_string e))
+         )
       );
   ) else (
     S.add_route_handler server ~meth:`DELETE
@@ -134,93 +125,93 @@ let add_dir_path ~config ~dir ~prefix server =
     S.add_route_handler_stream server ~meth:`PUT
       S.Route.(exact_path prefix (rest_of_path_urlencoded))
       ~accept:(fun req ->
-        match S.Request.get_header_int req "Content-Length" with
-        | Some n when n > config.max_upload_size ->
-           Error (403, "max upload size is " ^ string_of_int config.max_upload_size)
-        | Some _ when contains_dot_dot req.S.Request.path ->
-           Error (403, "invalid path (contains '..')")
-        | _ -> Ok ()
-      )
+          match S.Request.get_header_int req "Content-Length" with
+          | Some n when n > config.max_upload_size ->
+            Error (403, "max upload size is " ^ string_of_int config.max_upload_size)
+          | Some _ when contains_dot_dot req.S.Request.path ->
+            Error (403, "invalid path (contains '..')")
+          | _ -> Ok ()
+        )
       (fun path req ->
-        let fpath = dir // path in
-        let oc =
-          try open_out fpath
-          with e ->
-            S.Response.fail_raise ~code:403 "cannot upload to %S: %s"
-              path (Printexc.to_string e)
-        in
-        let req = S.Request.limit_body_size ~max_size:config.max_upload_size req in
-        S.Byte_stream.to_chan oc req.S.Request.body;
-        flush oc;
-        close_out oc;
-        S._debug (fun k->k "done uploading");
-        S.Response.make_raw ~code:201 "upload successful"
+         let fpath = dir // path in
+         let oc =
+           try open_out fpath
+           with e ->
+             S.Response.fail_raise ~code:403 "cannot upload to %S: %s"
+               path (Printexc.to_string e)
+         in
+         let req = S.Request.limit_body_size ~max_size:config.max_upload_size req in
+         S.Byte_stream.to_chan oc req.S.Request.body;
+         flush oc;
+         close_out oc;
+         S._debug (fun k->k "done uploading");
+         S.Response.make_raw ~code:201 "upload successful"
       )
   ) else (
     S.add_route_handler server ~meth:`PUT
       S.Route.(exact_path prefix (string @/ return))
-           (fun _ _  -> S.Response.make_raw ~code:405 "upload not allowed");
+      (fun _ _  -> S.Response.make_raw ~code:405 "upload not allowed");
   );
 
   if config.download then (
     S.add_route_handler server ~meth:`GET
       S.Route.(exact_path prefix (rest_of_path_urlencoded))
       (fun path req ->
-        let full_path = dir // path in
-        let mtime = lazy (
-                        try Printf.sprintf "mtime: %f" (Unix.stat full_path).Unix.st_mtime
-                        with _ -> S.Response.fail_raise ~code:403 "Cannot access file"
-                      ) in
-        if contains_dot_dot full_path then (
-          S.Response.fail ~code:403 "Path is forbidden";
-        ) else if not (Sys.file_exists full_path) then (
-          S.Response.fail ~code:404 "File not found";
-        ) else if S.Request.get_header req "If-None-Match" = Some (Lazy.force mtime) then (
-          S._debug (fun k->k "cached object %S (etag: %S)" path (Lazy.force mtime));
-          S.Response.make_raw ~code:304 ""
-        ) else if Sys.is_directory full_path then (
-          S._debug (fun k->k "list dir %S (topdir %S)"  full_path dir);
-          let parent = Filename.(dirname path) in
-          let parent = if parent <> path then Some parent else None in
-          match config.dir_behavior with
-          | Index | IndexAndLists when
-                 Sys.file_exists (full_path // "index.html") ->
+         let full_path = dir // path in
+         let mtime = lazy (
+           try Printf.sprintf "mtime: %f" (Unix.stat full_path).Unix.st_mtime
+           with _ -> S.Response.fail_raise ~code:403 "Cannot access file"
+         ) in
+         if contains_dot_dot full_path then (
+           S.Response.fail ~code:403 "Path is forbidden";
+         ) else if not (Sys.file_exists full_path) then (
+           S.Response.fail ~code:404 "File not found";
+         ) else if S.Request.get_header req "If-None-Match" = Some (Lazy.force mtime) then (
+           S._debug (fun k->k "cached object %S (etag: %S)" path (Lazy.force mtime));
+           S.Response.make_raw ~code:304 ""
+         ) else if Sys.is_directory full_path then (
+           S._debug (fun k->k "list dir %S (topdir %S)"  full_path dir);
+           let parent = Filename.(dirname path) in
+           let parent = if parent <> path then Some parent else None in
+           match config.dir_behavior with
+           | Index | Index_or_lists when
+               Sys.file_exists (full_path // "index.html") ->
              (* redirect using path, not full path *)
              let new_path = "/" // path // "index.html" in
              S._debug (fun k->k "redirect to `%s`" new_path);
              S.Response.make_raw ~code:301 ""
                ~headers:S.Headers.(empty |> set "location" new_path)
-          | Lists | IndexAndLists ->
+           | Lists | Index_or_lists ->
              let body = html_list_dir ~top:dir path ~parent in
              S.Response.make_string
                ~headers:[header_html; "ETag", Lazy.force mtime]
                (Ok body)
-          | Forbidden | Index ->
+           | Forbidden | Index ->
              S.Response.make_raw ~code:405 "listing dir not allowed"
-        ) else (
-          try
-            let ic = open_in full_path in
-            let mime_type =
-              if Filename.extension full_path = ".css" then (
-                ["Content-Type", "text/css"]
-              ) else if Filename.extension full_path = ".js" then (
-                ["Content-Type", "text/javascript"]
-              ) else try
-                    let p = Unix.open_process_in (Printf.sprintf "file -i -b %S" full_path) in
-                    finally_ ~h:(fun p->ignore @@ Unix.close_process_in p) p
-                      (fun p ->
+         ) else (
+           try
+             let ic = open_in full_path in
+             let mime_type =
+               if Filename.extension full_path = ".css" then (
+                 ["Content-Type", "text/css"]
+               ) else if Filename.extension full_path = ".js" then (
+                 ["Content-Type", "text/javascript"]
+               ) else try
+                   let p = Unix.open_process_in (Printf.sprintf "file -i -b %S" full_path) in
+                   finally_ ~h:(fun p->ignore @@ Unix.close_process_in p) p
+                     (fun p ->
                         try ["Content-Type", String.trim (input_line p)]
                         with _ -> [])
-                  with _ -> []
-            in
-            S.Response.make_raw_stream
-              ~headers:(mime_type@["Etag", Lazy.force mtime])
-              ~code:200 (S.Byte_stream.of_chan ic)
-          with e ->
-            S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e))
+                 with _ -> []
+             in
+             S.Response.make_raw_stream
+               ~headers:(mime_type@["Etag", Lazy.force mtime])
+               ~code:200 (S.Byte_stream.of_chan ic)
+           with e ->
+             S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e))
       )
   ) else (
     S.add_route_handler server ~meth:`GET
       S.Route.(exact_path prefix (string @/ return))
-           (fun _ _  -> S.Response.make_raw ~code:405 "download not allowed");
+      (fun _ _  -> S.Response.make_raw ~code:405 "download not allowed");
   );
