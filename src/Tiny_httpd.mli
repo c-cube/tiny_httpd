@@ -228,7 +228,9 @@ module Request : sig
     path_components: string list;
     query: (string*string) list;
     body: 'body;
-    start_time: float; (** @since NEXT_RELEASE *)
+    start_time: float;
+    (** Obtained via [get_time_s] in {!create}
+        @since NEXT_RELEASE *)
   }
   (** A request with method, path, host, headers, and a body, sent by a client.
 
@@ -238,8 +240,9 @@ module Request : sig
       entirely read as a string via {!read_body_full}.
 
       @since 0.6 The field [query] was added and contains the query parameters in ["?foo=bar,x=y"]
-
       @since 0.6 The field [path_components] is the part of the path that precedes [query] and is split on ["/"].
+      @since NEXT_RELEASE the type is a private alias
+      @since NEXT_RELEASE the field [start_time] was added
   *)
 
   val pp : Format.formatter -> string t -> unit
@@ -300,7 +303,7 @@ module Request : sig
   (**/**)
   (* for testing purpose, do not use *)
   module Internal_ : sig
-    val parse_req_start : ?buf:Buf_.t -> byte_stream -> unit t option
+    val parse_req_start : ?buf:Buf_.t -> get_time_s:(unit -> float) -> byte_stream -> unit t option
     val parse_body : ?buf:Buf_.t -> unit t -> byte_stream -> byte_stream t
   end
   (**/**)
@@ -503,6 +506,7 @@ val create :
   ?max_connections:int ->
   ?timeout:float ->
   ?buf_size:int ->
+  ?get_time_s:(unit -> float) ->
   ?new_thread:((unit -> unit) -> unit) ->
   ?addr:string ->
   ?port:int ->
@@ -537,6 +541,9 @@ val create :
       systemd on Linux (or launchd on macOS). If passed in, this socket will be
       used instead of the [addr] and [port]. If not passed in, those will be
       used. This parameter exists since 0.10.
+
+    @param get_time_s obtain the current timestamp in seconds.
+      This parameter exists since NEXT_RELEASE.
 *)
 
 val addr : t -> string

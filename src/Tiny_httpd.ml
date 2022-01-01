@@ -490,10 +490,10 @@ module Request = struct
         )
 
   (* parse request, but not body (yet) *)
-  let parse_req_start ~buf (bs:byte_stream) : unit t option resp_result =
+  let parse_req_start ~get_time_s ~buf (bs:byte_stream) : unit t option resp_result =
     try
       let line = Byte_stream.read_line ~buf bs in
-      let start_time = Unix.gettimeofday () in
+      let start_time = get_time_s() in
       let meth, path, version =
         try
           let meth, path, version = Scanf.sscanf line "%s %s HTTP/1.%d\r" (fun x y z->x,y,z) in
@@ -566,8 +566,8 @@ module Request = struct
     | e -> bad_reqf 500 "failed to read body: %s" (Printexc.to_string e)
 
   module Internal_ = struct
-    let parse_req_start ?(buf=Buf_.create()) bs =
-      parse_req_start ~buf bs |> unwrap_resp_result
+    let parse_req_start ?(buf=Buf_.create()) ~get_time_s bs =
+      parse_req_start ~get_time_s ~buf bs |> unwrap_resp_result
 
     let parse_body ?(buf=Buf_.create()) req bs : _ t =
       parse_body_ ~tr_stream:(fun s->s) ~buf {req with body=bs} |> unwrap_resp_result
@@ -577,7 +577,7 @@ end
 (*$R
   let q = "GET hello HTTP/1.1\r\nHost: coucou\r\nContent-Length: 11\r\n\r\nsalutationsSOMEJUNK" in
   let str = Byte_stream.of_string q in
-  let r = Request.Internal_.parse_req_start str in
+  let r = Request.Internal_.parse_req_start ~get_time_s:(fun _ -> 0.) str in
   match r with
   | None -> assert_failure "should parse"
   | Some req ->
@@ -863,6 +863,8 @@ type t = {
 
   buf_size: int;
 
+  get_time_s : unit -> float;
+
   mutable handler: (string Request.t -> Response.t);
   (* toplevel handler, if any *)
 
@@ -1006,6 +1008,7 @@ let create
     ?(max_connections=32)
     ?(timeout=0.0)
     ?(buf_size=16 * 1_024)
+    ?(get_time_s=Unix.gettimeofday)
     ?(new_thread=(fun f -> ignore (Thread.create f () : Thread.t)))
     ?(addr="127.0.0.1") ?(port=8080) ?sock
     ?(middlewares=[])
@@ -1015,7 +1018,7 @@ let create
   let self = {
     new_thread; addr; port; sock; masksigpipe; handler; buf_size;
     running= true; sem_max_connections=Sem_.create max_connections;
-    path_handlers=[]; timeout;
+    path_handlers=[]; timeout; get_time_s;
     middlewares=[]; middlewares_sorted=lazy [];
   } in
   List.iter (fun (stage,m) -> add_middleware self ~stage m) middlewares;
@@ -1042,7 +1045,7 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
   let continue = ref true in
   while !continue && self.running do
     _debug (fun k->k "read next request");
-    match Request.parse_req_start ~buf is with
+    match Request.parse_req_start ~get_time_s:self.get_time_s ~buf is with
     | Ok None ->
       continue := false (* client is done *)
 
