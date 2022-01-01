@@ -4,7 +4,7 @@ val middleware :
   ?buf_size:int -> unit ->
   Tiny_httpd.Middleware.t
 (** Middleware responsible for deflate compression/decompression.
-    @since NEXT_RELEASE *)
+    @since 0.11 *)
 
 val setup :
   ?compress_above:int ->

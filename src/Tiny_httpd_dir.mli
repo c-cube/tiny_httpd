@@ -5,7 +5,7 @@
     It exposes a directory (and its subdirectories), with the optional ability
     to delete or upload files.
 
-    @since NEXT_RELEASE *)
+    @since 0.11 *)
 
 (** behavior of static directory.
 

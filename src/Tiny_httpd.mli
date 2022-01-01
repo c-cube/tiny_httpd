@@ -230,7 +230,7 @@ module Request : sig
     body: 'body;
     start_time: float;
     (** Obtained via [get_time_s] in {!create}
-        @since NEXT_RELEASE *)
+        @since 0.11 *)
   }
   (** A request with method, path, host, headers, and a body, sent by a client.
 
@@ -241,8 +241,8 @@ module Request : sig
 
       @since 0.6 The field [query] was added and contains the query parameters in ["?foo=bar,x=y"]
       @since 0.6 The field [path_components] is the part of the path that precedes [query] and is split on ["/"].
-      @since NEXT_RELEASE the type is a private alias
-      @since NEXT_RELEASE the field [start_time] was added
+      @since 0.11 the type is a private alias
+      @since 0.11 the field [start_time] was added
   *)
 
   val pp : Format.formatter -> string t -> unit
@@ -287,7 +287,7 @@ module Request : sig
 
   val start_time : _ t -> float
   (** time stamp (from {!Unix.gettimeofday}) after parsing the first line of the request
-      @since NEXT_RELEASE *)
+      @since 0.11 *)
 
   val limit_body_size : max_size:int -> byte_stream t -> byte_stream t
   (** Limit the body size to [max_size] bytes, or return
@@ -298,7 +298,7 @@ module Request : sig
   val read_body_full : ?buf_size:int -> byte_stream t -> string t
   (** Read the whole body into a string. Potentially blocking.
 
-      @param buf_size initial size of underlying buffer (since NEXT_RELEASE) *)
+      @param buf_size initial size of underlying buffer (since 0.11) *)
 
   (**/**)
   (* for testing purpose, do not use *)
@@ -460,7 +460,7 @@ module Route : sig
   val exact_path : string -> ('a,'b) t -> ('a,'b) t
   (** [exact_path "foo/bar/..." r] is equivalent to
       [exact "foo" @/ exact "bar" @/ ... @/ r]
-      @since NEXT_RELEASE **)
+      @since 0.11 **)
 
   val pp : Format.formatter -> _ t -> unit
   (** Print the route.
@@ -476,7 +476,7 @@ end
     A middleware can be inserted in a handler to modify or observe
     its behavior.
 
-    @since NEXT_RELEASE
+    @since 0.11
 *)
 module Middleware : sig
   type handler = byte_stream Request.t -> resp:(Response.t -> unit) -> unit
@@ -523,7 +523,7 @@ val create :
     @param masksigpipe if true, block the signal {!Sys.sigpipe} which otherwise
     tends to kill client threads when they try to write on broken sockets. Default: [true].
 
-    @param buf_size size for buffers (since NEXT_RELEASE)
+    @param buf_size size for buffers (since 0.11)
 
     @param new_thread a function used to spawn a new thread to handle a
     new client connection. By default it is {!Thread.create} but one
@@ -543,7 +543,7 @@ val create :
       used. This parameter exists since 0.10.
 
     @param get_time_s obtain the current timestamp in seconds.
-      This parameter exists since NEXT_RELEASE.
+      This parameter exists since 0.11.
 *)
 
 val addr : t -> string
@@ -591,7 +591,7 @@ val add_middleware :
     @param stage specify when middleware applies.
       Encoding comes first (outermost layer), then stages in increasing order.
     @raise Invalid_argument if stage is [`Stage n] where [n < 1]
-    @since NEXT_RELEASE
+    @since 0.11
 *)
 
 (** {2 Request handlers} *)
