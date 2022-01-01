@@ -14,8 +14,9 @@ jobs:
       with:
         ocaml-compiler: ${{ matrix.ocaml-compiler }}
     - run: opam pin -n .
-    - run: opam depext -yt tiny_httpd tiny_httpd_camlzip
-    - run: opam install -t . --deps-only
-    - run: opam exec -- dune build @install
-    - run: opam exec -- dune runtest
-      if: ${{ matrix.operating-system == 'unbuntu-latest' }}
+    - run: opam install tiny_httpd
+    - run: opam install tiny_httpd_camlzip
+    - run: opam reinstall -t tiny_httpd
+    - run: opam reinstall -t tiny_httpd_camlzip
+    - run: opam remove tiny_httpd tiny_httpd_camlzip
+    - run: opam exec -- dune build @install @runtest
