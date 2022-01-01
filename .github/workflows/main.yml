@@ -8,6 +8,9 @@ jobs:
       matrix:
         operating-system: [macos-latest, ubuntu-latest, windows-latest]
         ocaml-compiler: [ '4.04.0', '4.11.0' ]
+    env:
+      OPAMCLI: 2.1
+      OPAMCONFIRMLEVEL: unsafe-yes
     steps:
     - uses: actions/checkout@master
     - uses: avsm/setup-ocaml@v2
