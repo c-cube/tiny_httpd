@@ -1,4 +1,32 @@
 
+## 0.11
+
+- breaking: remove deprecated path handlers based on scanf
+- breaking: more getter/setters for request/response, change signatures,
+  make request/response private aliases
+
+- fix: release semaphore in case of exception in accept
+
+- feat: add a notion of Middleware
+- feat: add `?middlewares` param to `create`
+- feat: add `?get_time_s` param to `create`
+- feat: close connection if response's headers contains connection
+- feat: store `start_time` in request
+- feat: implement connection timeout using socket options
+  Default is `max_keep_alive = -1.0` which preserves the original behaviour.
+- feat: in server-sent-events, add a `close()` function
+
+- refactor(zip): compression is now a middleware
+- perf: pass `buf_size` in many places, set default `buf_size` to 16kb
+- example: update `echo` to provide a /stats/ endpoint using a middleware
+
+## 0.10
+
+- feat: allow socket activation by passing a raw unix socket to `create`
+- fix: `Unix.accept` may raise an exception
+  (typicall Unix.EINTR, even with sigpipe blocked ?),
+  prevent the server from stopping
+
 ## 0.9
 
 - support handlers that stream server-sent events to client
