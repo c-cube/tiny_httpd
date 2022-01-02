@@ -10,10 +10,10 @@ let atomic_before_412 = {|
     y
 
   let[@inline] compare_and_set r seen v =
-    if r.x == seen then
+    if r.x == seen then (
       r.x <- v;
       true
-    else false
+    ) else false
 
   let[@inline] fetch_and_add r x =
     let v = r.x in
