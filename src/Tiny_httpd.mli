@@ -75,10 +75,11 @@ echo:
 *)
 
 
-(** {2 Tiny buffer implementation}
+(** Buffers
 
     These buffers are used to avoid allocating too many byte arrays when
     processing streams and parsing requests.
+    They should be allocated through the main server, see {!with_buf}.
 *)
 
 module Buf = Tiny_httpd_buf

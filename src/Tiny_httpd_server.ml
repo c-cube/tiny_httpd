@@ -196,9 +196,9 @@ module Request = struct
       self.path self.body pp_comp_ self.path_components pp_query self.query
 
   (* decode a "chunked" stream into a normal stream *)
-  let read_stream_chunked_ ?buf (bs:byte_stream) : byte_stream =
+  let read_stream_chunked_ ?(buf=Buf.create()) (bs:byte_stream) : byte_stream =
     _debug (fun k->k "body: start reading chunked stream...");
-    Byte_stream.read_chunked ?buf
+    Byte_stream.read_chunked ~buf
       ~fail:(fun s -> Bad_req (400, s))
       bs
 
@@ -290,9 +290,12 @@ module Request = struct
     | e ->
       Error (400, Printexc.to_string e)
 
-  let read_body_full ?buf_size (self:byte_stream t) : string t =
+  let read_body_full ?buf (self:byte_stream t) : string t =
+    let buf = match buf with
+      | Some b -> b
+      | None -> Buf.create ()
+    in
     try
-      let buf = Buf.create ?size:buf_size () in
       let body = Byte_stream.read_all ~buf self.body in
       { self with body }
     with
@@ -409,6 +412,13 @@ module Response = struct
       | `Stream str -> Byte_stream.output_chunked oc str;
     end;
     flush oc
+
+  (** Dispose of the stream. *)
+  let close_ (self:t) =
+    match self.body with
+    | `Stream bs -> Byte_stream.close bs
+    | `String _ | `Void -> ()
+
 end
 
 (* semaphore, for limiting concurrency. *)
@@ -580,6 +590,7 @@ type t = {
   masksigpipe: bool;
 
   buf_size: int;
+  buf_pool : Buf.Pool.t;
 
   get_time_s : unit -> float;
 
@@ -604,6 +615,23 @@ let addr self = self.addr
 let port self = self.port
 
 let active_connections self = Sem_.num_acquired self.sem_max_connections - 1
+
+let with_alloc_buf self f =
+  let buf = Buf.Pool.alloc self.buf_pool in
+  try
+    let res = f buf in
+    Buf.Pool.dealloc self.buf_pool buf;
+    res
+  with e ->
+    Buf.Pool.dealloc self.buf_pool buf;
+    raise e
+
+let alloc_buf_for_stream self f =
+  let buf = Buf.Pool.alloc self.buf_pool in
+  let stream = f buf in
+  let close = stream.Byte_stream.close in
+  Byte_stream.set_close stream (fun () -> Buf.Pool.dealloc self.buf_pool buf; close());
+  stream
 
 let add_middleware ~stage self m =
   let stage = match stage with
@@ -670,7 +698,13 @@ let add_route_handler_
 
 let add_route_handler (type a) ?accept ?middlewares ?meth
     self (route:(a,_) Route.t) (f:_) : unit =
-  let tr_req _oc req ~resp f = resp (f (Request.read_body_full ~buf_size:self.buf_size req)) in
+  let tr_req _oc req ~resp f =
+    let body =
+      with_alloc_buf self @@ fun buf ->
+      Request.read_body_full ~buf req
+    in
+    resp (f body)
+  in
   add_route_handler_ ?accept ?middlewares ?meth self route ~tr_req f
 
 let add_route_handler_stream ?accept ?middlewares ?meth self route f =
@@ -683,7 +717,10 @@ let[@inline] _opt_iter ~f o = match o with
 
 let add_route_server_sent_handler ?accept self route f =
   let tr_req oc req ~resp f =
-    let req = Request.read_body_full ~buf_size:self.buf_size req in
+    let req =
+      with_alloc_buf self @@ fun buf ->
+      Request.read_body_full ~buf req
+    in
     let headers = ref Headers.(empty |> set "content-type" "text/event-stream") in
 
     (* send response once *)
@@ -733,8 +770,10 @@ let create
     () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let max_connections = max 4 max_connections in
+  let buf_pool = Buf.Pool.create ~buf_size () in
   let self = {
-    new_thread; addr; port; sock; masksigpipe; handler; buf_size;
+    new_thread; addr; port; sock; masksigpipe; handler;
+    buf_size; buf_pool;
     running= true; sem_max_connections=Sem_.create max_connections;
     path_handlers=[]; timeout; get_time_s;
     middlewares=[]; middlewares_sorted=lazy [];
@@ -758,12 +797,16 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
   Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout);
   let ic = Unix.in_channel_of_descr client_sock in
   let oc = Unix.out_channel_of_descr client_sock in
-  let buf = Buf.create ~size:self.buf_size () in
-  let is = Byte_stream.of_chan ~buf_size:self.buf_size ic in
+  let buf_q = Buf.Pool.alloc self.buf_pool in
+  let buf_is = Buf.Pool.alloc self.buf_pool in
+  let buf_body = Buf.Pool.alloc self.buf_pool in
+  let is = Byte_stream.of_chan ~buf:buf_is ic in
+
   let continue = ref true in
   while !continue && self.running do
     _debug (fun k->k "read next request");
-    match Request.parse_req_start ~get_time_s:self.get_time_s ~buf is with
+    Buf.clear buf_q;
+    match Request.parse_req_start ~get_time_s:self.get_time_s ~buf:buf_q is with
     | Ok None ->
       continue := false (* client is done *)
 
@@ -788,7 +831,9 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
           | Some f -> unwrap_resp_result f
           | None ->
             (fun _oc req ~resp ->
-               let body_str = Request.read_body_full ~buf_size:self.buf_size req in
+               let buf = Buf.Pool.alloc self.buf_pool in
+               let body_str = Request.read_body_full ~buf req in
+               Buf.Pool.dealloc self.buf_pool buf;
                resp (self.handler body_str))
         in
 
@@ -809,8 +854,9 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
         in
 
         (* now actually read request's body into a stream *)
+        Buf.clear buf_body;
         let req =
-          Request.parse_body_ ~tr_stream:(fun s->s) ~buf {req with body=is}
+          Request.parse_body_ ~tr_stream:(fun s->s) ~buf:buf_body {req with body=is}
           |> unwrap_resp_result
         in
 
@@ -819,7 +865,8 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
           try
             if Headers.get "connection" r.Response.headers = Some"close" then
               continue := false;
-            Response.output_ oc r
+            Response.output_ oc r;
+            Response.close_ r;
           with Sys_error _ -> continue := false
         in
 
@@ -838,6 +885,11 @@ let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
         continue := false;
         Response.output_ oc @@ Response.fail ~code:500 "server error: %s" (Printexc.to_string e)
   done;
+
+  Buf.Pool.dealloc self.buf_pool buf_q;
+  Buf.Pool.dealloc self.buf_pool buf_is;
+  Buf.Pool.dealloc self.buf_pool buf_body;
+
   _debug (fun k->k "done with client, exiting");
   (try Unix.close client_sock
    with e -> _debug (fun k->k "error when closing sock: %s" (Printexc.to_string e)));

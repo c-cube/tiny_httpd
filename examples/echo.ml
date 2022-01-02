@@ -73,7 +73,9 @@ let () =
     S.Route.(exact "zcat" @/ string_urlencoded @/ return)
     (fun path _req ->
         let ic = open_in path in
-        let str = S.Byte_stream.of_chan ic in
+        let str =
+          S.alloc_buf_for_stream server @@ fun buf ->
+          S.Byte_stream.of_chan ~buf ic in
         let mime_type =
           try
             let p = Unix.open_process_in (Printf.sprintf "file -i -b %S" path) in

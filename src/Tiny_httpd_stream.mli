@@ -28,7 +28,7 @@ type t = {
   (** Consume [n] bytes from the buffer.
       This should only be called with [n <= len]. *)
 
-  close: unit -> unit;
+  mutable close: unit -> unit;
   (** Close the stream. *)
 
   _rest: hidden;
@@ -41,13 +41,15 @@ type t = {
 val close : t -> unit
 (** Close stream *)
 
+val set_close : t -> (unit -> unit) -> unit
+
 val empty : t
 (** Stream with 0 bytes inside *)
 
-val of_chan : ?buf_size:int -> in_channel -> t
+val of_chan : ?buf:Tiny_httpd_buf.t -> in_channel -> t
 (** Make a buffered stream from the given channel. *)
 
-val of_chan_close_noerr : ?buf_size:int -> in_channel -> t
+val of_chan_close_noerr : ?buf:Tiny_httpd_buf.t -> in_channel -> t
 (** Same as {!of_chan} but the [close] method will never fail. *)
 
 val of_bytes : ?i:int -> ?len:int -> bytes -> t
@@ -76,7 +78,7 @@ val make :
     @param init_size size of the buffer.
 *)
 
-val with_file : ?buf_size:int -> string -> (t -> 'a) -> 'a
+val with_file : ?buf:Tiny_httpd_buf.t -> string -> (t -> 'a) -> 'a
 (** Open a file with given name, and obtain an input stream
     on its content. When the function returns, the stream (and file) are closed. *)
 

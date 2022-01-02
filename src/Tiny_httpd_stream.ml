@@ -10,11 +10,12 @@ type t = {
   mutable len : int;
   fill_buf: unit -> unit;
   consume: int -> unit;
-  close: unit -> unit;
+  mutable close: unit -> unit;
   _rest: hidden;
 }
 
 let[@inline] close self = self.close()
+let[@inline] set_close self f = self.close <- f
 
 let empty = {
   bs=Bytes.empty;
@@ -26,7 +27,9 @@ let empty = {
   _rest=();
 }
 
-let make ?(bs=Bytes.create @@ 16 * 1024) ?(close=ignore) ~consume ~fill () : t =
+let make
+    ?(bs=Bytes.create @@ 16 * 1024)
+    ?(close=ignore) ~consume ~fill () : t =
   let rec self = {
     bs;
     off=0;
@@ -43,9 +46,10 @@ let make ?(bs=Bytes.create @@ 16 * 1024) ?(close=ignore) ~consume ~fill () : t =
   } in
   self
 
-let of_chan_ ?(buf_size=16 * 1024) ~close ic : t =
+let of_chan_  ?(buf=Buf.create ~size:(16*1024) ()) ~close ic : t =
+  let bs = Buf.bytes_slice buf in (* we just reuse the bytes of [buf] *)
   make
-    ~bs:(Bytes.create buf_size)
+    ~bs
     ~close:(fun _ -> close ic)
     ~consume:(fun self n ->
         self.off <- self.off + n;
@@ -101,10 +105,10 @@ let of_bytes ?(i=0) ?len (bs:bytes) : t =
 let of_string s : t =
   of_bytes (Bytes.unsafe_of_string s)
 
-let with_file ?buf_size file f =
+let with_file ?buf file f =
   let ic = open_in file in
   try
-    let x = f (of_chan ?buf_size ic) in
+    let x = f (of_chan ?buf ic) in
     close_in ic;
     x
   with e ->

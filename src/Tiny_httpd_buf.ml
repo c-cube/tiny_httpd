@@ -3,6 +3,7 @@ type t = {
   mutable bytes: bytes;
   mutable i: int;
 }
+type buf = t
 
 let create ?(size=4_096) () : t =
   { bytes=Bytes.make size ' '; i=0 }
@@ -33,3 +34,38 @@ let contents_and_clear (self:t) : string =
   let x = contents self in
   clear self;
   x
+
+module Pool = struct
+  let b_create_ = create
+
+  type t = {
+    buf_size: int;
+    mutable n: int;
+    mutable bufs: buf list;
+  }
+
+  let create ?(buf_size=16 * 1024) () : t =
+    { buf_size;
+      n=0; bufs=[];
+    }
+
+  let alloc self =
+    match self.bufs with
+    | [] -> b_create_ ~size:self.buf_size ()
+    | b :: tl ->
+      self.bufs <- tl;
+      self.n <- self.n - 1;
+      b
+
+  let max_bufs_ = 64 (* do not recycle buffers if we already have that many *)
+
+  let dealloc self b =
+    if self.n < max_bufs_ &&
+       Bytes.length b.bytes >= self.buf_size
+    then (
+      clear b;
+      self.n <- self.n + 1;
+      self.bufs <- b :: self.bufs
+    )
+
+end

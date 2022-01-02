@@ -8,9 +8,15 @@
 *)
 
 type t
+
+type buf = t
+
 val size : t -> int
+
 val clear : t -> unit
+
 val create : ?size:int -> unit -> t
+
 val contents : t -> string
 
 val bytes_slice : t -> bytes
@@ -25,3 +31,13 @@ val add_bytes : t -> bytes -> int -> int -> unit
 (** Append given bytes slice to the buffer.
     @since 0.5 *)
 
+(** A pool of buffers, to reuse memory. *)
+module Pool : sig
+  type t
+
+  val create : ?buf_size:int -> unit -> t
+
+  val alloc : t -> buf
+
+  val dealloc : t -> buf -> unit
+end

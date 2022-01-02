@@ -145,7 +145,7 @@ module Request : sig
       @since 0.3
   *)
 
-  val read_body_full : ?buf_size:int -> byte_stream t -> string t
+  val read_body_full : ?buf:buf -> byte_stream t -> string t
   (** Read the whole body into a string. Potentially blocking.
 
       @param buf_size initial size of underlying buffer (since 0.11) *)
@@ -394,6 +394,25 @@ val create :
 
     @param get_time_s obtain the current timestamp in seconds.
       This parameter exists since 0.11.
+*)
+
+val with_alloc_buf : t -> (buf -> 'a) -> 'a
+(** [with_alloc_buf server f] calls [f buf] with a buffer [buf].
+    It behaves like [f buf].
+
+    Make sure that the [buf] argument doesn't escape the scope of the call to
+    [f], as the buffer might be recycled internally.
+    @since NEXT_RELEASE
+*)
+
+val alloc_buf_for_stream :
+  t -> (buf -> byte_stream) -> byte_stream
+(** Similar to {!with_alloc_buf}, except the buffer can live as long as the returned
+    byte stream.
+    This is handy along with {!Response.make_stream}, to request a buffer to
+    process the stream, and ensure the buffer will be recycled when
+    the stream is closed.
+    @since NEXT_RELEASE
 *)
 
 val addr : t -> string
