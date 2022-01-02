@@ -13,7 +13,7 @@
   (name echo)
   (flags :standard -warn-error -a+8)
   (modules echo vfs)
-  (libraries tiny_httpd tiny_httpd_camlzip))
+  (libraries tiny_httpd tiny_httpd.pool tiny_httpd_camlzip))
 
 (rule
   (targets test_output.txt)
