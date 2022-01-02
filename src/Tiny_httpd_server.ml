@@ -37,6 +37,7 @@ module Response_code = struct
     | 302 -> "Found"
     | 304 -> "Not Modified"
     | 400 -> "Bad request"
+    | 401 -> "Unauthorized"
     | 403 -> "Forbidden"
     | 404 -> "Not found"
     | 405 -> "Method not allowed"
