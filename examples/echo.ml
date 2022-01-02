@@ -37,18 +37,22 @@ let middleware_stat () : S.Middleware.t * (unit -> string) =
 let () =
   let port_ = ref 8080 in
   let pool = ref false in
+  let pool_size = ref 0 in
   let j = ref 32 in
   Arg.parse (Arg.align [
       "--port", Arg.Set_int port_, " set port";
       "-p", Arg.Set_int port_, " set port";
       "--debug", Arg.Unit (fun () -> S._enable_debug true), " enable debug";
       "--pool", Arg.Set pool, " use a thread pool";
+      "--pool-size", Arg.Set_int pool_size, " size of thread pool if --pool is enabled";
       "-j", Arg.Set_int j, " maximum number of connections";
     ]) (fun _ -> raise (Arg.Bad "")) "echo [option]*";
 
   let new_thread =
     if !pool then (
-      let j = if !j > 64 then Some (!j/4) else None in
+      let j =
+        if !pool_size > 0 then Some !pool_size
+        else if !j > 64 then Some (!j/4) else None in
       let pool = Tiny_httpd_pool.create ?j () in
       Some (fun f -> Tiny_httpd_pool.run pool f)
     ) else None
