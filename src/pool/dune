@@ -1,0 +1,13 @@
+
+(library
+  (name tiny_httpd_pool)
+  (public_name tiny_httpd.pool)
+  (synopsis "Simple thread pool for tiny_httpd")
+  (libraries unix threads)
+  (flags :standard -safe-string -warn-error -a+8))
+
+; produce shims for atomics (before 4.12)
+(rule
+  (targets tiny_httpd_atomic.ml)
+  (deps ./gen/mkshims.exe)
+  (action (run ./gen/mkshims.exe)))
