@@ -1,6 +1,6 @@
 
 let atomic_before_412 = {|
-  type !'a t = {mutable x: 'a}
+  type 'a t = {mutable x: 'a}
   let[@inline] make x = {x}
   let[@inline] get {x} = x
   let[@inline] set r x = r.x <- x
