@@ -126,6 +126,10 @@ let () =
                ~dir_behavior:Tiny_httpd_dir.Index_or_lists ())
     ~vfs:Vfs.vfs ~prefix:"vfs";
 
+  (* quit *)
+  S.add_route_handler server ~meth:`POST S.Route.(exact "quit" @/ return)
+    (fun _ -> S.stop server; S.Response.make_string @@ Ok "stopping…");
+
   (* main page *)
   S.add_route_handler server S.Route.(return)
     (fun _req ->
@@ -142,6 +146,7 @@ let () =
                li[][pre[][txt "/zcat/:path (GET) to download a file (deflate transfer-encoding)"]];
                li[][pre[][a[A.href "/stats/"][txt"/stats/"]; txt" (GET) to access statistics"]];
                li[][pre[][a[A.href "/vfs/"][txt"/vfs"]; txt" (GET) to access a VFS embedded in the binary"]];
+               li[][pre[][a[A.href "/quit"][txt "/quit"]; txt" (POST) to quit"]];
              ]
            ]
          ] in
