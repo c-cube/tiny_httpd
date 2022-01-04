@@ -19,6 +19,7 @@ jobs:
     - run: opam pin -n .
     - run: opam install tiny_httpd
     - run: opam install tiny_httpd_camlzip
+    - run: opam depext -yt tiny_httpd tiny_httpd_camlzip
     - run: opam reinstall -t tiny_httpd
     - run: opam reinstall -t tiny_httpd_camlzip
     - run: opam remove tiny_httpd tiny_httpd_camlzip
