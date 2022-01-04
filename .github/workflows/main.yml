@@ -1,21 +1,40 @@
 name: build
-on: [push, pull_request]
+
+on:
+  pull_request:
+  push:
+  schedule:
+    # Prime the caches every Monday
+    - cron: 0 1 * * MON
+
 jobs:
-  run:
-    name: Build
-    runs-on: ${{ matrix.operating-system }}
+  build:
     strategy:
+      fail-fast: false
       matrix:
-        operating-system: [macos-latest, ubuntu-latest, windows-latest]
-        ocaml-compiler: [ '4.04.0', '4.11.0' ]
+        os:
+          - macos-latest
+          - ubuntu-latest
+          - windows-latest
+        ocaml-compiler:
+          - 4.04.x
+          - 4.13.x
+
+    runs-on: ${{ matrix.os }}
+
     steps:
-    - uses: actions/checkout@master
-    - uses: avsm/setup-ocaml@v2
-      with:
-        ocaml-compiler: ${{ matrix.ocaml-compiler }}
-    - run: opam pin -n .
-    - run: opam depext -yt tiny_httpd tiny_httpd_camlzip
-    - run: opam install -t . --deps-only
-    - run: opam exec -- dune build @install
-    - run: opam exec -- dune runtest
-      if: ${{ matrix.operating-system == 'unbuntu-latest' }}
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          opam-depext-flags: --with-test
+
+      - run: opam install . --deps-only --with-test
+
+      - run: opam exec -- dune build @install
+
+      - run: opam exec -- dune runtest
+        if: ${{ matrix.os == 'ubuntu-latest' }}
