@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 SERVER=$1
-PORT=8084
+PORT=8088
 "$SERVER" . -p $PORT &
 PID=$!
 
