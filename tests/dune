@@ -10,6 +10,7 @@
 (rule
   (alias runtest)
   (package tiny_httpd_camlzip)
+  (enabled_if (= %{system} "linux"))
   (action (diff echo1.expect echo1.out)))
 
 (rule
@@ -23,6 +24,7 @@
 (rule
   (alias runtest)
   (package tiny_httpd)
+  (enabled_if (= %{system} "linux"))
   (action (diff sse_count.expect sse_count.out)))
 
 (rule
@@ -37,6 +39,7 @@
 (rule
   (alias runtest)
   (package tiny_httpd)
+  (enabled_if (= %{system} "linux"))
   (action (diff upload-out.expect upload-out)))
 
 (rule
@@ -51,10 +54,12 @@
 (rule
   (alias runtest)
   (package tiny_httpd)
+  (enabled_if (= %{system} "linux"))
   (action (diff dl-out.expect dl-out)))
 
 
 (rule
   (targets foo_50)
+  (enabled_if (= %{system} "linux"))
   (action
     (bash "dd if=/dev/zero of=%{targets} bs=1M count=50")))
