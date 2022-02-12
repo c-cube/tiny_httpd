@@ -1,4 +1,3 @@
-
 # Tiny_httpd [![build](https://github.com/c-cube/tiny_httpd/workflows/build/badge.svg)](https://github.com/c-cube/tiny_httpd/actions)
 
 Minimal HTTP server using good old threads, with stream abstractions,
@@ -68,6 +67,45 @@ $ curl -X GET http://localhost:8080
 
 ```
 
+## Socket activation
+
+Since version 0.10, socket activation is supported indirectly, by allowing a
+socket to be explicitly passed in to the `create` function:
+
+```ocaml
+module S = Tiny_httpd
+
+let not_found _ _ = S.Response.fail ~code:404 "Not Found\n"
+
+let () =
+  (* Module [Daemon] is from the [ocaml-systemd] package *)
+  let server = match Daemon.listen_fds () with
+    (* If no socket passed in, assume server was started explicitly i.e. without
+       socket activation *)
+    | [] -> S.create ()
+
+    (* If a socket passed in e.g. by systemd, listen on that *)
+    | sock :: _ -> S.create ~sock ()
+  in
+  S.add_route_handler server S.Route.rest_of_path not_found;
+  Printf.printf "Listening on http://%s:%d\n%!" (S.addr server) (S.port server);
+  match S.run server with
+  | Ok () -> ()
+  | Error e -> raise e
+```
+
+On Linux, this requires the
+[ocaml-systemd](https://github.com/juergenhoetzel/ocaml-systemd) package:
+
+```
+opam install ocaml-systemd
+```
+
+Tip: in the `dune` file, the package name should be `systemd`.
+
+In case you're not familiar with socket activation, Lennart Poettering's
+[blog post](http://0pointer.de/blog/projects/socket-activation.html) explains it
+well.
 
 ## Why?
 
@@ -90,5 +128,3 @@ See https://c-cube.github.io/tiny_httpd
 ## License
 
 MIT.
-
-
