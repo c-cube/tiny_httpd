@@ -75,18 +75,19 @@ echo:
 *)
 
 
-(** {2 Tiny buffer implementation}
+(** Tiny buffer implementation.
 
     These buffers are used to avoid allocating too many byte arrays when
     processing streams and parsing requests.
 *)
-
-module Buf_ : sig
+module Buf : sig
   type t
   val size : t -> int
   val clear : t -> unit
   val create : ?size:int -> unit -> t
   val contents : t -> string
+
+  val ensure : t -> int -> unit
 
   val bytes_slice : t -> bytes
   (** Access underlying slice of bytes.
@@ -101,35 +102,25 @@ module Buf_ : sig
       @since 0.5 *)
 end
 
-(** {2 Generic stream of data}
+(** Generic stream of data.
 
     Streams are used to represent a series of bytes that can arrive progressively.
-    For example, an uploaded file will be sent as a series of chunks. *)
+    For example, an uploaded file will be sent as a series of chunks.
 
-type byte_stream = {
-  bs_fill_buf: unit -> (bytes * int * int);
-  (** See the current slice of the internal buffer as [bytes, i, len],
-      where the slice is [bytes[i] .. [bytes[i+len-1]]].
-      Can block to refill the buffer if there is currently no content.
-      If [len=0] then there is no more data. *)
-  bs_consume: int -> unit;
-  (** Consume n bytes from the buffer. This should only be called with [n <= len]
-      after a call to [is_fill_buf] that returns a slice of length [len]. *)
-  bs_close: unit -> unit;
-  (** Close the stream. *)
-}
-(** A buffered stream, with a view into the current buffer (or refill if empty),
-    and a function to consume [n] bytes.
-    See {!Byte_stream} for more details. *)
+    It's a pair of function to read data, and to close the stream. *)
+type istream = (bytes -> int -> int -> int) * (unit -> unit)
 
-module Byte_stream : sig
-  type t = byte_stream
+(** An output stream, into which we can push bytes. *)
+type ostream = (bytes -> int -> int -> unit) * (unit -> unit)
+
+module Istream : sig
+  type t = istream
 
   val close : t -> unit
 
   val empty : t
 
-  val of_chan : ?buf_size:int -> in_channel -> t
+  val of_chan : in_channel -> t
   (** Make a buffered stream from the given channel. *)
 
   val of_chan_close_noerr : ?buf_size:int -> in_channel -> t
@@ -141,26 +132,34 @@ module Byte_stream : sig
 
   val of_string : string -> t
 
-  val iter : (bytes -> int -> int -> unit) -> t -> unit
-  (** Iterate on the chunks of the stream
-      @since 0.3 *)
-
-  val to_chan : out_channel -> t -> unit
+  val to_chan : ?buf:Buf.t -> out_channel -> t -> unit
   (** Write the stream to the channel.
       @since 0.3 *)
 
-  val with_file : ?buf_size:int -> string -> (t -> 'a) -> 'a
+  val with_file : string -> (t -> 'a) -> 'a
   (** Open a file with given name, and obtain an input stream
       on its content. When the function returns, the stream (and file) are closed. *)
 
-  val read_line : ?buf:Buf_.t -> t -> string
+  val read_line : ?buf:Buf.t -> t -> string
   (** Read a line from the stream.
       @param buf a buffer to (re)use. Its content will be cleared. *)
 
-  val read_all : ?buf:Buf_.t -> t -> string
+  val read_all : ?buf:Buf.t -> t -> string
   (** Read the whole stream into a string.
       @param buf a buffer to (re)use. Its content will be cleared. *)
 end
+
+module Ostream : sig
+  type t = ostream
+
+  val of_chan : out_channel -> t
+
+  val of_buf : Buffer.t -> t
+
+  val close : t -> unit
+end
+
+val copy_into : ?buf:Buf.t -> istream -> ostream -> unit
 
 (** {2 Methods} *)
 
@@ -289,13 +288,13 @@ module Request : sig
   (** time stamp (from {!Unix.gettimeofday}) after parsing the first line of the request
       @since 0.11 *)
 
-  val limit_body_size : max_size:int -> byte_stream t -> byte_stream t
+  val limit_body_size : max_size:int -> istream t -> istream t
   (** Limit the body size to [max_size] bytes, or return
       a [413] error.
       @since 0.3
   *)
 
-  val read_body_full : ?buf_size:int -> byte_stream t -> string t
+  val read_body_full : ?buf_size:int -> istream t -> string t
   (** Read the whole body into a string. Potentially blocking.
 
       @param buf_size initial size of underlying buffer (since 0.11) *)
@@ -303,8 +302,8 @@ module Request : sig
   (**/**)
   (* for testing purpose, do not use *)
   module Internal_ : sig
-    val parse_req_start : ?buf:Buf_.t -> get_time_s:(unit -> float) -> byte_stream -> unit t option
-    val parse_body : ?buf:Buf_.t -> unit t -> byte_stream -> byte_stream t
+    val parse_req_start : ?buf:Buf.t -> get_time_s:(unit -> float) -> istream -> unit t option
+    val parse_body : ?buf:Buf.t -> unit t -> istream -> istream t
   end
   (**/**)
 end
@@ -334,7 +333,7 @@ end
     the client to answer a {!Request.t}*)
 
 module Response : sig
-  type body = [`String of string | `Stream of byte_stream | `Void]
+  type body = [`String of string | `Stream of istream | `Void]
   (** Body of a response, either as a simple string,
       or a stream of bytes, or nothing (for server-sent events). *)
 
@@ -376,7 +375,7 @@ module Response : sig
   val make_raw_stream :
     ?headers:Headers.t ->
     code:Response_code.t ->
-    byte_stream ->
+    istream ->
     t
   (** Same as {!make_raw} but with a stream body. The body will be sent with
       the chunked transfer-encoding. *)
@@ -398,7 +397,7 @@ module Response : sig
 
   val make_stream :
     ?headers:Headers.t ->
-    (byte_stream, Response_code.t * string) result -> t
+    (istream, Response_code.t * string) result -> t
   (** Same as {!make} but with a stream body. *)
 
   val fail : ?headers:Headers.t -> code:int ->
@@ -479,7 +478,7 @@ end
     @since 0.11
 *)
 module Middleware : sig
-  type handler = byte_stream Request.t -> resp:(Response.t -> unit) -> unit
+  type handler = istream Request.t -> resp:(Response.t -> unit) -> unit
   (** Handlers are functions returning a response to a request.
       The response can be delayed, hence the use of a continuation
       as the [resp] parameter. *)
@@ -561,7 +560,7 @@ val active_connections : t -> int
 
 val add_decode_request_cb :
   t ->
-  (unit Request.t -> (unit Request.t * (byte_stream -> byte_stream)) option) -> unit
+  (unit Request.t -> (unit Request.t * (istream -> istream)) option) -> unit
 [@@deprecated "use add_middleware"]
 (** Add a callback for every request.
     The callback can provide a stream transformer and a new request (with
@@ -634,7 +633,7 @@ val add_route_handler_stream :
   ?middlewares:Middleware.t list ->
   ?meth:Meth.t ->
   t ->
-  ('a, byte_stream Request.t -> Response.t) Route.t -> 'a ->
+  ('a, istream Request.t -> Response.t) Route.t -> 'a ->
   unit
 (** Similar to {!add_route_handler}, but where the body of the request
     is a stream of bytes that has not been read yet.

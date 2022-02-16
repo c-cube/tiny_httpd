@@ -1,10 +1,3 @@
-type byte_stream = {
-  bs_fill_buf: unit -> (bytes * int * int);
-  bs_consume: int -> unit;
-  bs_close: unit -> unit;
-}
-(** A buffer input stream, with a view into the current buffer (or refill if empty),
-    and a function to consume [n] bytes *)
 
 let _debug_on = ref (
   match String.trim @@ Sys.getenv "HTTP_DBG" with
@@ -18,36 +11,50 @@ let _debug k =
        Printf.kfprintf (fun oc -> Printf.fprintf oc "\n%!") stdout fmt)
   )
 
-module Buf_ = struct
+module Buf = struct
   type t = {
     mutable bytes: bytes;
-    mutable i: int;
+    mutable len: int;
   }
 
   let create ?(size=4_096) () : t =
-    { bytes=Bytes.make size ' '; i=0 }
+    { bytes=Bytes.make size ' '; len=0 }
 
-  let size self = self.i
-  let bytes_slice self = self.bytes
+  let[@inline] size self = self.len
+  let[@inline] cap self = Bytes.length self.bytes
+  let[@inline] bytes_slice self = self.bytes
+
   let clear self : unit =
     if Bytes.length self.bytes > 4_096 * 1_024 then (
       self.bytes <- Bytes.make 4096 ' '; (* free big buffer *)
     );
-    self.i <- 0
+    self.len <- 0
 
-  let resize self new_size : unit =
-    let new_buf = Bytes.make new_size ' ' in
-    Bytes.blit self.bytes 0 new_buf 0 self.i;
+  let[@inline never] grow_to_ self new_cap : unit =
+    let new_buf = Bytes.make new_cap ' ' in
+    Bytes.blit self.bytes 0 new_buf 0 self.len;
     self.bytes <- new_buf
 
-  let add_bytes (self:t) s i len : unit =
-    if self.i + len >= Bytes.length self.bytes then (
-      resize self (self.i + self.i / 2 + len + 10);
-    );
-    Bytes.blit s i self.bytes self.i len;
-    self.i <- self.i + len
+  let next_cap_ self =
+    let n = cap self in n + n lsr 1 + 10
 
-  let contents (self:t) : string = Bytes.sub_string self.bytes 0 self.i
+  let ensure self new_cap : unit =
+    if new_cap > cap self then (
+      let new_cap = max new_cap (next_cap_ self) in
+      grow_to_ self new_cap
+    )
+
+  let[@inline never] grow_ self =
+    grow_to_ self (next_cap_ self)
+
+  let[@inline] add_bytes (self:t) b i len : unit =
+    if self.len + len >= cap self then (
+      grow_ self
+    );
+    Bytes.blit b i self.bytes self.len len;
+    self.len <- self.len + len
+
+  let contents (self:t) : string = Bytes.sub_string self.bytes 0 self.len
 
   let contents_and_clear (self:t) : string =
     let x = contents self in
@@ -55,34 +62,51 @@ module Buf_ = struct
     x
 end
 
-module Byte_stream = struct
-  type t = byte_stream
+type istream = (bytes -> int -> int -> int) * (unit -> unit)
+type ostream = (bytes -> int -> int -> unit) * (unit -> unit)
 
-  let close self = self.bs_close()
+let copy_into ?(buf=Buf.create()) (is:istream) (os:ostream) =
+  let continue = ref true in
+  while !continue do
+    let n = (fst is) buf.bytes 0 (Bytes.length buf.bytes) in
+    if n=0 then continue := false
+    else (
+      (fst os) buf.bytes 0 n
+    )
+  done
 
-  let empty = {
-    bs_fill_buf=(fun () -> Bytes.empty, 0, 0);
-    bs_consume=(fun _ -> ());
-    bs_close=(fun () -> ());
-  }
+module Ostream = struct
+  type t = ostream
 
-  let of_chan_ ?(buf_size=16 * 1024) ~close ic : t =
-    let i = ref 0 in
-    let len = ref 0 in
-    let buf = Bytes.make buf_size ' ' in
-    { bs_fill_buf=(fun () ->
-      if !i >= !len then (
-        i := 0;
-        len := input ic buf 0 (Bytes.length buf);
-      );
-      buf, !i,!len - !i);
-      bs_consume=(fun n -> i := !i + n);
-      bs_close=(fun () -> close ic)
-    }
+  let close (_,cl) = cl
+
+  let of_chan oc : t =
+    let write b i len = output oc b i len in
+    let close () = close_out oc in
+    write, close
+
+  let of_buf buf : t =
+    let write b i len = Buf.add_bytes buf b i len in
+    let close() = () in
+    write, close
+end
+
+module Istream = struct
+  type t = istream
+
+  let close (_,cl) = cl()
+
+  let empty : t = (fun _ _ _ -> 0), (fun()->())
+
+  let of_chan_ ~close ic : t =
+    let read b i len = input ic b i len in
+    let close() = close ic in
+    read, close
 
   let of_chan = of_chan_ ~close:close_in
   let of_chan_close_noerr = of_chan_ ~close:close_in_noerr
 
+  (*
   let rec iter f (self:t) : unit =
     let s, i, len = self.bs_fill_buf () in
     if len=0 then (
@@ -92,56 +116,62 @@ module Byte_stream = struct
       self.bs_consume len;
       (iter [@tailcall]) f self
     )
+     *)
 
-  let to_chan (oc:out_channel) (self:t) =
-    iter (fun s i len -> output oc s i len) self
+  let to_chan ?buf (oc:out_channel) (self:t) =
+    let os = Ostream.of_chan oc in
+    copy_into ?buf self os
 
-  let of_bytes ?(i=0) ?len s : t =
+  let of_bytes ?(i=0) ?len b : t =
     (* invariant: !i+!len is constant *)
     let len =
       ref (
         match len with
         | Some n ->
-          if n > Bytes.length s - i then invalid_arg "Byte_stream.of_bytes";
+          if n > Bytes.length b - i then invalid_arg "Byte_stream.of_bytes";
           n
-        | None -> Bytes.length s - i
+        | None -> Bytes.length b - i
       )
     in
     let i = ref i in
-    { bs_fill_buf=(fun () -> s, !i, !len);
-      bs_close=(fun () -> len := 0);
-      bs_consume=(fun n -> assert (n>=0 && n<= !len); i := !i + n; len := !len - n);
-    }
+    let close()= () in
+    let read b2 i2 n2 =
+      let n = min n2 !len in
+      Bytes.blit b !i b2 i2 n;
+      i := !i + n;
+      len := !len - n;
+      n
+    in
+    read, close
 
   let of_string s : t =
     of_bytes (Bytes.unsafe_of_string s)
 
-  let with_file ?buf_size file f =
+  let with_file file f =
     let ic = open_in file in
     try
-      let x = f (of_chan ?buf_size ic) in
+      let x = f (of_chan ic) in
       close_in ic;
       x
     with e ->
       close_in_noerr ic;
       raise e
 
-  let read_all ?(buf=Buf_.create()) (self:t) : string =
+  let read_all ?(buf=Buf.create()) (self:t) : string =
     let continue = ref true in
     while !continue do
-      let s, i, len = self.bs_fill_buf () in
-      _debug (fun k->k "read-all: got i=%d, len=%d, bufsize %d" i len (Buf_.size buf));
-      if len > 0 then (
-        Buf_.add_bytes buf s i len;
-        self.bs_consume len;
-      );
-      assert (len >= 0);
-      if len = 0 then (
-        continue := false
+      if Buf.size buf = Buf.cap buf then Buf.grow_ buf;
+      let n = (fst self) buf.bytes buf.len (Buf.cap buf - buf.len) in
+      if n=0 then continue := false
+      else (
+        buf.len <- buf.len + n;
       )
     done;
-    Buf_.contents_and_clear buf
+    let s = Buf.contents buf in
+    Buf.clear buf;
+    s
 
+  (*
   (* put [n] bytes from the input into bytes *)
   let read_exactly_ ~too_short (self:t) (bytes:bytes) (n:int) : unit =
     assert (Bytes.length bytes >= n);
@@ -154,10 +184,11 @@ module Byte_stream = struct
       self.bs_consume n_read;
       if n_read=0 then too_short();
     done
+     *)
 
   (* read a line into the buffer, after clearing it. *)
   let read_line_into (self:t) ~buf : unit =
-    Buf_.clear buf;
+    Buf.clear buf;
     let continue = ref true in
     while !continue do
       let s, i, len = self.bs_fill_buf () in
@@ -230,9 +261,9 @@ module Byte_stream = struct
       }
     )
 
-  let read_line ?(buf=Buf_.create()) self : string =
+  let read_line ?(buf=Buf.create()) self : string =
     read_line_into self ~buf;
-    Buf_.contents buf
+    Buf.contents buf
 end
 
 exception Bad_req of int * string
@@ -413,7 +444,7 @@ module Request = struct
       self.path self.body pp_comp_ self.path_components pp_query self.query
 
   (* decode a "chunked" stream into a normal stream *)
-  let read_stream_chunked_ ?(buf=Buf_.create()) (bs:byte_stream) : byte_stream =
+  let read_stream_chunked_ ?(buf=Buf.create()) (bs:istream) : istream =
     _debug (fun k->k "body: start reading chunked stream...");
     let first = ref true in
     let read_next_chunk_len () : int =
@@ -591,7 +622,7 @@ end
 *)
 
 module Response = struct
-  type body = [`String of string | `Stream of byte_stream | `Void]
+  type body = [`String of string | `Stream of istream | `Void]
   type t = {
     code: Response_code.t;
     headers: Headers.t;
@@ -648,7 +679,7 @@ module Response = struct
       self.code Headers.pp self.headers pp_body self.body
 
   (* print a stream as a series of chunks *)
-  let output_stream_chunked_ (oc:out_channel) (str:byte_stream) : unit =
+  let output_stream_chunked_ (oc:out_channel) (str:istream) : unit =
     let continue = ref true in
     while !continue do
       (* next chunk *)
