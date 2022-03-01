@@ -23,7 +23,12 @@ type dir_behavior =
   | Forbidden
   (** Forbid access to directory. This is suited for serving assets, for example. *)
 
-(** configuration for static file handlers *)
+type hidden
+(** Type used to prevent users from building a config directly.
+    Use {!default_config} or {!config} instead. *)
+
+(** configuration for static file handlers. This might get
+    more fields over time. *)
 type config = {
   mutable download: bool;
   (** Is downloading files allowed? *)
@@ -40,6 +45,9 @@ type config = {
   mutable max_upload_size: int;
   (** If {!upload} is true, this is the maximum size in bytes for
       uploaded files. *)
+
+  _rest: hidden;
+  (** Just ignore this field. *)
 }
 
 (** default configuration: [
@@ -50,6 +58,17 @@ type config = {
   ; max_upload_size = 10 * 1024 * 1024
   }] *)
 val default_config : unit -> config
+
+val config :
+  ?download:bool ->
+  ?dir_behavior:dir_behavior ->
+  ?delete:bool ->
+  ?upload:bool ->
+  ?max_upload_size:int ->
+  unit ->
+  config
+(** Build a config from {!default_config}.
+    @since NEXT_RELEASE *)
 
 (** [add_dirpath ~config ~dir ~prefix server] adds route handle to the
     [server] to serve static files in [dir] when url starts with [prefix],

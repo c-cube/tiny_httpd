@@ -5,21 +5,35 @@ module Pf = Printf
 type dir_behavior =
   | Index | Lists | Index_or_lists | Forbidden
 
+type hidden = unit
 type config = {
   mutable download: bool;
   mutable dir_behavior: dir_behavior;
   mutable delete: bool;
   mutable upload: bool;
   mutable max_upload_size: int;
+  _rest: hidden
 }
 
-let default_config () : config =
+let default_config_ : config =
   { download=true;
     dir_behavior=Forbidden;
     delete=false;
     upload=false;
     max_upload_size = 10 * 1024 * 1024;
+    _rest=();
   }
+
+let default_config () = default_config_
+let config
+    ?(download=default_config_.download)
+    ?(dir_behavior=default_config_.dir_behavior)
+    ?(delete=default_config_.delete)
+    ?(upload=default_config_.upload)
+    ?(max_upload_size=default_config_.max_upload_size)
+    () : config =
+  { download; dir_behavior; delete; upload; max_upload_size;
+    _rest=()}
 
 let contains_dot_dot s =
   try
