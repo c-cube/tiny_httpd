@@ -277,3 +277,26 @@ let add_vfs ~config ~vfs ~prefix server : unit =
 
 let add_dir_path ~config ~dir ~prefix server : unit =
   add_vfs_ ~on_fs:true ~top:dir ~config ~prefix ~vfs:(vfs_of_dir dir) server
+
+module Embedded_fs = struct
+  module Str_tbl = Hashtbl.Make(struct
+      include String
+      let hash = Hashtbl.hash
+    end)
+
+  type t = {
+    entries: entry Str_tbl.t
+  } [@@unboxed]
+
+  and entry =
+    | File of {
+        content: string;
+      }
+    | Dir of t
+
+  (* TODO: the rest *)
+  (* TODO: use util.split_on_slash *)
+
+
+end
+

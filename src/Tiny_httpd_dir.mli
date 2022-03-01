@@ -130,3 +130,19 @@ val add_vfs :
     @since NEXT_RELEASE
 *)
 
+(** An embedded file system, as a list of files with (relative) paths.
+    This is useful in combination with the "tiny-httpd-mkfs" tool,
+    which embeds the files it's given into a OCaml module.
+
+    @since NEXT_RELEASE
+*)
+module Embedded_fs : sig
+  type t
+  (** The pseudo-filesystem *)
+
+  val create : unit -> t
+
+  val add_file : t -> path:string -> string -> unit
+
+  val to_vfs : t -> (module VFS)
+end
