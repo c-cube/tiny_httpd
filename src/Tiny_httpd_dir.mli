@@ -78,3 +78,55 @@ val add_dir_path :
   dir:string ->
   prefix:string ->
   Tiny_httpd.t -> unit
+
+(** Virtual file system.
+
+    This is used to emulate a file system from pure OCaml functions and data,
+    e.g. for resources bundled inside the web server.
+    @since NEXT_RELEASE
+*)
+module type VFS = sig
+  val descr : string
+  (** Description of the VFS *)
+
+  val is_directory : string -> bool
+
+  val contains : string -> bool
+  (** [file_exists vfs path] returns [true] if [path] points to a file
+      or directory inside [vfs]. *)
+
+  val list_dir : string -> string array
+  (** List directory. This only returns basenames, the files need
+      to be put in the directory path using {!Filename.concat}. *)
+
+  val delete : string -> unit
+  (** Delete path *)
+
+  val create : string -> (bytes -> int -> int -> unit) * (unit -> unit)
+  (** Create a file and obtain a pair [write, close] *)
+
+  val read_file_content : string -> Tiny_httpd.Byte_stream.t
+  (** Read content of a file *)
+
+  val file_size : string -> int option
+  (** File size, e.g. using "stat" *)
+
+  val file_mtime : string -> float option
+  (** File modification time, e.g. using "stat" *)
+end
+
+val vfs_of_dir : string -> (module VFS)
+(** [vfs_of_dir dir] makes a virtual file system that reads from the
+    disk.
+    @since NEXT_RELEASE
+*)
+
+val add_vfs :
+  config:config ->
+  vfs:(module VFS) ->
+  prefix:string ->
+  Tiny_httpd.t -> unit
+(** Similar to {!add_dir_path} but using a virtual file system instead.
+    @since NEXT_RELEASE
+*)
+
