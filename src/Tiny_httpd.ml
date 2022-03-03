@@ -981,7 +981,7 @@ let add_route_server_sent_handler ?accept self route f =
 
     let send_event ?event ?id ?retry ~data () : unit =
       send_response_idempotent_();
-      _opt_iter event ~f:(fun e -> Printf.fprintf oc "data: %s\n" e);
+      _opt_iter event ~f:(fun e -> Printf.fprintf oc "event: %s\n" e);
       _opt_iter id ~f:(fun e -> Printf.fprintf oc "id: %s\n" e);
       _opt_iter retry ~f:(fun e -> Printf.fprintf oc "retry: %s\n" e);
       let l = String.split_on_char '\n' data in
