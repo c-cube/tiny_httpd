@@ -1,7 +1,8 @@
 # Tiny_httpd [![build](https://github.com/c-cube/tiny_httpd/workflows/build/badge.svg)](https://github.com/c-cube/tiny_httpd/actions)
 
 Minimal HTTP server using good old threads, with stream abstractions,
-simple routing, URL encoding/decoding, and optional compression with camlzip.
+simple routing, URL encoding/decoding, static asset serving,
+and optional compression with camlzip.
 It also supports [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
 ([w3c](https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation))
 
@@ -66,6 +67,43 @@ $ curl -X GET http://localhost:8080
 ...
 
 ```
+
+## Static assets and files
+
+The program `http_of_dir` relies on the module `Tiny_httpd_dir`, which
+can serve directories, as well as _virtual file systems_.
+
+In 'examples/dune', we produce an OCaml module `vfs.ml` using
+the program `tiny-httpd-vfs-pack`.  This module contains a VFS (virtual file
+system) which can be served as if it were an actual directory.
+
+The dune rule:
+
+```lisp
+(rule
+  (targets vfs.ml)
+  (deps (source_tree files) (:out test_output.txt.expected))
+  (enabled_if (= %{system} "linux"))
+  (action (run ../src/bin/vfs_pack.exe -o %{targets}
+               --mirror=files/
+               --file=test_out.txt,%{out}
+               --url=example_dot_com,http://example.com)))
+```
+
+The code to serve the VFS from `vfs.ml` is as follows:
+
+```ocaml
+  …
+  Tiny_httpd_dir.add_vfs server
+    ~config:(Tiny_httpd_dir.config ~download:true
+               ~dir_behavior:Tiny_httpd_dir.Index_or_lists ())
+    ~vfs:Vfs.vfs ~prefix:"vfs";
+  …
+```
+
+it allows downloading the files, and listing directories.
+If a directory contains `index.html` then this will be served
+instead of listing the content.
 
 ## Socket activation
 
