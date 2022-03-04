@@ -43,7 +43,7 @@
 
 (rule
   (targets vfs.ml)
-  (enabled_if (not (= %{system} "linux")))
+  (enabled_if (<> %{system} "linux"))
   (action
     (with-stdout-to
       %{targets}
