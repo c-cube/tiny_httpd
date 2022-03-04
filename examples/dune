@@ -40,3 +40,13 @@
                --mirror=files/
                --file=test_out.txt,%{out}
                --url=example_dot_com,http://example.com)))
+
+(rule
+  (targets vfs.ml)
+  (enabled_if (not (= %{system} "linux")))
+  (action
+    (with-stdout-to
+      %{targets}
+      (progn
+        (echo "let embedded_fs = Tiny_httpd_dir.Embedded_fs.create ~mtime:0. ()")
+        (echo "let vfs = Tiny_httpd_dir.Embedded_fs.to_vfs embedded_fs")))))
