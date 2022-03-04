@@ -1,0 +1,3 @@
+[submodule "vendor/curly"]
+	path = vendor/curly
+	url = https://github.com/rgrinberg/curly.git
