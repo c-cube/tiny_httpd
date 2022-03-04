@@ -98,7 +98,7 @@ let vfs_of_dir (top:string) : vfs =
   end in
   (module M)
 
-let html_list_dir (module VFS:VFS) ~parent d : string =
+let html_list_dir (module VFS:VFS) ~prefix ~parent d : string =
   let entries = VFS.list_dir d in
   Array.sort compare entries;
   let body = Buffer.create 256 in
@@ -111,7 +111,7 @@ let html_list_dir (module VFS:VFS) ~parent d : string =
     | None -> ()
     | Some p ->
       Printf.bprintf body "<a href=\"/%s\"> (parent directory) </a>\n"
-        (encode_path p);
+        (encode_path (prefix // p));
   end;
   Printf.bprintf body "<ul>\n";
   let hidden_stop = ref 0 in
@@ -137,7 +137,8 @@ let html_list_dir (module VFS:VFS) ~parent d : string =
              | None -> ""
            in
            Printf.bprintf body "  <li> <a href=\"/%s\"> %s </a> %s%s </li>\n"
-             (encode_path (d // f)) f (if VFS.is_directory fpath then "[dir]" else "") size
+             (encode_path (prefix // fpath)) f
+             (if VFS.is_directory fpath then "[dir]" else "") size
          );
        )
     )
@@ -157,9 +158,12 @@ let finally_ ~h x f =
 (* @param on_fs: if true, we assume the file exists on the FS *)
 let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS:VFS) as vfs) ~prefix server : unit=
 
+  let route () =
+    if prefix="" then S.Route.rest_of_path_urlencoded
+    else S.Route.exact_path prefix S.Route.rest_of_path_urlencoded
+  in
   if config.delete then (
-    S.add_route_handler server ~meth:`DELETE
-      S.Route.(exact_path prefix (rest_of_path_urlencoded))
+    S.add_route_handler server ~meth:`DELETE (route())
       (fun path _req ->
          if contains_dot_dot path then (
            S.Response.fail_raise ~code:403 "invalid path in delete"
@@ -171,14 +175,12 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS:VFS) as vfs) ~prefix server :
          )
       );
   ) else (
-    S.add_route_handler server ~meth:`DELETE
-      S.Route.(exact_path prefix (S.Route.(string @/ return)))
+    S.add_route_handler server ~meth:`DELETE (route())
       (fun _ _  -> S.Response.make_raw ~code:405 "delete not allowed");
   );
 
   if config.upload then (
-    S.add_route_handler_stream server ~meth:`PUT
-      S.Route.(exact_path prefix (rest_of_path_urlencoded))
+    S.add_route_handler_stream server ~meth:`PUT (route())
       ~accept:(fun req ->
           match S.Request.get_header_int req "Content-Length" with
           | Some n when n > config.max_upload_size ->
@@ -201,15 +203,14 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS:VFS) as vfs) ~prefix server :
          S.Response.make_raw ~code:201 "upload successful"
       )
   ) else (
-    S.add_route_handler server ~meth:`PUT
-      S.Route.(exact_path prefix (string @/ return))
+    S.add_route_handler server ~meth:`PUT (route())
       (fun _ _  -> S.Response.make_raw ~code:405 "upload not allowed");
   );
 
   if config.download then (
-    S.add_route_handler server ~meth:`GET
-      S.Route.(exact_path prefix (rest_of_path_urlencoded))
+    S.add_route_handler server ~meth:`GET (route())
       (fun path req ->
+         S._debug (fun k->k "path=%S" path);
          let mtime = lazy (
            match VFS.file_mtime path with
            | None -> S.Response.fail_raise ~code:403 "Cannot access file"
@@ -225,7 +226,7 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS:VFS) as vfs) ~prefix server :
          ) else if VFS.is_directory path then (
            S._debug (fun k->k "list dir %S (topdir %S)" path VFS.descr);
            let parent = Filename.(dirname path) in
-           let parent = if parent <> path then Some parent else None in
+           let parent = if parent <> "." && parent <> path then Some parent else None in
            match config.dir_behavior with
            | Index | Index_or_lists when VFS.contains (path // "index.html") ->
              (* redirect using path, not full path *)
@@ -234,7 +235,7 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS:VFS) as vfs) ~prefix server :
              S.Response.make_raw ~code:301 ""
                ~headers:S.Headers.(empty |> set "location" new_path)
            | Lists | Index_or_lists ->
-             let body = html_list_dir vfs path ~parent in
+             let body = html_list_dir ~prefix vfs path ~parent in
              S.Response.make_string
                ~headers:[header_html; "ETag", Lazy.force mtime]
                (Ok body)
@@ -266,8 +267,7 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS:VFS) as vfs) ~prefix server :
              S.Response.fail ~code:500 "error while reading file: %s" (Printexc.to_string e))
       )
   ) else (
-    S.add_route_handler server ~meth:`GET
-      S.Route.(exact_path prefix (string @/ return))
+    S.add_route_handler server ~meth:`GET (route())
       (fun _ _  -> S.Response.make_raw ~code:405 "download not allowed");
   );
   ()
@@ -279,24 +279,106 @@ let add_dir_path ~config ~dir ~prefix server : unit =
   add_vfs_ ~on_fs:true ~top:dir ~config ~prefix ~vfs:(vfs_of_dir dir) server
 
 module Embedded_fs = struct
-  module Str_tbl = Hashtbl.Make(struct
-      include String
-      let hash = Hashtbl.hash
-    end)
+  module Str_map = Map.Make(String)
 
   type t = {
-    entries: entry Str_tbl.t
-  } [@@unboxed]
+    mtime: float;
+    mutable entries: entry Str_map.t
+  }
 
   and entry =
     | File of {
         content: string;
+        mtime: float;
       }
     | Dir of t
 
-  (* TODO: the rest *)
-  (* TODO: use util.split_on_slash *)
+  let create ?(mtime=Unix.gettimeofday()) () : t = {
+    mtime;
+    entries=Str_map.empty;
+  }
 
+  let split_path_ (path:string) : string list * string =
+    let basename = Filename.basename path in
+    let dirname =
+      Filename.dirname path
+      |> String.split_on_char '/'
+      |> List.filter (function "" | "." -> false | _ -> true) in
+    dirname, basename
+
+  let add_file ?mtime (self:t) ~path content : unit =
+    let mtime = match mtime with Some t -> t | None -> self.mtime in
+    let dir_path, basename = split_path_ path in
+    if List.mem ".." dir_path then (
+      invalid_arg "add_file: '..' is not allowed";
+    );
+
+    let rec loop self dir = match dir with
+      | [] ->
+        self.entries <- Str_map.add basename (File {mtime; content}) self.entries
+      | d :: ds ->
+        let sub =
+          match Str_map.find d self.entries with
+          | Dir sub -> sub
+          | File _ ->
+            invalid_arg
+              (Printf.sprintf "in path %S, %S is a file, not a directory" path d)
+          | exception Not_found ->
+            let sub = create ~mtime:self.mtime () in
+            self.entries <- Str_map.add d (Dir sub) self.entries;
+            sub
+        in
+        loop sub ds
+    in
+    loop self dir_path
+
+  (* find entry *)
+  let find_ self path : entry option =
+    let dir_path, basename = split_path_ path in
+    let rec loop self dir_name = match dir_name with
+      | [] -> (try Some (Str_map.find basename self.entries) with _ -> None)
+      | d :: ds ->
+        match Str_map.find d self.entries with
+        | exception Not_found -> None
+        | File _ -> None
+        | Dir sub -> loop sub ds
+    in
+    if path="" then Some (Dir self)
+    else loop self dir_path
+
+  let to_vfs self : vfs =
+    let module M = struct
+      let descr = "Embedded_fs"
+      let file_mtime p = match find_ self p with
+        | Some (File {mtime;_}) -> Some mtime
+        | Some (Dir _) -> Some self.mtime
+        | _ -> None
+
+      let file_size p = match find_ self p with
+        | Some (File {content;_}) -> Some (String.length content)
+        | _ -> None
+
+      let contains p = S._debug (fun k->k "contains %S" p); match find_ self p with
+        | Some _ -> true
+        | None -> false
+
+      let is_directory p = match find_ self p with
+        | Some (Dir _) -> true
+        | _ -> false
+
+      let read_file_content p = match find_ self p with
+        | Some (File {content;_}) -> Tiny_httpd.Byte_stream.of_string content
+        | _ -> failwith (Printf.sprintf "no such file: %S" p)
+
+      let list_dir p = S._debug (fun k->k "list dir %S" p); match find_ self p with
+        | Some (Dir sub) ->
+          Str_map.fold (fun sub _ acc -> sub::acc) sub.entries [] |> Array.of_list
+        | _ -> failwith (Printf.sprintf "no such directory: %S" p)
+
+      let create _ = failwith "Embedded_fs is read-only"
+      let delete _ = failwith "Embedded_fs is read-only"
+
+    end in (module M)
 
 end
 
