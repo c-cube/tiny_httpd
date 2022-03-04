@@ -140,9 +140,12 @@ module Embedded_fs : sig
   type t
   (** The pseudo-filesystem *)
 
-  val create : unit -> t
+  val create : ?mtime:float -> unit -> t
 
-  val add_file : t -> path:string -> string -> unit
+  val add_file : ?mtime:float -> t -> path:string -> string -> unit
+  (** Add file to the virtual file system.
+      @raise Invalid_argument if the path contains '..' or if it tries to
+      make a directory out of an existing path that is a file. *)
 
   val to_vfs : t -> (module VFS)
 end
