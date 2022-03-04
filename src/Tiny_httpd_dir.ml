@@ -103,7 +103,7 @@ let html_list_dir (module VFS:VFS) ~prefix ~parent d : string =
   Array.sort compare entries;
   let body = Buffer.create 256 in
   (* TODO: breadcrumbs for the path, each element a link to the given ancestor dir *)
-  Printf.bprintf body {|<head><title> http_of_dir %S</title><meta charset="utf-8">
+  Printf.bprintf body {|<head><title> list directory %S</title><meta charset="utf-8">
   </head><body>
     <h2> Index of %S</h2>
   |} VFS.descr d;
