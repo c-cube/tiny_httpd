@@ -135,6 +135,7 @@ let () =
     let vfs_path, path = split_comma s in
     let vfs_path, path = if path="" then "", vfs_path else vfs_path, path in
     add_entry (Mirror (vfs_path, path))
+  and add_source f = add_entry (Source_file f)
   and add_url s =
     let vfs_path, path = split_comma s in
     if is_url path then add_entry (Url(vfs_path, path))
@@ -147,6 +148,7 @@ let () =
     "--file", Arg.String add_file, " <name,file> adds name=file to the VFS";
     "--url", Arg.String add_url, " <name,url> adds name=url to the VFS";
     "--mirror", Arg.String add_mirror, " <prefix,dir> copies directory dir into the VFS under prefix";
+    "-F", Arg.String add_source, " <file> reads entries from the file, on per line";
   ] |> Arg.align in
   Arg.parse opts (fun _ -> raise (Arg.Help "no positional arg")) help;
 
