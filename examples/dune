@@ -12,7 +12,7 @@
 (executable
   (name echo)
   (flags :standard -warn-error -a+8)
-  (modules echo)
+  (modules echo vfs)
   (libraries tiny_httpd tiny_httpd_camlzip))
 
 (rule
@@ -30,3 +30,23 @@
   (deps test_output.txt)
   (action
     (diff test_output.txt.expected test_output.txt)))
+
+; produce an embedded FS
+(rule
+  (targets vfs.ml)
+  (deps (source_tree files) (:out test_output.txt.expected))
+  (enabled_if (= %{system} "linux"))
+  (action (run ../src/bin/vfs_pack.exe -o %{targets}
+               --mirror=files/
+               --file=test_out.txt,%{out}
+               --url=example_dot_com,http://example.com)))
+
+(rule
+  (targets vfs.ml)
+  (enabled_if (<> %{system} "linux"))
+  (action
+    (with-stdout-to
+      %{targets}
+      (progn
+        (echo "let embedded_fs = Tiny_httpd_dir.Embedded_fs.create ~mtime:0. ()")
+        (echo "let vfs = Tiny_httpd_dir.Embedded_fs.to_vfs embedded_fs")))))

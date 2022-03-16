@@ -107,16 +107,23 @@ let () =
        S.Response.make_string @@ Ok stats
     );
 
+  (* VFS *)
+  Tiny_httpd_dir.add_vfs server
+    ~config:(Tiny_httpd_dir.config ~download:true
+               ~dir_behavior:Tiny_httpd_dir.Index_or_lists ())
+    ~vfs:Vfs.vfs ~prefix:"vfs";
+
   (* main page *)
   S.add_route_handler server S.Route.(return)
     (fun _req ->
        let s = "<head></head><body>\n\
                 <p><b>welcome!</b>\n<p>endpoints are:\n<ul>\
                 <li><pre>/hello/'name' (GET)</pre></li>\n\
-                <li><pre>/echo/ (GET) echoes back query</pre></li>\n\
+                <li><pre><a href=\"/echo/\">/echo/</a> (GET) echoes back query</pre></li>\n\
                 <li><pre>/upload/'path' (PUT) to upload a file</pre></li>\n\
                 <li><pre>/zcat/'path' (GET) to download a file (compressed)</pre></li>\n\
                 <li><pre>/stats/ (GET) to access statistics</pre></li>\n\
+                <li><pre><a href=\"/vfs/\">/vfs/</a> (GET) to access statistics</pre></li>\n\
                 </ul></body>"
        in
        S.Response.make_string ~headers:["content-type", "text/html"] @@ Ok s);

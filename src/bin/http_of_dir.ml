@@ -20,8 +20,9 @@ let parse_size s : int =
   with _ -> raise (Arg.Bad "invalid size (expected <int>[kM]?)")
 
 let main () =
-  let config = D.default_config() in
-  config.dir_behavior <- Index_or_lists; (* keep old behavior *)
+  let config =
+    D.config ~dir_behavior:Index_or_lists ()
+  in
   let dir_ = ref "." in
   let addr = ref "127.0.0.1" in
   let port = ref 8080 in

@@ -23,7 +23,12 @@ type dir_behavior =
   | Forbidden
   (** Forbid access to directory. This is suited for serving assets, for example. *)
 
-(** configuration for static file handlers *)
+type hidden
+(** Type used to prevent users from building a config directly.
+    Use {!default_config} or {!config} instead. *)
+
+(** configuration for static file handlers. This might get
+    more fields over time. *)
 type config = {
   mutable download: bool;
   (** Is downloading files allowed? *)
@@ -40,6 +45,9 @@ type config = {
   mutable max_upload_size: int;
   (** If {!upload} is true, this is the maximum size in bytes for
       uploaded files. *)
+
+  _rest: hidden;
+  (** Just ignore this field. *)
 }
 
 (** default configuration: [
@@ -51,6 +59,17 @@ type config = {
   }] *)
 val default_config : unit -> config
 
+val config :
+  ?download:bool ->
+  ?dir_behavior:dir_behavior ->
+  ?delete:bool ->
+  ?upload:bool ->
+  ?max_upload_size:int ->
+  unit ->
+  config
+(** Build a config from {!default_config}.
+    @since NEXT_RELEASE *)
+
 (** [add_dirpath ~config ~dir ~prefix server] adds route handle to the
     [server] to serve static files in [dir] when url starts with [prefix],
     using the given configuration [config]. *)
@@ -59,3 +78,74 @@ val add_dir_path :
   dir:string ->
   prefix:string ->
   Tiny_httpd.t -> unit
+
+(** Virtual file system.
+
+    This is used to emulate a file system from pure OCaml functions and data,
+    e.g. for resources bundled inside the web server.
+    @since NEXT_RELEASE
+*)
+module type VFS = sig
+  val descr : string
+  (** Description of the VFS *)
+
+  val is_directory : string -> bool
+
+  val contains : string -> bool
+  (** [file_exists vfs path] returns [true] if [path] points to a file
+      or directory inside [vfs]. *)
+
+  val list_dir : string -> string array
+  (** List directory. This only returns basenames, the files need
+      to be put in the directory path using {!Filename.concat}. *)
+
+  val delete : string -> unit
+  (** Delete path *)
+
+  val create : string -> (bytes -> int -> int -> unit) * (unit -> unit)
+  (** Create a file and obtain a pair [write, close] *)
+
+  val read_file_content : string -> Tiny_httpd.Byte_stream.t
+  (** Read content of a file *)
+
+  val file_size : string -> int option
+  (** File size, e.g. using "stat" *)
+
+  val file_mtime : string -> float option
+  (** File modification time, e.g. using "stat" *)
+end
+
+val vfs_of_dir : string -> (module VFS)
+(** [vfs_of_dir dir] makes a virtual file system that reads from the
+    disk.
+    @since NEXT_RELEASE
+*)
+
+val add_vfs :
+  config:config ->
+  vfs:(module VFS) ->
+  prefix:string ->
+  Tiny_httpd.t -> unit
+(** Similar to {!add_dir_path} but using a virtual file system instead.
+    @since NEXT_RELEASE
+*)
+
+(** An embedded file system, as a list of files with (relative) paths.
+    This is useful in combination with the "tiny-httpd-mkfs" tool,
+    which embeds the files it's given into a OCaml module.
+
+    @since NEXT_RELEASE
+*)
+module Embedded_fs : sig
+  type t
+  (** The pseudo-filesystem *)
+
+  val create : ?mtime:float -> unit -> t
+
+  val add_file : ?mtime:float -> t -> path:string -> string -> unit
+  (** Add file to the virtual file system.
+      @raise Invalid_argument if the path contains '..' or if it tries to
+      make a directory out of an existing path that is a file. *)
+
+  val to_vfs : t -> (module VFS)
+end
