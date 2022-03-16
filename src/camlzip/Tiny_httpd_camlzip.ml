@@ -47,8 +47,6 @@ let decode_deflate_stream_ ~buf_size (is:S.byte_stream) : S.byte_stream =
       )
     ()
 
-;;
-
 let encode_deflate_stream_ ~buf_size (is:S.byte_stream) : S.byte_stream =
   S._debug (fun k->k "wrap stream with deflate.encode");
   let refill = ref true in
@@ -117,9 +115,7 @@ let encode_deflate_stream_ ~buf_size (is:S.byte_stream) : S.byte_stream =
           S.Response.fail_raise ~code:400
             "deflate: error during compression:\n%s %s" e1 e2
       )
-
     ()
-;;
 
 let split_on_char ?(f=fun x->x) c s : string list =
   let rec loop acc i =
