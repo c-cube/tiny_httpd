@@ -77,7 +77,7 @@ val add_dir_path :
   config:config ->
   dir:string ->
   prefix:string ->
-  Tiny_httpd.t -> unit
+  Tiny_httpd_server.t -> unit
 
 (** Virtual file system.
 
@@ -105,7 +105,7 @@ module type VFS = sig
   val create : string -> (bytes -> int -> int -> unit) * (unit -> unit)
   (** Create a file and obtain a pair [write, close] *)
 
-  val read_file_content : string -> Tiny_httpd.Byte_stream.t
+  val read_file_content : string -> Tiny_httpd_stream.t
   (** Read content of a file *)
 
   val file_size : string -> int option
@@ -125,7 +125,7 @@ val add_vfs :
   config:config ->
   vfs:(module VFS) ->
   prefix:string ->
-  Tiny_httpd.t -> unit
+  Tiny_httpd_server.t -> unit
 (** Similar to {!add_dir_path} but using a virtual file system instead.
     @since NEXT_RELEASE
 *)
