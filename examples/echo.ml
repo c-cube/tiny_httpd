@@ -123,7 +123,7 @@ let () =
                 <li><pre>/upload/'path' (PUT) to upload a file</pre></li>\n\
                 <li><pre>/zcat/'path' (GET) to download a file (compressed)</pre></li>\n\
                 <li><pre>/stats/ (GET) to access statistics</pre></li>\n\
-                <li><pre><a href=\"/vfs/\">/vfs/</a> (GET) to access statistics</pre></li>\n\
+                <li><pre><a href=\"/vfs/\">/vfs/</a> (GET) to access a VFS embedded in the binary</pre></li>\n\
                 </ul></body>"
        in
        S.Response.make_string ~headers:["content-type", "text/html"] @@ Ok s);
