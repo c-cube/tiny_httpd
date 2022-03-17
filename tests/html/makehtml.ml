@@ -18,7 +18,7 @@ let t2() =
     body [] [
       ul' [A.style "list-style: circle"] (fun buf ->
           for i=0 to 99 do
-            li [A.id (spf "l%d" i)] [txt (spf "item %d" i)] buf
+            li ~if_:(i<> 42) [A.id (spf "l%d" i)] [txt (spf "item %d" i)] buf
           done
       )
     ]
