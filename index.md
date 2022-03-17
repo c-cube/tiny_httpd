@@ -1,8 +1,8 @@
 ## Documentation
 
-[dev](dev/)
-[latest](0.9)
+[development version (follows mater branch)](dev/)
 
+- [latest release](0.9)
 - [0.9](0.9)
 - [0.7](0.7)
 - [0.6](0.6)
