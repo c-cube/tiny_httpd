@@ -281,7 +281,10 @@ let prelude = {|
 (** Output for HTML combinators.
 
     This output type is used to produce a string reasonably efficiently from
-    a tree of combinators. *)
+    a tree of combinators.
+
+    @since NEXT_RELEASE
+    @open *)
 module Out : sig
   type t
   val create : unit -> t
