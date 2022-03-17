@@ -6,10 +6,10 @@ include Tiny_httpd_html_
     @param top if true, add DOCTYPE at the beginning. The top element should then
     be a "html" tag. *)
 let to_string ?(top=false) (self:elt) : string =
-  let buf = Buffer.create 256 in
-  if top then Printf.bprintf buf "<!DOCTYPE html>\n";
-  self buf;
-  Buffer.contents buf
+  let out = Out.create () in
+  if top then Out.add_string out "<!DOCTYPE html>\n";
+  self out;
+  Out.to_string out
 
 let to_string_top = to_string ~top:true
 

@@ -278,34 +278,74 @@ let attrs = [
 ]
 
 let prelude = {|
-type attribute = string * string
-type elt = Buffer.t -> unit
-type void = attribute list -> elt
-type nary = attribute list -> elt list -> elt
-type nary' = attribute list -> (Buffer.t -> unit) -> elt
+(** Output for HTML combinators.
 
-let str_escape (buf:Buffer.t) (s:string) : unit =
+    This output type is used to produce a string reasonably efficiently from
+    a tree of combinators. *)
+module Out : sig
+  type t
+  val create : unit -> t
+  val clear : t -> unit
+  val add_char : t -> char -> unit
+  val add_string : t -> string -> unit
+  val to_string : t -> string
+end = struct
+  include Buffer
+  let create () = Buffer.create 256
+  let to_string = contents
+end
+
+type attribute = string * string
+(** An attribute, i.e. a key/value pair *)
+
+type elt = Out.t -> unit
+(** A html element. It is represented by its output function, so we
+    can directly print it. *)
+
+type void = ?if_:bool -> attribute list -> elt
+(** Element without children. *)
+
+type nary = ?if_:bool -> attribute list -> elt list -> elt
+(** Element with children, represented as a list.
+    @param if_ if false, do not print anything (default true) *)
+
+type nary' = ?if_:bool -> attribute list -> (Out.t -> unit) -> elt
+(** Element with children, represented as a continuation.
+    @param if_ if false, do not print anything (default true) *)
+
+(** Escape string so it can be safely embedded in HTML text. *)
+let str_escape (out:Out.t) (s:string) : unit =
   String.iter (function
-    | '<' -> Buffer.add_string buf "&lt;"
-    | '>' -> Buffer.add_string buf "&gt;"
-    | '&' -> Buffer.add_string buf "&amp;"
-    | '"' -> Buffer.add_string buf "&quot;"
-    | '\'' -> Buffer.add_string buf "&apos;"
-    | c -> Buffer.add_char buf c)
+    | '<' -> Out.add_string out "&lt;"
+    | '>' -> Out.add_string out "&gt;"
+    | '&' -> Out.add_string out "&amp;"
+    | '"' -> Out.add_string out "&quot;"
+    | '\'' -> Out.add_string out "&apos;"
+    | c -> Out.add_char out c)
   s
 
 (** Print the value part of an attribute *)
-let attr_escape buf (s:string) =
-  Buffer.add_char buf '"';
-  str_escape buf s;
-  Buffer.add_char buf '"'
+let attr_escape (out:Out.t) (s:string) =
+  Out.add_char out '"';
+  str_escape out s;
+  Out.add_char out '"'
+
+(** Output a list of attributes. *)
+let write_attrs (out:Out.t ) (l:attribute list) : unit =
+  List.iter
+    (fun (k,v) ->
+      Out.add_char out ' ';
+      Out.add_string out k;
+      Out.add_char out '=';
+      attr_escape out v)
+    l
 
 (** Emit a string value, which will be escaped. *)
-let txt (txt:string) : elt = fun buf -> str_escape buf txt
+let txt (txt:string) : elt = fun out -> str_escape out txt
 
 (** Emit raw HTML. Caution, this can lead to injection vulnerabilities,
   never use with text that comes from untrusted users. *)
-let raw_html (s:string) : elt = fun buf -> Buffer.add_string buf s
+let raw_html (s:string) : elt = fun out -> Out.add_string out s
 |}
 
 let oname = function
@@ -324,10 +364,11 @@ let emit_void name =
   let oname = oname name in
   pf "(** tag %S, see {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/%s} mdn} *)\n"
     name name;
-  pf "let %s : void = fun attrs buf ->\n" oname;
-  pf "  Buffer.add_string buf \"<%s\";\n" name;
-  pf "  List.iter (fun (k,v) -> Printf.bprintf buf \" %%s=%%a\" k attr_escape v) attrs;\n";
-  pf "  Buffer.add_string buf \"/>\"";
+  pf "let %s : void = fun ?(if_=true) attrs out ->\n" oname;
+  pf "  if if_ then (\n";
+  pf "    Out.add_string out \"<%s\";\n" name;
+  pf "    write_attrs out attrs;\n";
+  pf "    Out.add_string out \"/>\")";
   pf "\n\n";
   ()
 
@@ -336,24 +377,26 @@ let emit_normal name =
 
   pf "(** tag %S, see {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/%s} mdn} *)\n"
     name name;
-  pf "let %s : nary = fun attrs sub buf ->\n" oname;
-  pf "  Buffer.add_string buf \"<%s\";\n" name;
-  pf "  List.iter (fun (k,v) -> Printf.bprintf buf \" %%s=%%a\" k attr_escape v) attrs;\n";
-  pf "  Buffer.add_string buf \">\\n\";\n";
-  pf "  List.iter (fun sub -> sub buf; Buffer.add_char buf '\\n') sub;\n";
-  pf "  Buffer.add_string buf \"</%s>\\n\"" name;
+  pf "let %s : nary = fun ?(if_=true) attrs sub out ->\n" oname;
+  pf "  if if_ then (\n";
+  pf "    Out.add_string out \"<%s\";\n" name;
+  pf "    write_attrs out attrs;\n";
+  pf "    Out.add_string out \">\\n\";\n";
+  pf "    List.iter (fun sub -> sub out; Out.add_char out '\\n') sub;\n";
+  pf "    Out.add_string out \"</%s>\\n\")" name;
   pf "\n\n";
 
   (* block version *)
   let oname = oname ^ "'" in
   pf "(** tag %S, see {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/%s} mdn} *)\n"
     name name;
-  pf "let %s : nary' = fun attrs f buf ->\n" oname;
-  pf "  Buffer.add_string buf \"<%s\";\n" name;
-  pf "  List.iter (fun (k,v) -> Printf.bprintf buf \" %%s=%%a\" k attr_escape v) attrs;\n";
-  pf "  Buffer.add_string buf \">\\n\";\n";
-  pf "  f buf;\n";
-  pf "  Buffer.add_string buf \"</%s>\\n\"" name;
+  pf "let %s : nary' = fun ?(if_=true) attrs f out ->\n" oname;
+  pf "  if if_ then (\n";
+  pf "    Out.add_string out \"<%s\";\n" name;
+  pf "    write_attrs out attrs;\n";
+  pf "    Out.add_string out \">\\n\";\n";
+  pf "    f out;\n";
+  pf "    Out.add_string out \"</%s>\\n\")" name;
   pf "\n\n";
 
 
