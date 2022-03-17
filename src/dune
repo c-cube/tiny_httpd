@@ -5,3 +5,8 @@
   (libraries threads)
   (flags :standard -safe-string -warn-error -a+8)
   (wrapped false))
+
+(rule
+  (targets Tiny_httpd_html_.ml)
+  (deps (:bin ./gen/gentags.exe))
+  (action (with-stdout-to %{targets} (run %{bin}))))
