@@ -1,0 +1,22 @@
+
+(executable
+  (libraries tiny_httpd)
+  (name makehtml))
+
+(rule
+  (targets t1.out.html)
+  (deps (:bin ./makehtml.exe))
+  (action (with-stdout-to %{targets} (run %{bin} 1))))
+
+(rule
+  (alias runtest)
+  (action (diff t1.expected.html t1.out.html)))
+
+(rule
+  (targets t2.out.html)
+  (deps (:bin ./makehtml.exe))
+  (action (with-stdout-to %{targets} (run %{bin} 2))))
+
+(rule
+  (alias runtest)
+  (action (diff t2.expected.html t2.out.html)))
