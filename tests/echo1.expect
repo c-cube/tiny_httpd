@@ -7,3 +7,65 @@ echo:
  path="/echo/?a=b&c=d"; body=""; path_components=["echo"];
  query=["c","d";"a","b"]}
 (query: "c" = "d";"a" = "b")
+<!DOCTYPE html>
+<html>
+<head>
+<title>
+list directory &quot;Embedded_fs&quot;
+</title>
+
+<meta charset="utf-8"/>
+</head>
+<body>
+<h2>
+Index of &quot;&quot;
+</h2>
+<ul>
+<li>
+<a href="/vfs/a.txt">
+a.txt
+</a>
+ (12b)</li>
+<li>
+<a href="/vfs/example_dot_com">
+example_dot_com
+</a>
+ (1.12k)</li>
+<li>
+<a href="/vfs/foo.html">
+foo.html
+</a>
+ (214b)</li>
+<li>
+<a href="/vfs/sub">
+sub
+</a>
+[dir]</li>
+<li>
+<a href="/vfs/test_out.txt">
+test_out.txt
+</a>
+ (209b)</li>
+</ul>
+</body>
+</html>
+hello
+world
+
+<html>
+<head>
+
+</head>
+<body>
+  <h2> funky: </h2>
+
+  <ul>
+    <li>
+      <a href="../"> go up!! </a>
+    </li>
+    <li>
+      <a href="../foo.html"> up/foo </a>
+    </li>
+  </ul>
+</body>
+</html>

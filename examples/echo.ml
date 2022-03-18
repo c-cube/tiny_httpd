@@ -116,16 +116,23 @@ let () =
   (* main page *)
   S.add_route_handler server S.Route.(return)
     (fun _req ->
-       let s = "<head></head><body>\n\
-                <p><b>welcome!</b>\n<p>endpoints are:\n<ul>\
-                <li><pre>/hello/'name' (GET)</pre></li>\n\
-                <li><pre><a href=\"/echo/\">/echo/</a> (GET) echoes back query</pre></li>\n\
-                <li><pre>/upload/'path' (PUT) to upload a file</pre></li>\n\
-                <li><pre>/zcat/'path' (GET) to download a file (compressed)</pre></li>\n\
-                <li><pre>/stats/ (GET) to access statistics</pre></li>\n\
-                <li><pre><a href=\"/vfs/\">/vfs/</a> (GET) to access a VFS embedded in the binary</pre></li>\n\
-                </ul></body>"
-       in
+       let open Tiny_httpd_html in
+       let h = html [] [
+           head[][title[][txt "index of echo"]];
+           body[][
+             h3[] [txt "welcome!"];
+             p[] [b[] [txt "endpoints are:"]];
+             ul[] [
+               li[][pre[][txt "/hello/:name (GET)"]];
+               li[][pre[][a[A.href "/echo/"][txt "echo"]; txt " echo back query"]];
+               li[][pre[][txt "/upload/:path (PUT) to upload a file"]];
+               li[][pre[][txt "/zcat/:path (GET) to download a file (deflate transfer-encoding)"]];
+               li[][pre[][a[A.href "/stats/"][txt"/stats/"]; txt" (GET) to access statistics"]];
+               li[][pre[][a[A.href "/vfs/"][txt"/vfs"]; txt" (GET) to access a VFS embedded in the binary"]];
+             ]
+           ]
+         ] in
+       let s = to_string_top h in
        S.Response.make_string ~headers:["content-type", "text/html"] @@ Ok s);
 
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);

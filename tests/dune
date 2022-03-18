@@ -57,7 +57,6 @@
   (enabled_if (= %{system} "linux"))
   (action (diff dl-out.expect dl-out)))
 
-
 (rule
   (targets foo_50)
   (enabled_if (= %{system} "linux"))
