@@ -1,5 +1,6 @@
 module S = Tiny_httpd_server
 module U = Tiny_httpd_util
+module Html = Tiny_httpd_html
 module Pf = Printf
 
 type dir_behavior =
@@ -98,53 +99,68 @@ let vfs_of_dir (top:string) : vfs =
   end in
   (module M)
 
-let html_list_dir (module VFS:VFS) ~prefix ~parent d : string =
+let html_list_dir (module VFS:VFS) ~prefix ~parent d : Html.elt =
   let entries = VFS.list_dir d in
-  Array.sort compare entries;
-  let body = Buffer.create 256 in
+  Array.sort String.compare entries;
+  let open Html in
+
+  html'[] @@ fun out ->
+
   (* TODO: breadcrumbs for the path, each element a link to the given ancestor dir *)
-  Printf.bprintf body {|<head><title> list directory %S</title><meta charset="utf-8">
-  </head><body>
-    <h2> Index of %S</h2>
-  |} VFS.descr d;
+  out @< head[][
+    title[][txtf "list directory %S" VFS.descr];
+    meta[A.charset "utf-8"];
+  ];
+
+  out @< body'[] @@ fun out ->
+  out @< h2[][txtf "Index of %S" d];
   begin match parent with
     | None -> ()
     | Some p ->
-      Printf.bprintf body "<a href=\"/%s\"> (parent directory) </a>\n"
-        (encode_path (prefix // p));
+      out @< a[A.href (encode_path (prefix // p))][txt"(parent directory)"];
   end;
-  Printf.bprintf body "<ul>\n";
-  let hidden_stop = ref 0 in
-  Array.iteri
-    (fun i f ->
-       if is_hidden f && (i=0 || not (is_hidden entries.(i-1))) then (
-         hidden_stop := i;
-         while !hidden_stop < Array.length entries && is_hidden entries.(!hidden_stop) do
-           incr hidden_stop;
-         done;
-         Printf.bprintf body "<details> <summary>(%d hidden files)</summary>\n" (!hidden_stop-i);
-       ) else if i = !hidden_stop then (
-         Printf.bprintf body "</details/>\n";
-       );
-       if not @@ contains_dot_dot (d // f) then (
-         let fpath = d // f in
-         if not @@ VFS.contains fpath then (
-           Printf.bprintf body "  <li> %s [invalid file]</li>\n" f
-         ) else (
-           let size =
-             match VFS.file_size fpath with
-             | Some f -> Printf.sprintf " (%s)" @@ human_size f
-             | None -> ""
-           in
-           Printf.bprintf body "  <li> <a href=\"/%s\"> %s </a> %s%s </li>\n"
-             (encode_path (prefix // fpath)) f
-             (if VFS.is_directory fpath then "[dir]" else "") size
-         );
-       )
+
+  out @< ul'[] @@ fun out ->
+
+  let n_hidden = ref 0 in
+  Array.iter (fun f -> if is_hidden f then incr n_hidden) entries;
+
+  let emit_file f out : unit =
+    if not @@ contains_dot_dot (d // f) then (
+      let fpath = d // f in
+      if not @@ VFS.contains fpath then (
+        out @< li[][txtf "%s [invalid file]" f];
+      ) else (
+        let size =
+          match VFS.file_size fpath with
+          | Some f -> Printf.sprintf " (%s)" @@ human_size f
+          | None -> ""
+        in
+        out @< li'[] @@ fun out ->
+        out @< a[A.href ("/" // prefix // fpath)][txt f];
+        if VFS.is_directory fpath then out @< txt"[dir]";
+        out @< txt size;
+      );
     )
+  in
+
+  if !n_hidden>0 then (
+    out @< details'[] @@ fun out ->
+    out @< summary[][txtf "(%d hidden files)" !n_hidden];
+
+    Array.iter
+      (fun f ->
+         if is_hidden f then (
+           emit_file f out;
+         ))
+      entries;
+  );
+
+  Array.iter
+    (fun f ->
+       if not @@ is_hidden f then emit_file f out)
     entries;
-  Printf.bprintf body "</ul></body>\n";
-  Buffer.contents body
+  ()
 
 let finally_ ~h x f =
   try
@@ -235,7 +251,7 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS:VFS) as vfs) ~prefix server :
              S.Response.make_raw ~code:301 ""
                ~headers:S.Headers.(empty |> set "location" new_path)
            | Lists | Index_or_lists ->
-             let body = html_list_dir ~prefix vfs path ~parent in
+             let body = html_list_dir ~prefix vfs path ~parent |> Html.to_string_top in
              S.Response.make_string
                ~headers:[header_html; "ETag", Lazy.force mtime]
                (Ok body)
