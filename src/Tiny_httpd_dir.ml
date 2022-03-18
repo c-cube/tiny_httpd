@@ -242,7 +242,7 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS:VFS) as vfs) ~prefix server :
          ) else if VFS.is_directory path then (
            S._debug (fun k->k "list dir %S (topdir %S)" path VFS.descr);
            let parent = Filename.(dirname path) in
-           let parent = if path <> "." then Some parent else None in
+           let parent = if Filename.basename path <> "." then Some parent else None in
            match config.dir_behavior with
            | Index | Index_or_lists when VFS.contains (path // "index.html") ->
              (* redirect using path, not full path *)

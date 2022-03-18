@@ -333,7 +333,7 @@ type nary' = ?if_:bool -> attribute list -> (Out.t -> unit) -> elt
 let (@<) (out:Out.t) (elt:elt) : unit = elt out
 
 (** Escape string so it can be safely embedded in HTML text. *)
-let str_escape (out:Out.t) (s:string) : unit =
+let _str_escape (out:Out.t) (s:string) : unit =
   String.iter (function
     | '<' -> Out.add_string out "&lt;"
     | '>' -> Out.add_string out "&gt;"
@@ -344,26 +344,34 @@ let str_escape (out:Out.t) (s:string) : unit =
   s
 
 (** Print the value part of an attribute *)
-let attr_escape (out:Out.t) (s:string) =
+let _attr_escape (out:Out.t) (s:string) =
   Out.add_char out '"';
-  str_escape out s;
+  _str_escape out s;
   Out.add_char out '"'
 
 (** Output a list of attributes. *)
-let write_attrs (out:Out.t ) (l:attribute list) : unit =
+let _write_attrs (out:Out.t ) (l:attribute list) : unit =
   List.iter
     (fun (k,v) ->
       Out.add_char out ' ';
       Out.add_string out k;
       Out.add_char out '=';
-      attr_escape out v)
+      _attr_escape out v)
     l
 
+(** Write a tag, with its attributes.
+    @param void if true, end with "/>", otherwise end with ">" *)
+let _write_tag_attrs ~void (out:Out.t) (tag:string) (attrs:attribute list) : unit =
+  Out.add_string out "<";
+  Out.add_string out tag;
+  _write_attrs out attrs;
+  if void then Out.add_string out "/>" else Out.add_string out ">"
+
 (** Emit a string value, which will be escaped. *)
-let txt (txt:string) : elt = fun out -> str_escape out txt
+let txt (txt:string) : elt = fun out -> _str_escape out txt
 
 (** Formatted version of {!txt} *)
-let txtf fmt = Format.kasprintf (fun s -> fun out -> str_escape out s) fmt
+let txtf fmt = Format.kasprintf (fun s -> fun out -> _str_escape out s) fmt
 
 (** Emit raw HTML. Caution, this can lead to injection vulnerabilities,
   never use with text that comes from untrusted users. *)
@@ -388,9 +396,8 @@ let emit_void name =
     name name;
   pf "let %s : void = fun ?(if_=true) attrs out ->\n" oname;
   pf "  if if_ then (\n";
-  pf "    Out.add_string out \"<%s\";\n" name;
-  pf "    write_attrs out attrs;\n";
-  pf "    Out.add_string out \"/>\")";
+  pf "    _write_tag_attrs ~void:true out %S attrs;\n" name;
+  pf "  )";
   pf "\n\n";
   ()
 
@@ -403,9 +410,7 @@ let emit_normal name =
   pf "  if if_ then (\n";
   (* for <pre>, newlines actually matter *)
   if name="pre" then pf "  Out.with_no_format_nl out @@ fun () ->\n";
-  pf "    Out.add_string out \"<%s\";\n" name;
-  pf "    write_attrs out attrs;\n";
-  pf "    Out.add_string out \">\";\n";
+  pf "    _write_tag_attrs ~void:false out %S attrs;\n" name;
   pf "    Out.add_format_nl out;\n";
   pf "    List.iter (fun sub -> sub out; Out.add_format_nl out) sub;\n";
   pf "    Out.add_string out \"</%s>\";" name;
@@ -419,9 +424,7 @@ let emit_normal name =
   pf "let %s : nary' = fun ?(if_=true) attrs f out ->\n" oname;
   pf "  if if_ then (\n";
   if name="pre" then pf "  Out.with_no_format_nl out @@ fun () ->\n";
-  pf "    Out.add_string out \"<%s\";\n" name;
-  pf "    write_attrs out attrs;\n";
-  pf "    Out.add_string out \">\";\n";
+  pf "    _write_tag_attrs ~void:false out %S attrs;\n" name;
   pf "    Out.add_format_nl out;\n";
   pf "    f out;\n";
   pf "    Out.add_string out \"</%s>\";" name;
