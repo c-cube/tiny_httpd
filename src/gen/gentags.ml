@@ -291,11 +291,25 @@ module Out : sig
   val clear : t -> unit
   val add_char : t -> char -> unit
   val add_string : t -> string -> unit
+  val add_format_nl : t -> unit
+  val with_no_format_nl : t -> (unit -> 'a) -> 'a
   val to_string : t -> string
 end = struct
-  include Buffer
-  let create () = Buffer.create 256
-  let to_string = contents
+  type t = {
+    buf: Buffer.t;
+    mutable fmt_nl: bool; (* if true, we print \b around to format the html *)
+  }
+  let create () = {buf=Buffer.create 256; fmt_nl=true}
+  let clear self = Buffer.clear self.buf; self.fmt_nl <- true
+  let[@inline] add_char self c = Buffer.add_char self.buf c
+  let[@inline] add_string self s = Buffer.add_string self.buf s
+  let to_string self = Buffer.contents self.buf
+  let add_format_nl self = if self.fmt_nl then add_char self '\n'
+  let with_no_format_nl self f =
+    if self.fmt_nl then (
+      self.fmt_nl <- false;
+      try let x=f() in self.fmt_nl <- true; x with e -> self.fmt_nl <- true; raise e
+    ) else f()
 end
 
 type attribute = string * string
@@ -315,6 +329,8 @@ type nary = ?if_:bool -> attribute list -> elt list -> elt
 type nary' = ?if_:bool -> attribute list -> (Out.t -> unit) -> elt
 (** Element with children, represented as a continuation.
     @param if_ if false, do not print anything (default true) *)
+
+let (@<) (out:Out.t) (elt:elt) : unit = elt out
 
 (** Escape string so it can be safely embedded in HTML text. *)
 let str_escape (out:Out.t) (s:string) : unit =
@@ -345,6 +361,9 @@ let write_attrs (out:Out.t ) (l:attribute list) : unit =
 
 (** Emit a string value, which will be escaped. *)
 let txt (txt:string) : elt = fun out -> str_escape out txt
+
+(** Formatted version of {!txt} *)
+let txtf fmt = Format.kasprintf (fun s -> fun out -> str_escape out s) fmt
 
 (** Emit raw HTML. Caution, this can lead to injection vulnerabilities,
   never use with text that comes from untrusted users. *)
@@ -382,11 +401,15 @@ let emit_normal name =
     name name;
   pf "let %s : nary = fun ?(if_=true) attrs sub out ->\n" oname;
   pf "  if if_ then (\n";
+  (* for <pre>, newlines actually matter *)
+  if name="pre" then pf "  Out.with_no_format_nl out @@ fun () ->\n";
   pf "    Out.add_string out \"<%s\";\n" name;
   pf "    write_attrs out attrs;\n";
-  pf "    Out.add_string out \">\\n\";\n";
-  pf "    List.iter (fun sub -> sub out; Out.add_char out '\\n') sub;\n";
-  pf "    Out.add_string out \"</%s>\\n\")" name;
+  pf "    Out.add_string out \">\";\n";
+  pf "    Out.add_format_nl out;\n";
+  pf "    List.iter (fun sub -> sub out; Out.add_format_nl out) sub;\n";
+  pf "    Out.add_string out \"</%s>\";" name;
+  pf "    Out.add_format_nl out)\n";
   pf "\n\n";
 
   (* block version *)
@@ -395,15 +418,23 @@ let emit_normal name =
     name name;
   pf "let %s : nary' = fun ?(if_=true) attrs f out ->\n" oname;
   pf "  if if_ then (\n";
+  if name="pre" then pf "  Out.with_no_format_nl out @@ fun () ->\n";
   pf "    Out.add_string out \"<%s\";\n" name;
   pf "    write_attrs out attrs;\n";
-  pf "    Out.add_string out \">\\n\";\n";
+  pf "    Out.add_string out \">\";\n";
+  pf "    Out.add_format_nl out;\n";
   pf "    f out;\n";
-  pf "    Out.add_string out \"</%s>\\n\")" name;
+  pf "    Out.add_string out \"</%s>\";" name;
+  pf "    Out.add_format_nl out)\n";
   pf "\n\n";
 
 
   ()
+
+let doc_attrs = {|Attributes.
+
+This module contains combinator for the standard attributes.
+One can also just use a pair of strings. |}
 
 let emit_attr name =
   let oname = oname name in
@@ -415,7 +446,7 @@ let () =
   pf "%s\n" prelude;
   List.iter emit_void void;
   List.iter emit_normal normal;
-  pf "(** Attributes *)\n";
+  pf "(** %s *)\n" doc_attrs;
   pf "module A = struct\n";
   pf "  type t = string -> attribute\n";
   pf "  (** Attribute builder *)\n";
