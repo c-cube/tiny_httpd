@@ -6,7 +6,7 @@ let t1() =
     head [] [];
     body [] [
       ul [A.style "list-style: circle"] (
-        li[][pre [] [txt "a"; txt "b"]] ::
+        li[][pre [] [txt "a"; pre[][txt "c"; txt"d"]; txt "b"]] ::
         List.init 100 (fun i -> li [A.id (spf "l%d" i)] [txt (spf "item %d" i)])
       )
     ]
