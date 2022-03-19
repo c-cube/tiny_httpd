@@ -18,11 +18,10 @@ let t2() =
     head [] [];
     pre [] [txt "a"; txt "b"];
     body [] [
-      ul' [A.style "list-style: circle"] (fun out ->
-          for i=0 to 99 do
-            li ~if_:(i<> 42) [A.id (spf "l%d" i)] [txt (spf "item %d" i)] out
-          done
-      )
+      ul' [A.style "list-style: circle"] [
+        sub_l @@ List.init 100 @@ fun i ->
+        li ~if_:(i<> 42) [A.id (spf "l%d" i)] [txt (spf "item %d" i)]
+      ]
     ]
   ]
 

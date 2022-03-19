@@ -104,63 +104,64 @@ let html_list_dir (module VFS:VFS) ~prefix ~parent d : Html.elt =
   Array.sort String.compare entries;
   let open Html in
 
-  html'[] @@ fun out ->
-
   (* TODO: breadcrumbs for the path, each element a link to the given ancestor dir *)
-  out @< head[][
-    title[][txtf "list directory %S" VFS.descr];
-    meta[A.charset "utf-8"];
-  ];
-
-  out @< body'[] @@ fun out ->
-  out @< h2[][txtf "Index of %S" d];
-  begin match parent with
-    | None -> ()
-    | Some p ->
-      out @< a[A.href (encode_path ("/" // prefix // p))][txt"(parent directory)"];
-  end;
-
-  out @< ul'[] @@ fun out ->
+  let head =
+    head[][
+      title[][txtf "list directory %S" VFS.descr];
+      meta[A.charset "utf-8"];
+    ] in
 
   let n_hidden = ref 0 in
   Array.iter (fun f -> if is_hidden f then incr n_hidden) entries;
 
-  let emit_file f out : unit =
+  let file_to_elt f : elt option =
     if not @@ contains_dot_dot (d // f) then (
       let fpath = d // f in
       if not @@ VFS.contains fpath then (
-        out @< li[][txtf "%s [invalid file]" f];
+        Some (li[][txtf "%s [invalid file]" f])
       ) else (
         let size =
           match VFS.file_size fpath with
           | Some f -> Printf.sprintf " (%s)" @@ human_size f
           | None -> ""
         in
-        out @< li'[] @@ fun out ->
-        out @< a[A.href ("/" // prefix // fpath)][txt f];
-        if VFS.is_directory fpath then out @< txt"[dir]";
-        out @< txt size;
-      );
-    )
+        Some (li'[] [
+          sub_e @@ a[A.href ("/" // prefix // fpath)][txt f];
+          (if VFS.is_directory fpath then sub_e @@ txt "[dir]" else sub_empty);
+          sub_e @@ txt size;
+        ])
+      )
+    ) else None
   in
 
-  if !n_hidden>0 then (
-    out @< details'[] @@ fun out ->
-    out @< summary[][txtf "(%d hidden files)" !n_hidden];
+  let body = body'[] [
+    sub_e @@ h2[][txtf "Index of %S" d];
+    begin match parent with
+      | None -> sub_empty
+      | Some p ->
+        sub_e @@
+        a[A.href (encode_path ("/" // prefix // p))][txt"(parent directory)"]
+    end;
 
-    Array.iter
-      (fun f ->
-         if is_hidden f then (
-           emit_file f out;
-         ))
-      entries;
-  );
-
-  Array.iter
-    (fun f ->
-       if not @@ is_hidden f then emit_file f out)
-    entries;
-  ()
+    sub_e @@ ul' [] [
+      if !n_hidden>0 then
+        sub_e @@ details'[][
+          sub_e @@ summary[][txtf "(%d hidden files)" !n_hidden];
+          sub_seq (
+            seq_of_array entries
+            |> Seq.filter_map
+              (fun f -> if is_hidden f then file_to_elt f else None)
+          );
+        ] else sub_empty;
+      sub_seq (
+        seq_of_array entries
+        |> Seq.filter_map (fun f ->
+            if not (is_hidden f) then file_to_elt f else None)
+      )
+    ];
+  ]
+  in
+  html [][head; body]
 
 let finally_ ~h x f =
   try

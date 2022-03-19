@@ -13,7 +13,6 @@ echo:
 <title>
 list directory &quot;Embedded_fs&quot;
 </title>
-
 <meta charset="utf-8"/>
 </head>
 <body>
@@ -25,27 +24,33 @@ Index of &quot;&quot;
 <a href="/vfs/a.txt">
 a.txt
 </a>
- (12b)</li>
+ (12b)
+</li>
 <li>
 <a href="/vfs/example_dot_com">
 example_dot_com
 </a>
- (1.12k)</li>
+ (1.12k)
+</li>
 <li>
 <a href="/vfs/foo.html">
 foo.html
 </a>
- (214b)</li>
+ (214b)
+</li>
 <li>
 <a href="/vfs/sub">
 sub
 </a>
-[dir]</li>
+[dir]
+
+</li>
 <li>
 <a href="/vfs/test_out.txt">
 test_out.txt
 </a>
- (209b)</li>
+ (209b)
+</li>
 </ul>
 </body>
 </html>

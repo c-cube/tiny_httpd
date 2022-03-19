@@ -303,8 +303,8 @@ end = struct
   let clear self = Buffer.clear self.buf; self.fmt_nl <- true
   let[@inline] add_char self c = Buffer.add_char self.buf c
   let[@inline] add_string self s = Buffer.add_string self.buf s
-  let to_string self = Buffer.contents self.buf
   let add_format_nl self = if self.fmt_nl then add_char self '\n'
+  let to_string self = add_format_nl self; Buffer.contents self.buf
   let with_no_format_nl self f =
     if self.fmt_nl then (
       self.fmt_nl <- false;
@@ -326,11 +326,13 @@ type nary = ?if_:bool -> attribute list -> elt list -> elt
 (** Element with children, represented as a list.
     @param if_ if false, do not print anything (default true) *)
 
-type nary' = ?if_:bool -> attribute list -> (Out.t -> unit) -> elt
-(** Element with children, represented as a continuation.
-    @param if_ if false, do not print anything (default true) *)
+(** A chunk of sub-elements, possibly empty.
+    @inline *)
+type sub_elt = [ `E of elt | `L of elt list | `S of elt Seq.t | `Nil]
 
-let (@<) (out:Out.t) (elt:elt) : unit = elt out
+type nary' = ?if_:bool -> attribute list -> sub_elt list -> elt
+(** Element with children, represented as a list of {!sub_elt} to be flattened
+    @param if_ if false, do not print anything (default true) *)
 
 (** Escape string so it can be safely embedded in HTML text. *)
 let _str_escape (out:Out.t) (s:string) : unit =
@@ -350,7 +352,7 @@ let _attr_escape (out:Out.t) (s:string) =
   Out.add_char out '"'
 
 (** Output a list of attributes. *)
-let _write_attrs (out:Out.t ) (l:attribute list) : unit =
+let _write_attrs (out:Out.t) (l:attribute list) : unit =
   List.iter
     (fun (k,v) ->
       Out.add_char out ' ';
@@ -359,6 +361,20 @@ let _write_attrs (out:Out.t ) (l:attribute list) : unit =
       _attr_escape out v)
     l
 
+(** Write sub-elements of a {!nary'} element, returns [true] iff
+    at least one sub-element was written. *)
+let _write_subs (out:Out.t) (l:sub_elt list) : bool =
+  let has_sub = ref false in
+  let prepend_white () = has_sub := true; Out.add_format_nl out; in
+  let emit1 = function
+    | `E x -> prepend_white(); x out
+    | `L l -> List.iter (fun e -> prepend_white(); e out) l
+    | `S l -> Seq.iter (fun e -> prepend_white(); e out) l
+    | `Nil -> ()
+  in
+  List.iter emit1 l;
+  !has_sub
+
 (** Write a tag, with its attributes.
     @param void if true, end with "/>", otherwise end with ">" *)
 let _write_tag_attrs ~void (out:Out.t) (tag:string) (attrs:attribute list) : unit =
@@ -366,6 +382,20 @@ let _write_tag_attrs ~void (out:Out.t) (tag:string) (attrs:attribute list) : uni
   Out.add_string out tag;
   _write_attrs out attrs;
   if void then Out.add_string out "/>" else Out.add_string out ">"
+
+let[@inline] sub_e (elt:elt) : sub_elt = `E elt
+
+let[@inline] sub_l (l:elt list) : sub_elt = `L l
+
+let[@inline] sub_seq (l:elt Seq.t) : sub_elt = `S l
+
+let seq_of_array (a:_ array) : _ Seq.t =
+  let rec loop i () =
+    if i=Array.length a then Seq.Nil
+    else Seq.Cons (a.(i), loop (i+1))
+  in loop 0
+
+let sub_empty : sub_elt = `Nil
 
 (** Emit a string value, which will be escaped. *)
 let txt (txt:string) : elt = fun out -> _str_escape out txt
@@ -411,24 +441,22 @@ let emit_normal name =
   (* for <pre>, newlines actually matter *)
   if name="pre" then pf "  Out.with_no_format_nl out @@ fun () ->\n";
   pf "    _write_tag_attrs ~void:false out %S attrs;\n" name;
-  pf "    Out.add_format_nl out;\n";
-  pf "    List.iter (fun sub -> sub out; Out.add_format_nl out) sub;\n";
-  pf "    Out.add_string out \"</%s>\";" name;
-  pf "    Out.add_format_nl out)\n";
+  pf "    List.iter (fun sub -> Out.add_format_nl out; sub out) sub;\n";
+  pf "    if sub <> [] then Out.add_format_nl out;\n";
+  pf "    Out.add_string out \"</%s>\")" name;
   pf "\n\n";
 
   (* block version *)
   let oname = oname ^ "'" in
   pf "(** tag %S, see {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/%s} mdn} *)\n"
     name name;
-  pf "let %s : nary' = fun ?(if_=true) attrs f out ->\n" oname;
+  pf "let %s : nary' = fun ?(if_=true) attrs l out ->\n" oname;
   pf "  if if_ then (\n";
   if name="pre" then pf "  Out.with_no_format_nl out @@ fun () ->\n";
   pf "    _write_tag_attrs ~void:false out %S attrs;\n" name;
-  pf "    Out.add_format_nl out;\n";
-  pf "    f out;\n";
-  pf "    Out.add_string out \"</%s>\";" name;
-  pf "    Out.add_format_nl out)\n";
+  pf "    let has_sub = _write_subs out l in\n";
+  pf "    if has_sub then Out.add_format_nl out;\n";
+  pf "    Out.add_string out \"</%s>\")" name;
   pf "\n\n";
 
 
