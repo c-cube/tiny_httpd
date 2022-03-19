@@ -13,6 +13,7 @@ depends: [
   "dune" { >= "2.0" }
   "base-threads"
   "result"
+  "seq"
   "ocaml" { >= "4.04.0" }
   "odoc" {with-doc}
   "qtest" { >= "2.9" & with-test}
