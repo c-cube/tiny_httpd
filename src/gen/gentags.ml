@@ -334,6 +334,9 @@ type nary' = ?if_:bool -> attribute list -> sub_elt list -> elt
 (** Element with children, represented as a list of {!sub_elt} to be flattened
     @param if_ if false, do not print anything (default true) *)
 
+(**/**)
+module Helpers_ = struct
+
 (** Escape string so it can be safely embedded in HTML text. *)
 let _str_escape (out:Out.t) (s:string) : unit =
   String.iter (function
@@ -383,18 +386,28 @@ let _write_tag_attrs ~void (out:Out.t) (tag:string) (attrs:attribute list) : uni
   _write_attrs out attrs;
   if void then Out.add_string out "/>" else Out.add_string out ">"
 
+end
+open Helpers_
+(**/**)
+
+(** Sub-element with a single element inside. *)
 let[@inline] sub_e (elt:elt) : sub_elt = `E elt
 
+(** Sub-element with a list of items inside. *)
 let[@inline] sub_l (l:elt list) : sub_elt = `L l
 
+(** Sub-element with a sequence ({!Seq.t}) of items inside. *)
 let[@inline] sub_seq (l:elt Seq.t) : sub_elt = `S l
 
+(** Helper to build a {!Seq.t} from an array. *)
 let seq_of_array (a:_ array) : _ Seq.t =
   let rec loop i () =
     if i=Array.length a then Seq.Nil
     else Seq.Cons (a.(i), loop (i+1))
   in loop 0
 
+(** Sub-element with nothing inside. Useful in conditionals, when one
+    decides not to emit a sub-element at all. *)
 let sub_empty : sub_elt = `Nil
 
 (** Emit a string value, which will be escaped. *)
