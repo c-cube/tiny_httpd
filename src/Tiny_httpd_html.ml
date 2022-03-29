@@ -19,6 +19,15 @@ let to_string ?(top=false) (self:elt) : string =
   self out;
   Out.to_string out
 
+(** Convert a list of HTML elements to a string.
+    This is designed for fragments of HTML that are to be injected inside
+    a bigger context, as it's invalid to have multiple elements at the toplevel
+    of a HTML document. *)
+let to_string_l (l:elt list) =
+  let out = Out.create () in
+  List.iter (fun f -> f out; Out.add_format_nl out) l;
+  Out.to_string out
+
 let to_string_top = to_string ~top:true
 
 (** Convert a HTML element to a stream. This might just convert
