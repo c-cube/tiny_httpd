@@ -11,6 +11,8 @@
   (name vfs_pack)
   (public_name tiny-httpd-vfs-pack)
   (package tiny_httpd)
-  (modules vfs_pack)
-  (libraries curly unix)
+  (modules vfs_pack curly http)
+  (libraries result unix)
   (flags :standard -warn-error -3))
+
+(ocamllex http)
