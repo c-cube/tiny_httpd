@@ -25,8 +25,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-        with:
-          submodules: recursive
 
       - name: Use OCaml ${{ matrix.ocaml-compiler }}
         uses: ocaml/setup-ocaml@v2
@@ -36,7 +34,7 @@ jobs:
 
       - run: opam install . --deps-only --with-test
 
-      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,curly
+      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
 
       - run: opam exec -- dune build @src/runtest @examples/runtest
         if: ${{ matrix.os == 'ubuntu-latest' }}
