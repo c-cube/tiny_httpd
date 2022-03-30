@@ -68,7 +68,7 @@ val config :
   unit ->
   config
 (** Build a config from {!default_config}.
-    @since NEXT_RELEASE *)
+    @since 0.12 *)
 
 (** [add_dirpath ~config ~dir ~prefix server] adds route handle to the
     [server] to serve static files in [dir] when url starts with [prefix],
@@ -83,7 +83,7 @@ val add_dir_path :
 
     This is used to emulate a file system from pure OCaml functions and data,
     e.g. for resources bundled inside the web server.
-    @since NEXT_RELEASE
+    @since 0.12
 *)
 module type VFS = sig
   val descr : string
@@ -118,7 +118,7 @@ end
 val vfs_of_dir : string -> (module VFS)
 (** [vfs_of_dir dir] makes a virtual file system that reads from the
     disk.
-    @since NEXT_RELEASE
+    @since 0.12
 *)
 
 val add_vfs :
@@ -127,14 +127,14 @@ val add_vfs :
   prefix:string ->
   Tiny_httpd_server.t -> unit
 (** Similar to {!add_dir_path} but using a virtual file system instead.
-    @since NEXT_RELEASE
+    @since 0.12
 *)
 
 (** An embedded file system, as a list of files with (relative) paths.
     This is useful in combination with the "tiny-httpd-mkfs" tool,
     which embeds the files it's given into a OCaml module.
 
-    @since NEXT_RELEASE
+    @since 0.12
 *)
 module Embedded_fs : sig
   type t

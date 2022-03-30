@@ -4,7 +4,7 @@
     These buffers are used to avoid allocating too many byte arrays when
     processing streams and parsing requests.
 
-    @since NEXT_RELEASE
+    @since 0.12
 *)
 
 type t

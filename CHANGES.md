@@ -1,3 +1,11 @@
+## 0.12
+
+- add dep on `seq`
+- add a `Html` module with combinators to produce html
+- add `Tiny_httpd_dir.VFS` to emulate file systems
+- add a small program, `tiny-httpd-vfs-pack`, to pack directories and files
+  (local or behind a URL) into a OCaml module using `VFS`
+- show small example of socket activation
 
 ## 0.11
 

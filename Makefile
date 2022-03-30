@@ -18,3 +18,12 @@ watch:
 	@dune build @all -w
 
 .PHONY: benchs tests build watch
+
+VERSION=$(shell awk '/^version:/ {print $$2}' tiny_httpd.opam)
+
+update_next_tag:
+	@echo "update version to $(VERSION)..."
+	sed --follow-symlinks -i "s/NEXT_VERSION/$(VERSION)/g" $(wildcard src/**.ml) $(wildcard src/**.mli) \
+			$(wildcard src/**/*.ml) $(wildcard src/**/*.mli)
+	sed --follow-symlinks -i "s/NEXT_RELEASE/$(VERSION)/g" $(wildcard src/**.ml) $(wildcard src/**.mli) \
+		$(wildcard src/**/*.ml) $(wildcard src/**/*.mli)

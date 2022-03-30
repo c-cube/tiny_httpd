@@ -283,7 +283,7 @@ let prelude = {|
     This output type is used to produce a string reasonably efficiently from
     a tree of combinators.
 
-    @since NEXT_RELEASE
+    @since 0.12
     @open *)
 module Out : sig
   type t
