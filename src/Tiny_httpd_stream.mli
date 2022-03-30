@@ -1,5 +1,11 @@
 
+(** Byte streams.
+
+    These used to live in {!Tiny_httpd} but are now in their own module.
+    @since 0.12 *)
+
 type hidden
+(** Type used to make {!t} unbuildable via a record literal. Use {!make} instead. *)
 
 type t = {
   mutable bs: bytes;
@@ -33,8 +39,10 @@ type t = {
     See {!Byte_stream} for more details. *)
 
 val close : t -> unit
+(** Close stream *)
 
 val empty : t
+(** Stream with 0 bytes inside *)
 
 val of_chan : ?buf_size:int -> in_channel -> t
 (** Make a buffered stream from the given channel. *)

@@ -1,10 +1,12 @@
 
 (** HTTP server.
 
-    This library implements a very simple, basic HTTP/1.1 server using blocking
+    This module implements a very simple, basic HTTP/1.1 server using blocking
     IOs and threads.
 
     It is possible to use a thread pool, see {!create}'s argument [new_thread].
+
+    @since NEXT_RELEASE
 *)
 
 type buf = Tiny_httpd_buf.t

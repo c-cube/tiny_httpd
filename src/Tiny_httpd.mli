@@ -92,6 +92,7 @@ module Byte_stream = Tiny_httpd_stream
 
 (** {2 Main Server Type} *)
 
+(** @inline *)
 include module type of struct include Tiny_httpd_server end
 
 (** {2 Utils} *)
