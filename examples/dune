@@ -39,7 +39,8 @@
   (action (run %{bin:tiny-httpd-vfs-pack} -o %{targets}
                --mirror=files/
                --file=test_out.txt,%{out}
-               --url=example_dot_com,http://example.com)))
+               ; --url=example_dot_com,http://example.com ; this breaks tests in opam sandbox 😢
+               )))
 
 (rule
   (targets vfs.ml)
