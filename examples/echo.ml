@@ -178,8 +178,19 @@ let () =
                li[][pre[][txt "/zcat/:path (GET) to download a file (deflate transfer-encoding)"]];
                li[][pre[][a[A.href "/stats/"][txt"/stats/"]; txt" (GET) to access statistics"]];
                li[][pre[][a[A.href "/vfs/"][txt"/vfs"]; txt" (GET) to access a VFS embedded in the binary"]];
-               li[][pre[][a[A.href "/quit"][txt "/quit"]; txt" (POST) to quit"]];
-               li[][pre[][a[A.href "/protected"][txt "/protected"]; txt" (GET) to see a protected page (user:foobar)"]];
+               li[][
+                 pre[A.style "display: inline"][
+                   a[A.href "/quit"][txt "/quit"]; txt" (POST) to stop server"
+                 ];
+                 form[A.style "display: inline";
+                      A.action "/quit"; A.method_ "POST";
+                     ][
+                   button
+                     [A.type_ "submit"]
+                     [txt"quit"]
+                 ];
+               ];
+               li[][pre[][a[A.href "/protected"][txt "/protected"]; txt" (GET) to see a protected page (login: user, password: foobar)"]];
                li[][pre[][a[A.href "/logout"][txt "/logout"]; txt" (POST) to log out"]];
              ]
            ]
