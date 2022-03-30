@@ -36,7 +36,7 @@
   (targets vfs.ml)
   (deps (source_tree files) (:out test_output.txt.expected))
   (enabled_if (= %{system} "linux"))
-  (action (run ../src/bin/vfs_pack.exe -o %{targets}
+  (action (run %{bin:tiny-httpd-vfs-pack} -o %{targets}
                --mirror=files/
                --file=test_out.txt,%{out}
                --url=example_dot_com,http://example.com)))
@@ -44,6 +44,7 @@
 (rule
   (targets vfs.ml)
   (enabled_if (<> %{system} "linux"))
+  (package tiny_httpd)
   (action
     (with-stdout-to
       %{targets}

@@ -1,13 +1,19 @@
 open Tiny_httpd_html
 let spf = Printf.sprintf
 
+let list_init n f =
+  let rec loop i =
+    if i=n then []
+    else f i :: loop (i+1)
+  in loop 0
+
 let t1() =
   html [] [
     head [] [];
     body [] [
       ul [A.style "list-style: circle"] (
         li[][pre [] [txt "a"; pre[][txt "c"; txt"d"]; txt "b"]] ::
-        List.init 100 (fun i -> li [A.id (spf "l%d" i)] [txt (spf "item %d" i)])
+        list_init 100 (fun i -> li [A.id (spf "l%d" i)] [txt (spf "item %d" i)])
       )
     ]
   ]
@@ -19,7 +25,7 @@ let t2() =
     pre [] [txt "a"; txt "b"];
     body [] [
       ul' [A.style "list-style: circle"] [
-        sub_l @@ List.init 100 @@ fun i ->
+        sub_l @@ list_init 100 @@ fun i ->
         li ~if_:(i<> 42) [A.id (spf "l%d" i)] [txt (spf "item %d" i)]
       ]
     ]
