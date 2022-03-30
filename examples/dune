@@ -44,7 +44,6 @@
 (rule
   (targets vfs.ml)
   (enabled_if (<> %{system} "linux"))
-  (package tiny_httpd)
   (action
     (with-stdout-to
       %{targets}
