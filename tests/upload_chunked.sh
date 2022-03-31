@@ -10,7 +10,8 @@ PID=$!
 
 sleep 0.1
 
-cat foo_50 | curl -N -X PUT http://localhost:$PORT/data --data-binary @- -H 'Transfer-Encoding: chunked'
+cat foo_50 | curl -N -X PUT http://localhost:$PORT/data --data-binary @- \
+  -H 'Transfer-Encoding: chunked' --max-time 10
 
 kill $PID
 wc data

@@ -7,5 +7,5 @@ PORT=8086
 PID=$!
 sleep 0.1
 
-curl -N "http://localhost:${PORT}/count/10" -H user-agent:test
+curl -N "http://localhost:${PORT}/count/10" -H user-agent:test --max-time 10
 kill $PID
