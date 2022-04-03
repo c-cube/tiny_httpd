@@ -102,3 +102,5 @@ module Util = Tiny_httpd_util
 (** {2 Static directory serving} *)
 
 module Dir = Tiny_httpd_dir
+
+module Html = Tiny_httpd_html
