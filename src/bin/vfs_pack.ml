@@ -53,7 +53,7 @@ let emit oc (l:entry list) : unit =
     | Url (vfs_path, url) ->
       if !verbose then Printf.eprintf "add url %S = %S\n%!" vfs_path url;
 
-      begin match Curly.get url with
+      begin match Curly.get ~args:["-L"] url with
         | Ok b ->
           let code = b.Curly.Response.code in
           if code >= 200 && code < 300 then (
