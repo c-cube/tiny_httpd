@@ -104,3 +104,5 @@ module Util = Tiny_httpd_util
 module Dir = Tiny_httpd_dir
 
 module Html = Tiny_httpd_html
+(** Alias to {!Tiny_httpd_html}
+    @since NEXT_RELEASE *)
