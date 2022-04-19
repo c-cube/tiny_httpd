@@ -3,41 +3,23 @@ name: github pages
 on:
   push:
     branches:
-      - master  # Set a branch name to trigger deployment
+      - master
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@main
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Cache opam
-        id: cache-opam
-        uses: actions/cache@v2
+      - name: Use OCaml 4.14.x
+        uses: ocaml/setup-ocaml@v2
         with:
-          path: ~/.opam
-          key: opam-ubuntu-latest-4.12.0
+          ocaml-compiler: 4.14.x
+          dune-cache: true
 
-      - uses: avsm/setup-ocaml@v1
+      - name: Deploy odoc to GitHub Pages
+        uses: ocaml/setup-ocaml/deploy-doc@v2
         with:
-          ocaml-version: '4.12.0'
-
-      - name: Pin
-        run: opam pin -n .
-
-      - name: Depext
-        run: opam depext -yt tiny_httpd tiny_httpd_camlzip
-
-      - name: Deps
-        run: opam install -d . --deps-only
-
-      - name: Build
-        run: opam exec -- dune build @doc
-
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./_build/default/_doc/_html/
-          destination_dir: dev
-          enable_jekyll: true
+          destination-dir: dev
+          enable-jekyll: true
