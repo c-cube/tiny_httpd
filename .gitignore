@@ -1,4 +1,5 @@
 .git
 _build
+_opam
 *.install
 .merlin
