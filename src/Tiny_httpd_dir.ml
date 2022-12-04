@@ -247,7 +247,7 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS:VFS) as vfs) ~prefix server :
            match config.dir_behavior with
            | Index | Index_or_lists when VFS.contains (path // "index.html") ->
              (* redirect using path, not full path *)
-             let new_path = "/" // path // "index.html" in
+             let new_path = "/" // prefix // path // "index.html" in
              S._debug (fun k->k "redirect to `%s`" new_path);
              S.Response.make_raw ~code:301 ""
                ~headers:S.Headers.(empty |> set "location" new_path)
