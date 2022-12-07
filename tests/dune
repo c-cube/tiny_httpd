@@ -1,4 +1,4 @@
-
+;echo
 (rule
   (targets echo1.out)
   (deps (:bin ../examples/echo.exe))
@@ -7,6 +7,68 @@
   (package tiny_httpd_camlzip)
   (action (with-stdout-to %{targets} (run ./echo1.sh %{bin} 8085))))
 
+(rule
+  (alias runtest)
+  (package tiny_httpd_camlzip)
+  (enabled_if (= %{system} "linux"))
+  (action (diff echo1.expect echo1.out)))
+
+;sse_count
+(rule
+  (targets sse_count.out)
+  (deps (:bin ../examples/sse_server.exe))
+  (locks /port)
+  (enabled_if (= %{system} "linux"))
+  (package tiny_httpd)
+  (action (with-stdout-to %{targets} (run ./sse_count.sh %{bin} 8086))))
+
+(rule
+  (alias runtest)
+  (package tiny_httpd)
+  (enabled_if (= %{system} "linux"))
+  (action (diff sse_count.expect sse_count.out)))
+
+;upload
+(rule
+  (targets upload-out)
+  (deps (:bin ../src/bin/http_of_dir.exe) foo_50)
+  (locks /port)
+  (package tiny_httpd)
+  (enabled_if (= %{system} "linux"))
+  (action (with-stdout-to %{targets}
+                          (run ./upload_chunked.sh %{bin} 8087))))
+
+(rule
+  (alias runtest)
+  (package tiny_httpd)
+  (enabled_if (= %{system} "linux"))
+  (action (diff upload-out.expect upload-out)))
+
+;download
+(rule
+  (targets dl-out)
+  (deps (:bin ../src/bin/http_of_dir.exe) foo_50)
+  (locks /port)
+  (package tiny_httpd)
+  (enabled_if (= %{system} "linux"))
+  (action (with-stdout-to %{targets}
+                          (run ./download_chunked.sh %{bin} 8088))))
+
+(rule
+  (alias runtest)
+  (package tiny_httpd)
+  (enabled_if (= %{system} "linux"))
+  (action (diff dl-out.expect dl-out)))
+
+;big file (50Mo)
+(rule
+  (targets foo_50)
+  (enabled_if (= %{system} "linux"))
+  (action
+    (bash "dd if=/dev/zero of=%{targets} bs=1M count=50")))
+
+; with domains
+;echo
 (rule
   (targets echo1_domains.out)
   (deps (:bin ../examples/echo_domains.exe))
@@ -17,24 +79,11 @@
 
 (rule
   (alias runtest)
-  (package tiny_httpd_camlzip)
-  (enabled_if (= %{system} "linux"))
-  (action (diff echo1.expect echo1.out)))
-
-(rule
-  (alias runtest)
-  (package tiny_httpd_camlzip)
+  (package tiny_httpd_domains)
   (enabled_if (and (= %{system} "linux") (>= %{ocaml_version} 5.0.0)))
   (action (diff echo1_domains.expect echo1_domains.out)))
 
-(rule
-  (targets sse_count.out)
-  (deps (:bin ../examples/sse_server.exe))
-  (locks /port)
-  (enabled_if (= %{system} "linux"))
-  (package tiny_httpd)
-  (action (with-stdout-to %{targets} (run ./sse_count.sh %{bin} 8086))))
-
+;sse_count
 (rule
   (targets sse_count_domains.out)
   (deps (:bin ../examples/sse_server_domains.exe))
@@ -46,41 +95,37 @@
 (rule
   (alias runtest)
   (package tiny_httpd)
-  (enabled_if (= %{system} "linux"))
+  (enabled_if (and (= %{system} "linux") (>= %{ocaml_version} 5.0.0)))
   (action (diff sse_count_domains.expect sse_count_domains.out)))
 
+;upload
 (rule
-  (targets upload-out)
-  (deps (:bin ../src/bin/http_of_dir.exe) foo_50)
+  (targets upload-out-domains)
+  (deps (:bin ../src/bin/http_of_dir_domains.exe) foo_50)
   (locks /port)
-  (package tiny_httpd)
-  (enabled_if (= %{system} "linux"))
+  (package tiny_httpd_domains)
+  (enabled_if (and (= %{system} "linux") (>= %{ocaml_version} 5.0.0)))
   (action (with-stdout-to %{targets}
-                          (run ./upload_chunked.sh %{bin}))))
+                          (run ./upload_chunked.sh %{bin} 8097))))
 
 (rule
   (alias runtest)
   (package tiny_httpd)
-  (enabled_if (= %{system} "linux"))
-  (action (diff upload-out.expect upload-out)))
+  (enabled_if (and (= %{system} "linux") (>= %{ocaml_version} 5.0.0)))
+  (action (diff upload-out-domains.expect upload-out-domains)))
 
+;download
 (rule
-  (targets dl-out)
-  (deps (:bin ../src/bin/http_of_dir.exe) foo_50)
+  (targets dl-out-domains)
+  (deps (:bin ../src/bin/http_of_dir_domains.exe) foo_50)
   (locks /port)
-  (package tiny_httpd)
-  (enabled_if (= %{system} "linux"))
+  (package tiny_httpd_domains)
+  (enabled_if (and (= %{system} "linux") (>= %{ocaml_version} 5.0.0)))
   (action (with-stdout-to %{targets}
-                          (run ./download_chunked.sh %{bin}))))
+                          (run ./download_chunked.sh %{bin} 8098))))
 
 (rule
   (alias runtest)
-  (package tiny_httpd)
-  (enabled_if (= %{system} "linux"))
-  (action (diff dl-out.expect dl-out)))
-
-(rule
-  (targets foo_50)
-  (enabled_if (= %{system} "linux"))
-  (action
-    (bash "dd if=/dev/zero of=%{targets} bs=1M count=50")))
+  (package tiny_httpd_domains)
+  (enabled_if (and (= %{system} "linux") (>= %{ocaml_version} 5.0.0)))
+  (action (diff dl-out-domains.expect dl-out-domains)))

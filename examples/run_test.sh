@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-PORT=$1
+SERVER=$1
+PORT=$2
 
-./sse_server.exe -p $PORT &
+./$SERVER -p $PORT &
 PID=$!
 
 sleep 0.1

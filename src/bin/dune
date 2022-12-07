@@ -8,6 +8,15 @@
   (libraries tiny_httpd))
 
 (executable
+  (name http_of_dir_domains)
+  (public_name http_of_dir_domains)
+  (enabled_if (>= %{ocaml_version} 5.0.0))
+  (package tiny_httpd_domains)
+  (modules http_of_dir_domains)
+  (flags :standard -warn-error -3)
+  (libraries tiny_httpd tiny_httpd_domains))
+
+(executable
   (name vfs_pack)
   (public_name tiny-httpd-vfs-pack)
   (package tiny_httpd)
