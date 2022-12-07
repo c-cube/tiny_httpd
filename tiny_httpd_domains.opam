@@ -1,9 +1,9 @@
 opam-version: "2.0"
 version: "0.12"
 authors: ["Christophe Raffalli"]
-maintainer: "simon.cruanes.2007@m4x.org"
+maintainer: "christophe@raffalli.eu"
 license: "MIT"
-synopsis: "Interface to camlzip for tiny_httpd"
+synopsis: "Using OCaml 5 domains instead of thread"
 build: [
   ["dune" "build" "@install" "-p" name "-j" jobs]
   ["dune" "build" "@doc" "-p" name] {with-doc}

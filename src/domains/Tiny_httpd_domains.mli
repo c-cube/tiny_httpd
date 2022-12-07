@@ -14,11 +14,8 @@ let server = Tiny_httpd.create ~new_thread ()
 match Tiny_httpd_domains.run pool server with
 | Ok () -> ()
 | Error e -> raise e
-
 *)
 
-let new_thread pool f =
-   ignore (Domainslib.Task.async pool f)
+val new_thread : Domainslib.Task.pool -> 'a Domainslib.Task.task  -> unit
 
-let run pool server =
-  Domainslib.Task.run pool (fun () -> Tiny_httpd.run server)
+val run : Domainslib.Task.pool -> Tiny_httpd_server.t -> (unit, exn) result
