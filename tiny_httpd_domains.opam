@@ -1,0 +1,23 @@
+opam-version: "2.0"
+version: "0.12"
+authors: ["Christophe Raffalli"]
+maintainer: "simon.cruanes.2007@m4x.org"
+license: "MIT"
+synopsis: "Interface to camlzip for tiny_httpd"
+build: [
+  ["dune" "build" "@install" "-p" name "-j" jobs]
+  ["dune" "build" "@doc" "-p" name] {with-doc}
+  ["dune" "runtest" "-p" name] {with-test}
+]
+depends: [
+  "dune" { >= "2.0" }
+  "tiny_httpd" { = version }
+  "ocaml" { >= "5.00.0" }
+  "odoc" {with-doc}
+  "domainslib"
+]
+tags: [ "http" "thread" "server" "domain" ]
+homepage: "https://github.com/c-cube/tiny_httpd/"
+doc: "https://c-cube.github.io/tiny_httpd/"
+bug-reports: "https://github.com/c-cube/tiny_httpd/issues"
+dev-repo: "git+https://github.com/c-cube/tiny_httpd.git"
