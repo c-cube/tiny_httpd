@@ -5,6 +5,11 @@
   (libraries tiny_httpd unix ptime ptime.clock.os))
 
 (executable
+  (name sse_server_domains)
+  (modules sse_server_domains)
+  (libraries tiny_httpd tiny_httpd_domains unix ptime ptime.clock.os))
+
+(executable
   (name sse_client)
   (modules sse_client)
   (libraries unix))
@@ -14,6 +19,12 @@
   (flags :standard -warn-error -a+8)
   (modules echo vfs)
   (libraries tiny_httpd tiny_httpd_camlzip))
+
+(executable
+  (name echo_domains)
+  (flags :standard -warn-error -a+8)
+  (modules echo_domains vfs_domains)
+  (libraries tiny_httpd tiny_httpd_camlzip tiny_httpd_domains))
 
 (rule
   (targets test_output.txt)
@@ -44,6 +55,27 @@
 
 (rule
   (targets vfs.ml)
+  (enabled_if (<> %{system} "linux"))
+  (action
+    (with-stdout-to
+      %{targets}
+      (progn
+        (echo "let embedded_fs = Tiny_httpd_dir.Embedded_fs.create ~mtime:0. ()")
+        (echo "let vfs = Tiny_httpd_dir.Embedded_fs.to_vfs embedded_fs")))))
+
+; to make dune happy, duplicate vfs FIXME!
+(rule
+  (targets vfs_domains.ml)
+  (deps (source_tree files) (:out test_output.txt.expected))
+  (enabled_if (= %{system} "linux"))
+  (action (run %{bin:tiny-httpd-vfs-pack} -o %{targets}
+               --mirror=files/
+               --file=test_out.txt,%{out}
+               ; --url=example_dot_com,http://example.com ; this breaks tests in opam sandbox 😢
+               )))
+
+(rule
+  (targets vfs_domains.ml)
   (enabled_if (<> %{system} "linux"))
   (action
     (with-stdout-to
