@@ -32,7 +32,7 @@ jobs:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           opam-depext-flags: --with-test
 
-      - run: opam install . --deps-only --with-test
+      - run: opam install ./tiny_httpd.opam ./tiny_httpd_camlzip.opam --deps-only --with-test
 
       - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
 
