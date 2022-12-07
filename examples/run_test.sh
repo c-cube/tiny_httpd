@@ -11,7 +11,7 @@ sleep 0.1
 kill $PID
 echo "success"
 
-if [ -x ./sse_server_domains.exe ]; then
+if [ -f ./sse_server_domains.exe ]; then
   ./sse_server_domains.exe -p $PORT &
   PID=$!
 
