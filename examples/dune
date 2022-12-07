@@ -7,6 +7,7 @@
 (executable
   (name sse_server_domains)
   (modules sse_server_domains)
+  (enabled_if (>= %{ocaml_version} 5.00.0))
   (libraries tiny_httpd tiny_httpd_domains unix ptime ptime.clock.os))
 
 (executable
@@ -23,6 +24,7 @@
 (executable
   (name echo_domains)
   (flags :standard -warn-error -a+8)
+  (enabled_if (>= %{ocaml_version} 5.00.0))
   (modules echo_domains vfs_domains)
   (libraries tiny_httpd tiny_httpd_camlzip tiny_httpd_domains))
 
