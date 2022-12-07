@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 ECHO=$1
-PORT=8085
+PORT=$2
 
 "$ECHO" -p $PORT &
 PID=$!

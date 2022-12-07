@@ -7,7 +7,7 @@
 (executable
   (name sse_server_domains)
   (modules sse_server_domains)
-  (enabled_if (>= %{ocaml_version} 5.00.0))
+  (enabled_if (>= %{ocaml_version} 5.0.0))
   (libraries tiny_httpd tiny_httpd_domains unix ptime ptime.clock.os))
 
 (executable
@@ -24,7 +24,7 @@
 (executable
   (name echo_domains)
   (flags :standard -warn-error -a+8)
-  (enabled_if (>= %{ocaml_version} 5.00.0))
+  (enabled_if (>= %{ocaml_version} 5.0.0))
   (modules echo_domains vfs_domains)
   (libraries tiny_httpd tiny_httpd_camlzip tiny_httpd_domains))
 
@@ -34,7 +34,15 @@
   (enabled_if (= %{system} "linux"))
   (package tiny_httpd)
   (action
-    (with-stdout-to %{targets} (run %{script}))))
+    (with-stdout-to %{targets} (run %{script} 8082))))
+
+(rule
+  (targets test_output_domains.txt)
+  (deps (:script ./run_test.sh) ./sse_client.exe ./sse_server_domains.exe)
+  (enabled_if (and (= %{system} "linux") (>= %{ocaml_version} 5.0.0)))
+  (package tiny_httpd)
+  (action
+    (with-stdout-to %{targets} (run %{script} 8083))))
 
 (rule
   (alias runtest)
@@ -43,6 +51,14 @@
   (deps test_output.txt)
   (action
     (diff test_output.txt.expected test_output.txt)))
+
+(rule
+  (alias runtest)
+  (package tiny_httpd_domains)
+  (enabled_if (and (= %{system} "linux") (>= %{ocaml_version} 5.0.0)))
+  (deps test_output_domains.txt)
+  (action
+    (diff test_output_domains.txt.expected test_output_domains.txt)))
 
 ; produce an embedded FS
 (rule

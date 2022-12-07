@@ -2,7 +2,7 @@
 (library
   (name tiny_httpd_domains)
   (public_name tiny_httpd_domains)
-  (enabled_if (>= %{ocaml_version} 5.00.0))
+  (enabled_if (>= %{ocaml_version} 5.0.0))
   (synopsis "Allowing to use ocaml domains instead of theads")
   (flags :standard -safe-string -warn-error -a+8)
   (libraries tiny_httpd domainslib))

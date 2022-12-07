@@ -5,7 +5,15 @@
   (locks /port)
   (enabled_if (= %{system} "linux"))
   (package tiny_httpd_camlzip)
-  (action (with-stdout-to %{targets} (run ./echo1.sh %{bin}))))
+  (action (with-stdout-to %{targets} (run ./echo1.sh %{bin} 8085))))
+
+(rule
+  (targets echo1_domains.out)
+  (deps (:bin ../examples/echo_domains.exe))
+  (locks /port)
+  (enabled_if (and (= %{system} "linux") (>= %{ocaml_version} 5.0.0)))
+  (package tiny_httpd_domains)
+  (action (with-stdout-to %{targets} (run ./echo1.sh %{bin} 8095))))
 
 (rule
   (alias runtest)
@@ -14,18 +22,32 @@
   (action (diff echo1.expect echo1.out)))
 
 (rule
+  (alias runtest)
+  (package tiny_httpd_camlzip)
+  (enabled_if (and (= %{system} "linux") (>= %{ocaml_version} 5.0.0)))
+  (action (diff echo1_domains.expect echo1_domains.out)))
+
+(rule
   (targets sse_count.out)
   (deps (:bin ../examples/sse_server.exe))
   (locks /port)
   (enabled_if (= %{system} "linux"))
   (package tiny_httpd)
-  (action (with-stdout-to %{targets} (run ./sse_count.sh %{bin}))))
+  (action (with-stdout-to %{targets} (run ./sse_count.sh %{bin} 8086))))
+
+(rule
+  (targets sse_count_domains.out)
+  (deps (:bin ../examples/sse_server_domains.exe))
+  (locks /port)
+  (enabled_if (and (= %{system} "linux") (>= %{ocaml_version} 5.0.0)))
+  (package tiny_httpd_domains)
+  (action (with-stdout-to %{targets} (run ./sse_count.sh %{bin} 8096))))
 
 (rule
   (alias runtest)
   (package tiny_httpd)
   (enabled_if (= %{system} "linux"))
-  (action (diff sse_count.expect sse_count.out)))
+  (action (diff sse_count_domains.expect sse_count_domains.out)))
 
 (rule
   (targets upload-out)

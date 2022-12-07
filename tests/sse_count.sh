@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 SSE_SERVER=$1
-PORT=8086
+PORT=$2
 
 "$SSE_SERVER" -p $PORT &
 PID=$!
