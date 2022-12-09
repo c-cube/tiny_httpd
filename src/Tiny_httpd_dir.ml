@@ -82,8 +82,8 @@ let vfs_of_dir (top:string) : vfs =
     let contains f = Sys.file_exists (top // f)
     let list_dir f = Sys.readdir (top // f)
     let read_file_content f =
-      let ic = open_in_bin (top // f) in
-      Tiny_httpd_stream.of_chan ic
+      let ic = Unix.(openfile (top // f) [O_RDONLY] 0) in
+      Tiny_httpd_stream.of_fd ic
     let create f =
       let oc = open_out_bin (top // f) in
       let write = output oc in
@@ -398,4 +398,3 @@ module Embedded_fs = struct
     end in (module M)
 
 end
-
