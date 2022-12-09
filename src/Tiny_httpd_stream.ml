@@ -61,6 +61,24 @@ let of_chan_ ?(buf_size=16 * 1024) ~close ic : t =
 let of_chan = of_chan_ ~close:close_in
 let of_chan_close_noerr = of_chan_ ~close:close_in_noerr
 
+let of_fd_ ?(buf_size=16 * 1024) ~close ic : t =
+  make
+    ~bs:(Bytes.create buf_size)
+    ~close:(fun _ -> close ic)
+    ~consume:(fun self n ->
+        self.off <- self.off + n;
+        self.len <- self.len - n)
+    ~fill:(fun self ->
+        if self.off >= self.len then (
+          self.off <- 0;
+          self.len <- Unix.read ic self.bs 0 (Bytes.length self.bs);
+        )
+      )
+    ()
+
+let of_fd = of_fd_ ~close:Unix.close
+let of_fd_close_noerr = of_fd_ ~close:(fun f -> try Unix.close f with _ -> ())
+
 let rec iter f (self:t) : unit =
   self.fill_buf();
   if self.len=0 then (
