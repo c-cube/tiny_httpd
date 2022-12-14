@@ -61,6 +61,24 @@ let of_chan_ ?(buf_size=16 * 1024) ~close ic : t =
 let of_chan = of_chan_ ~close:close_in
 let of_chan_close_noerr = of_chan_ ~close:close_in_noerr
 
+let of_fd_ ?(buf_size=16 * 1024) ~close ic : t =
+  make
+    ~bs:(Bytes.create buf_size)
+    ~close:(fun _ -> close ic)
+    ~consume:(fun self n ->
+        self.off <- self.off + n;
+        self.len <- self.len - n)
+    ~fill:(fun self ->
+        if self.off >= self.len then (
+          self.off <- 0;
+          self.len <- Unix.read ic self.bs 0 (Bytes.length self.bs);
+        )
+      )
+    ()
+
+let of_fd = of_fd_ ~close:Unix.close
+let of_fd_close_noerr = of_fd_ ~close:(fun f -> try Unix.close f with _ -> ())
+
 let rec iter f (self:t) : unit =
   self.fill_buf();
   if self.len=0 then (
@@ -102,13 +120,13 @@ let of_string s : t =
   of_bytes (Bytes.unsafe_of_string s)
 
 let with_file ?buf_size file f =
-  let ic = open_in file in
+  let ic = Unix.(openfile file [O_RDONLY] 0) in
   try
-    let x = f (of_chan ?buf_size ic) in
-    close_in ic;
+    let x = f (of_fd ?buf_size ic) in
+    Unix.close ic;
     x
   with e ->
-    close_in_noerr ic;
+    Unix.close ic;
     raise e
 
 let read_all ?(buf=Buf.create()) (self:t) : string =

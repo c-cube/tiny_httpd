@@ -258,7 +258,7 @@ module Request = struct
       } in
       Ok (Some req)
     with
-    | End_of_file | Sys_error _ -> Ok None
+    | End_of_file | Sys_error _ | Unix.Unix_error _ -> Ok None
     | Bad_req (c,s) -> Error (c,s)
     | e ->
       Error (400, Printexc.to_string e)
@@ -756,10 +756,9 @@ let find_map f l =
 let handle_client_ (self:t) (client_sock:Unix.file_descr) : unit =
   Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout);
   Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout);
-  let ic = Unix.in_channel_of_descr client_sock in
   let oc = Unix.out_channel_of_descr client_sock in
   let buf = Buf.create ~size:self.buf_size () in
-  let is = Byte_stream.of_chan ~buf_size:self.buf_size ic in
+  let is = Byte_stream.of_fd ~buf_size:self.buf_size client_sock in
   let continue = ref true in
   while !continue && self.running do
     _debug (fun k->k "read next request");
