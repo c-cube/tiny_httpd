@@ -1,12 +1,13 @@
 #!/bin/bash
 
 SERVER=$1
+nb=$2
+
 PORT=8088
-"$SERVER" . -p $PORT &
+"$SERVER" . -p $PORT -j $nb &
 PID=$!
 
 url=http://localhost:${PORT}/foo_50
-nb=$2
 sleep_time=0
 
 for (( c=1; c<=$nb; c++ )); do
