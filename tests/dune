@@ -1,3 +1,5 @@
+; echo
+;=====
 
 (rule
   (targets echo1.out)
@@ -13,6 +15,9 @@
   (enabled_if (= %{system} "linux"))
   (action (diff echo1.expect echo1.out)))
 
+; sse
+; ====
+
 (rule
   (targets sse_count.out)
   (deps (:bin ../examples/sse_server.exe))
@@ -26,6 +31,15 @@
   (package tiny_httpd)
   (enabled_if (= %{system} "linux"))
   (action (diff sse_count.expect sse_count.out)))
+
+; chunked
+;========
+
+(rule
+  (targets foo_50)
+  (enabled_if (= %{system} "linux"))
+  (action
+    (bash "dd if=/dev/zero of=%{targets} bs=1M count=50")))
 
 (rule
   (targets upload-out)
@@ -42,6 +56,7 @@
   (enabled_if (= %{system} "linux"))
   (action (diff upload-out.expect upload-out)))
 
+
 (rule
   (targets dl-out)
   (deps (:bin ../src/bin/http_of_dir.exe) foo_50)
@@ -57,8 +72,20 @@
   (enabled_if (= %{system} "linux"))
   (action (diff dl-out.expect dl-out)))
 
+; stress
+;=======
+
 (rule
-  (targets foo_50)
+  (targets dl-stress)
+  (deps (:bin ../src/bin/http_of_dir.exe) foo_50)
+  (locks /port)
+  (package tiny_httpd)
   (enabled_if (= %{system} "linux"))
-  (action
-    (bash "dd if=/dev/zero of=%{targets} bs=1M count=50")))
+  (action (with-stdout-to %{targets}
+                          (run ./stress.sh %{bin} 15))))
+
+(rule
+  (alias runtest)
+  (package tiny_httpd)
+  (enabled_if (= %{system} "linux"))
+  (action (diff dl-stress.expect dl-stress)))
