@@ -258,7 +258,7 @@ module Request = struct
       } in
       Ok (Some req)
     with
-    | End_of_file | Sys_error _ -> Ok None
+    | End_of_file | Sys_error _ | Unix.Unix_error _ -> Ok None
     | Bad_req (c,s) -> Error (c,s)
     | e ->
       Error (400, Printexc.to_string e)

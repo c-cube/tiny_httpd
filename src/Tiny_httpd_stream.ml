@@ -120,13 +120,13 @@ let of_string s : t =
   of_bytes (Bytes.unsafe_of_string s)
 
 let with_file ?buf_size file f =
-  let ic = open_in file in
+  let ic = Unix.(openfile file [O_RDONLY] 0) in
   try
-    let x = f (of_chan ?buf_size ic) in
-    close_in ic;
+    let x = f (of_fd ?buf_size ic) in
+    Unix.close ic;
     x
   with e ->
-    close_in_noerr ic;
+    Unix.close ic;
     raise e
 
 let read_all ?(buf=Buf.create()) (self:t) : string =
