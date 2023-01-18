@@ -39,7 +39,7 @@
   (targets foo_50)
   (enabled_if (= %{system} "linux"))
   (action
-    (bash "dd if=/dev/zero of=%{targets} bs=1M count=50")))
+    (bash "dd if=/dev/random of=%{targets} bs=1M count=50")))
 
 (rule
   (targets upload-out)

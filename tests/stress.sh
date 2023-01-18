@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# usage: source stress.sh path/http_of_dir.exe nb
+# it will run np parallel curl to fetch file $url below
+
 SERVER=$1
 nb=$2
 
@@ -12,7 +15,7 @@ sleep_time=0
 
 for (( c=1; c<=$nb; c++ )); do
   f=$(mktemp)
-  (curl -s $url > $f; stat -c %s $f; rm $f) &
+  (curl -s $url > $f; stat -c %s $f; diff foo_50 $f; rm $f) &
   PIDS[$c]=$!
 
   sleep $sleep_time

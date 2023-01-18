@@ -1,5 +1,5 @@
 serve directory . on http://127.0.0.1:8088
-        0         0  52428800 data21
-        0         0  52428800 data22
-        0         0  52428800 data23
-        0         0 157286400 total
+ 52428800 data21
+ 52428800 data22
+ 52428800 data23
+157286400 total
