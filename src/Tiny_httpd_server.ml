@@ -406,7 +406,12 @@ module Response = struct
     begin match body with
       | `String "" | `Void -> ()
       | `String s -> output_string oc s;
-      | `Stream str -> Byte_stream.output_chunked oc str;
+      | `Stream str ->
+         try
+           Byte_stream.output_chunked oc str;
+           Byte_stream.close str
+         with
+           e -> Byte_stream.close str; raise e
     end;
     flush oc
 end
