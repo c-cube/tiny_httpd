@@ -327,4 +327,6 @@ let output_chunked (oc:out_channel) (self:t) : unit =
     );
     output_string oc "\r\n";
   done;
+  (* write another crlf after the stream (see #56) *)
+  output_string oc "\r\n";
   ()
