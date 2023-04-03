@@ -569,10 +569,13 @@ type server_sent_generator = (module SERVER_SENT_GENERATOR)
 
 type t = {
   addr: string;
+  (** Address at creation *)
 
   port: int;
+  (** Port at creation *)
 
-  sock: Unix.file_descr option;
+  mutable sock: Unix.file_descr option;
+  (** Socket *)
 
   timeout: float;
 
@@ -589,24 +592,35 @@ type t = {
   get_time_s : unit -> float;
 
   mutable handler: (string Request.t -> Response.t);
-  (* toplevel handler, if any *)
+  (** toplevel handler, if any *)
 
   mutable middlewares : (int * Middleware.t) list;
   (** Global middlewares *)
 
   mutable middlewares_sorted : (int * Middleware.t) list lazy_t;
-  (* sorted version of {!middlewares} *)
+  (** sorted version of {!middlewares} *)
 
   mutable path_handlers : (unit Request.t -> cb_path_handler resp_result option) list;
-  (* path handlers *)
+  (** path handlers *)
 
   mutable running: bool;
-  (* true while the server is running. no need to protect with a mutex,
+  (** true while the server is running. no need to protect with a mutex,
      writes should be atomic enough. *)
 }
 
-let addr self = self.addr
-let port self = self.port
+let get_addr_ sock =
+    match Unix.getsockname sock with
+    | Unix.ADDR_INET (addr, port) -> addr, port
+    | _ -> invalid_arg "httpd: address is not INET"
+
+let addr self = match self.sock with
+  | None -> self.addr
+  | Some s -> Unix.string_of_inet_addr (fst @@ get_addr_ s)
+
+let port self =
+  match self.sock with
+  | None -> self.port
+  | Some sock -> snd @@ get_addr_ sock
 
 let active_connections self = Sem_.num_acquired self.sem_max_connections - 1
 
@@ -872,6 +886,7 @@ let run (self:t) : (unit,_) result =
       Unix.bind sock (Unix.ADDR_INET (inet_addr, self.port));
       Unix.listen sock (2 * self.sem_max_connections.Sem_.n)
     end;
+    self.sock <- Some sock;
     while self.running do
       (* limit concurrency *)
       Sem_.acquire 1 self.sem_max_connections;
