@@ -64,6 +64,7 @@ module Meth = struct
     | `POST
     | `HEAD
     | `DELETE
+    | `OPTIONS
   ]
 
   let to_string = function
@@ -72,6 +73,7 @@ module Meth = struct
     | `HEAD -> "HEAD"
     | `POST -> "POST"
     | `DELETE -> "DELETE"
+    | `OPTIONS -> "OPTIONS"
   let pp out s = Format.pp_print_string out (to_string s)
 
   let of_string = function
@@ -80,6 +82,7 @@ module Meth = struct
     | "POST" -> `POST
     | "HEAD" -> `HEAD
     | "DELETE" -> `DELETE
+    | "OPTIONS" -> `OPTIONS
     | s -> bad_reqf 400 "unknown method %S" s
 end
 

@@ -21,6 +21,7 @@ module Meth : sig
     | `POST
     | `HEAD
     | `DELETE
+    | `OPTIONS
   ]
   (** A HTTP method.
       For now we only handle a subset of these.
