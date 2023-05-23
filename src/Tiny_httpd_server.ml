@@ -353,9 +353,12 @@ module Response = struct
     let headers = Headers.set "Transfer-Encoding" "chunked" headers in
     { code; headers; body=`Stream body; }
 
+  let make_void_force_ ?(headers=[]) ~code () : t =
+    { code; headers; body=`Void; }
+
   let make_void ?(headers=[]) ~code () : t =
     let is_ok = code < 200 || code = 204 || code = 304 in
-    if is_ok then { code; headers; body=`Void; }
+    if is_ok then make_void_force_ ~headers ~code ()
     else make_raw ~headers ~code "" (* invalid to not have a body *)
 
   let make_string ?headers r = match r with
@@ -716,7 +719,7 @@ let add_route_server_sent_handler ?accept self route f =
       if not !resp_sent then (
         resp_sent := true;
         (* send 200 response now *)
-        let initial_resp = Response.make_void ~headers:!headers ~code:200 () in
+        let initial_resp = Response.make_void_force_ ~headers:!headers ~code:200 () in
         resp initial_resp;
       )
     in
