@@ -1,4 +1,2 @@
 (executable
-  (name gentags))
-
-
+ (name gentags))

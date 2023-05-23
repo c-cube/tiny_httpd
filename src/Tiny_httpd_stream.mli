@@ -1,4 +1,3 @@
-
 (** Byte streams.
 
     These used to live in {!Tiny_httpd} but are now in their own module.
@@ -8,31 +7,21 @@ type hidden
 (** Type used to make {!t} unbuildable via a record literal. Use {!make} instead. *)
 
 type t = {
-  mutable bs: bytes;
-  (** The bytes *)
-
-  mutable off : int;
-  (** Beginning of valid slice in {!bs} *)
-
-  mutable len : int;
-  (** Length of valid slice in {!bs}. If [len = 0] after
+  mutable bs: bytes;  (** The bytes *)
+  mutable off: int;  (** Beginning of valid slice in {!bs} *)
+  mutable len: int;
+      (** Length of valid slice in {!bs}. If [len = 0] after
       a call to {!fill}, then the stream is finished. *)
-
   fill_buf: unit -> unit;
-  (** See the current slice of the internal buffer as [bytes, i, len],
+      (** See the current slice of the internal buffer as [bytes, i, len],
       where the slice is [bytes[i] .. [bytes[i+len-1]]].
       Can block to refill the buffer if there is currently no content.
       If [len=0] then there is no more data. *)
-
   consume: int -> unit;
-  (** Consume [n] bytes from the buffer.
+      (** Consume [n] bytes from the buffer.
       This should only be called with [n <= len]. *)
-
-  close: unit -> unit;
-  (** Close the stream. *)
-
-  _rest: hidden;
-  (** Use {!make} to build a stream. *)
+  close: unit -> unit;  (** Close the stream. *)
+  _rest: hidden;  (** Use {!make} to build a stream. *)
 }
 (** A buffered stream, with a view into the current buffer (or refill if empty),
     and a function to consume [n] bytes.
@@ -75,7 +64,8 @@ val make :
   ?close:(t -> unit) ->
   consume:(t -> int -> unit) ->
   fill:(t -> unit) ->
-  unit -> t
+  unit ->
+  t
 (** [make ~fill ()] creates a byte stream.
     @param fill is used to refill the buffer, and is called initially.
     @param close optional closing.
@@ -95,18 +85,12 @@ val read_all : ?buf:Tiny_httpd_buf.t -> t -> string
     @param buf a buffer to (re)use. Its content will be cleared. *)
 
 val limit_size_to :
-  close_rec:bool ->
-  max_size:int ->
-  too_big:(int -> unit) ->
-  t -> t
+  close_rec:bool -> max_size:int -> too_big:(int -> unit) -> t -> t
 (* New stream with maximum size [max_size].
    @param close_rec if true, closing this will also close the input stream
    @param too_big called with read size if the max size is reached *)
 
-val read_chunked :
-  ?buf:Tiny_httpd_buf.t ->
-  fail:(string -> exn) ->
-  t -> t
+val read_chunked : ?buf:Tiny_httpd_buf.t -> fail:(string -> exn) -> t -> t
 (** Convert a stream into a stream of byte chunks using
     the chunked encoding. The size of chunks is not specified.
     @param buf buffer used for intermediate storage.
@@ -114,8 +98,7 @@ val read_chunked :
 *)
 
 val read_exactly :
-  close_rec:bool -> size:int -> too_short:(int -> unit) ->
-  t -> t
+  close_rec:bool -> size:int -> too_short:(int -> unit) -> t -> t
 (** [read_exactly ~size bs] returns a new stream that reads exactly
     [size] bytes from [bs], and then closes.
     @param close_rec if true, closing the resulting stream also closes

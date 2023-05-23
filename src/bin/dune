@@ -1,18 +1,17 @@
+(executable
+ (name http_of_dir)
+ (public_name http_of_dir)
+ (package tiny_httpd)
+ (modules http_of_dir)
+ (flags :standard -warn-error -3)
+ (libraries tiny_httpd))
 
 (executable
-  (name http_of_dir)
-  (public_name http_of_dir)
-  (package tiny_httpd)
-  (modules http_of_dir)
-  (flags :standard -warn-error -3)
-  (libraries tiny_httpd))
-
-(executable
-  (name vfs_pack)
-  (public_name tiny-httpd-vfs-pack)
-  (package tiny_httpd)
-  (modules vfs_pack curly http)
-  (libraries result unix)
-  (flags :standard -warn-error -3))
+ (name vfs_pack)
+ (public_name tiny-httpd-vfs-pack)
+ (package tiny_httpd)
+ (modules vfs_pack curly http)
+ (libraries result unix)
+ (flags :standard -warn-error -3))
 
 (ocamllex http)

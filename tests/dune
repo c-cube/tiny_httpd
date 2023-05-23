@@ -1,64 +1,92 @@
+(rule
+ (targets echo1.out)
+ (deps
+  (:bin ../examples/echo.exe))
+ (locks /port)
+ (enabled_if
+  (= %{system} "linux"))
+ (package tiny_httpd_camlzip)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run ./echo1.sh %{bin}))))
 
 (rule
-  (targets echo1.out)
-  (deps (:bin ../examples/echo.exe))
-  (locks /port)
-  (enabled_if (= %{system} "linux"))
-  (package tiny_httpd_camlzip)
-  (action (with-stdout-to %{targets} (run ./echo1.sh %{bin}))))
+ (alias runtest)
+ (package tiny_httpd_camlzip)
+ (enabled_if
+  (= %{system} "linux"))
+ (action
+  (diff echo1.expect echo1.out)))
 
 (rule
-  (alias runtest)
-  (package tiny_httpd_camlzip)
-  (enabled_if (= %{system} "linux"))
-  (action (diff echo1.expect echo1.out)))
+ (targets sse_count.out)
+ (deps
+  (:bin ../examples/sse_server.exe))
+ (locks /port)
+ (enabled_if
+  (= %{system} "linux"))
+ (package tiny_httpd)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run ./sse_count.sh %{bin}))))
 
 (rule
-  (targets sse_count.out)
-  (deps (:bin ../examples/sse_server.exe))
-  (locks /port)
-  (enabled_if (= %{system} "linux"))
-  (package tiny_httpd)
-  (action (with-stdout-to %{targets} (run ./sse_count.sh %{bin}))))
+ (alias runtest)
+ (package tiny_httpd)
+ (enabled_if
+  (= %{system} "linux"))
+ (action
+  (diff sse_count.expect sse_count.out)))
 
 (rule
-  (alias runtest)
-  (package tiny_httpd)
-  (enabled_if (= %{system} "linux"))
-  (action (diff sse_count.expect sse_count.out)))
+ (targets upload-out)
+ (deps
+  (:bin ../src/bin/http_of_dir.exe)
+  foo_50)
+ (locks /port)
+ (package tiny_httpd)
+ (enabled_if
+  (= %{system} "linux"))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run ./upload_chunked.sh %{bin}))))
 
 (rule
-  (targets upload-out)
-  (deps (:bin ../src/bin/http_of_dir.exe) foo_50)
-  (locks /port)
-  (package tiny_httpd)
-  (enabled_if (= %{system} "linux"))
-  (action (with-stdout-to %{targets}
-                          (run ./upload_chunked.sh %{bin}))))
+ (alias runtest)
+ (package tiny_httpd)
+ (enabled_if
+  (= %{system} "linux"))
+ (action
+  (diff upload-out.expect upload-out)))
 
 (rule
-  (alias runtest)
-  (package tiny_httpd)
-  (enabled_if (= %{system} "linux"))
-  (action (diff upload-out.expect upload-out)))
+ (targets dl-out)
+ (deps
+  (:bin ../src/bin/http_of_dir.exe)
+  foo_50)
+ (locks /port)
+ (package tiny_httpd)
+ (enabled_if
+  (= %{system} "linux"))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run ./download_chunked.sh %{bin}))))
 
 (rule
-  (targets dl-out)
-  (deps (:bin ../src/bin/http_of_dir.exe) foo_50)
-  (locks /port)
-  (package tiny_httpd)
-  (enabled_if (= %{system} "linux"))
-  (action (with-stdout-to %{targets}
-                          (run ./download_chunked.sh %{bin}))))
+ (alias runtest)
+ (package tiny_httpd)
+ (enabled_if
+  (= %{system} "linux"))
+ (action
+  (diff dl-out.expect dl-out)))
 
 (rule
-  (alias runtest)
-  (package tiny_httpd)
-  (enabled_if (= %{system} "linux"))
-  (action (diff dl-out.expect dl-out)))
-
-(rule
-  (targets foo_50)
-  (enabled_if (= %{system} "linux"))
-  (action
-    (bash "dd if=/dev/zero of=%{targets} bs=1M count=50")))
+ (targets foo_50)
+ (enabled_if
+  (= %{system} "linux"))
+ (action
+  (bash "dd if=/dev/zero of=%{targets} bs=1M count=50")))

@@ -29,7 +29,7 @@ val get_query : string -> string
 (** Obtain the query part of a path.
     @since 0.4 *)
 
-val parse_query : string -> ((string*string) list, string) result
+val parse_query : string -> ((string * string) list, string) result
 (** Parse a query as a list of ['&'] or [';'] separated [key=value] pairs.
     The order might not be preserved.
     @since 0.3

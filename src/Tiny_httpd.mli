@@ -1,4 +1,3 @@
-
 (** {1 Tiny Http Server}
 
     This library implements a very simple, basic HTTP/1.1 server using blocking
@@ -74,7 +73,6 @@ echo:
 
 *)
 
-
 (** {2 Tiny buffer implementation}
 
     These buffers are used to avoid allocating too many byte arrays when
@@ -93,7 +91,9 @@ module Byte_stream = Tiny_httpd_stream
 (** {2 Main Server Type} *)
 
 (** @inline *)
-include module type of struct include Tiny_httpd_server end
+include module type of struct
+  include Tiny_httpd_server
+end
 
 (** {2 Utils} *)
 

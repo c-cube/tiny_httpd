@@ -1,4 +1,3 @@
-
 (** Simple buffer.
 
     These buffers are used to avoid allocating too many byte arrays when
@@ -8,6 +7,7 @@
 *)
 
 type t
+
 val size : t -> int
 val clear : t -> unit
 val create : ?size:int -> unit -> t
@@ -24,4 +24,3 @@ val contents_and_clear : t -> string
 val add_bytes : t -> bytes -> int -> int -> unit
 (** Append given bytes slice to the buffer.
     @since 0.5 *)
-
