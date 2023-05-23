@@ -249,7 +249,7 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS:VFS) as vfs) ~prefix server :
              (* redirect using path, not full path *)
              let new_path = "/" // prefix // path // "index.html" in
              S._debug (fun k->k "redirect to `%s`" new_path);
-             S.Response.make_raw ~code:301 ""
+             S.Response.make_void ~code:301 ()
                ~headers:S.Headers.(empty |> set "location" new_path)
            | Lists | Index_or_lists ->
              let body = html_list_dir ~prefix vfs path ~parent |> Html.to_string_top in

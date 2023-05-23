@@ -232,6 +232,10 @@ module Response : sig
   (** Same as {!make_raw} but with a stream body. The body will be sent with
       the chunked transfer-encoding. *)
 
+  val make_void : ?headers:Headers.t -> code:int -> unit -> t
+  (** Return a response without a body at all.
+      @since NEXT_RELEASE *)
+
   val make :
     ?headers:Headers.t ->
     (body, Response_code.t * string) result -> t

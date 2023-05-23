@@ -354,7 +354,9 @@ module Response = struct
     { code; headers; body=`Stream body; }
 
   let make_void ?(headers=[]) ~code () : t =
-    { code; headers; body=`Void; }
+    let is_ok = code < 200 || code = 204 || code = 304 in
+    if is_ok then { code; headers; body=`Void; }
+    else make_raw ~headers ~code "" (* invalid to not have a body *)
 
   let make_string ?headers r = match r with
     | Ok body -> make_raw ?headers ~code:200 body
