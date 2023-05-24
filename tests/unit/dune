@@ -1,0 +1,4 @@
+
+(test
+  (name t_util)
+  (libraries tiny_httpd qcheck-core qcheck-core.runner))
