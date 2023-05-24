@@ -1,4 +1,5 @@
 
 (test
   (name t_util)
+  (package tiny_httpd)
   (libraries tiny_httpd qcheck-core qcheck-core.runner))
