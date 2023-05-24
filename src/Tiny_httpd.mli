@@ -1,4 +1,4 @@
-(** {1 Tiny Http Server}
+(** Tiny Http Server
 
     This library implements a very simple, basic HTTP/1.1 server using blocking
     IOs and threads. Basic routing based on {!Scanf} is provided for convenience,
@@ -81,10 +81,7 @@ echo:
 
 module Buf = Tiny_httpd_buf
 
-(** {2 Generic stream of data}
-
-    Streams are used to represent a series of bytes that can arrive progressively.
-    For example, an uploaded file will be sent as a series of chunks. *)
+(** {2 Generic byte streams} *)
 
 module Byte_stream = Tiny_httpd_stream
 
@@ -105,4 +102,4 @@ module Dir = Tiny_httpd_dir
 
 module Html = Tiny_httpd_html
 (** Alias to {!Tiny_httpd_html}
-    @since NEXT_RELEASE *)
+    @since 0.12 *)

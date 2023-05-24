@@ -1,5 +1,8 @@
 (** Byte streams.
 
+    Streams are used to represent a series of bytes that can arrive progressively.
+    For example, an uploaded file will be sent as a series of chunks.
+
     These used to live in {!Tiny_httpd} but are now in their own module.
     @since 0.12 *)
 
