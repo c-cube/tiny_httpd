@@ -1,7 +1,6 @@
 module S = Tiny_httpd_server
 module U = Tiny_httpd_util
 module Html = Tiny_httpd_html
-module Pf = Printf
 
 type dir_behavior =
   | Index | Lists | Index_or_lists | Forbidden

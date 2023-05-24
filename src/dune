@@ -3,7 +3,7 @@
   (name tiny_httpd)
   (public_name tiny_httpd)
   (libraries threads seq)
-  (flags :standard -safe-string -warn-error -a+8)
+  (flags :standard -safe-string -strict-sequence -w +a-4-40-42 -warn-error -a+8)
   (wrapped false))
 
 (rule
