@@ -568,7 +568,7 @@ val run : ?after_init:(unit -> unit) -> t -> (unit, exn) result
     This returns [Ok ()] if the server exits gracefully, or [Error e] if
     it exits with an error.
 
-    @param after_init is called after the server starts listening. @since NEXT_RELEASE .
+    @param after_init is called after the server starts listening. since NEXT_RELEASE .
 
 *)
 
