@@ -1,3 +1,18 @@
+## 0.13
+
+- feat: `Server.run` takes `?after_init` parameter
+- remove dep on ounit2 and qtest
+- expose `Response.make_void`
+- Add OPTIONS method
+- use ocamlformat on the code
+
+- fix: SSE requires no body
+- fix: get addr/port from the current socket
+- fix: missing closing crlf in chunked streams
+- fix: module Html was not exposed
+- fix: close stream after Response.output
+- fix(tiny-httpd-vfs-pack): allow redirections when fetching resources
+
 ## 0.12
 
 - add dep on `seq`

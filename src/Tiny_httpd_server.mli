@@ -5,7 +5,7 @@
 
     It is possible to use a thread pool, see {!create}'s argument [new_thread].
 
-    @since NEXT_RELEASE
+    @since 0.13
 *)
 
 type buf = Tiny_httpd_buf.t
@@ -234,7 +234,7 @@ module Response : sig
 
   val make_void : ?headers:Headers.t -> code:int -> unit -> t
   (** Return a response without a body at all.
-      @since NEXT_RELEASE *)
+      @since 0.13 *)
 
   val make : ?headers:Headers.t -> (body, Response_code.t * string) result -> t
   (** [make r] turns a result into a response.
@@ -568,7 +568,7 @@ val run : ?after_init:(unit -> unit) -> t -> (unit, exn) result
     This returns [Ok ()] if the server exits gracefully, or [Error e] if
     it exits with an error.
 
-    @param after_init is called after the server starts listening. since NEXT_RELEASE .
+    @param after_init is called after the server starts listening. since 0.13 .
 
 *)
 
