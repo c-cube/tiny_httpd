@@ -542,13 +542,17 @@ val stop : t -> unit
 (** Ask the server to stop. This might not have an immediate effect
     as {!run} might currently be waiting on IO. *)
 
-val run : t -> (unit, exn) result
+val run : ?after_init:(unit -> unit) -> t -> (unit, exn) result
 (** Run the main loop of the server, listening on a socket
     described at the server's creation time, using [new_thread] to
     start a thread for each new client.
 
     This returns [Ok ()] if the server exits gracefully, or [Error e] if
-    it exits with an error. *)
+    it exits with an error.
+
+    @param after_init is called after the server starts listening. @since NEXT_RELEASE .
+
+*)
 
 (**/**)
 

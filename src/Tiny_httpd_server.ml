@@ -897,7 +897,7 @@ let handle_client_ (self : t) (client_sock : Unix.file_descr) : unit =
 
 let is_ipv6 self = String.contains self.addr ':'
 
-let run (self : t) : (unit, _) result =
+let run ?(after_init = ignore) (self : t) : (unit, _) result =
   try
     if self.masksigpipe then
       ignore (Unix.sigprocmask Unix.SIG_BLOCK [ Sys.sigpipe ] : _ list);
@@ -925,6 +925,7 @@ let run (self : t) : (unit, _) result =
       Unix.listen sock (2 * self.sem_max_connections.Sem_.n)
     );
     self.sock <- Some sock;
+    after_init ();
     while self.running do
       (* limit concurrency *)
       Sem_.acquire 1 self.sem_max_connections;

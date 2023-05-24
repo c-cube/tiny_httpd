@@ -5,15 +5,17 @@ module Pf = Printf
 
 let serve ~config (dir : string) addr port j : _ result =
   let server = S.create ~max_connections:j ~addr ~port () in
-  Printf.printf "serve directory %s on http://%(%s%):%d\n%!" dir
-    (if S.is_ipv6 server then
-      "[%s]"
-    else
-      "%s")
-    addr port;
+  let after_init () =
+    Printf.printf "serve directory %s on http://%(%s%):%d\n%!" dir
+      (if S.is_ipv6 server then
+        "[%s]"
+      else
+        "%s")
+      addr (S.port server)
+  in
 
   D.add_dir_path ~config ~dir ~prefix:"" server;
-  S.run server
+  S.run ~after_init server
 
 let parse_size s : int =
   try Scanf.sscanf s "%dM" (fun n -> n * 1_024 * 1_024)
