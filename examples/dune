@@ -1,53 +1,68 @@
+(executable
+ (name sse_server)
+ (modules sse_server)
+ (libraries tiny_httpd unix ptime ptime.clock.os))
 
 (executable
-  (name sse_server)
-  (modules sse_server)
-  (libraries tiny_httpd unix ptime ptime.clock.os))
+ (name sse_client)
+ (modules sse_client)
+ (libraries unix))
 
 (executable
-  (name sse_client)
-  (modules sse_client)
-  (libraries unix))
-
-(executable
-  (name echo)
-  (flags :standard -warn-error -a+8)
-  (modules echo vfs)
-  (libraries tiny_httpd tiny_httpd_camlzip))
+ (name echo)
+ (flags :standard -warn-error -a+8)
+ (modules echo vfs)
+ (libraries tiny_httpd tiny_httpd_camlzip))
 
 (rule
-  (targets test_output.txt)
-  (deps (:script ./run_test.sh) ./sse_client.exe ./sse_server.exe)
-  (enabled_if (= %{system} "linux"))
-  (package tiny_httpd)
-  (action
-    (with-stdout-to %{targets} (run %{script}))))
+ (targets test_output.txt)
+ (deps
+  (:script ./run_test.sh)
+  ./sse_client.exe
+  ./sse_server.exe)
+ (enabled_if
+  (= %{system} "linux"))
+ (package tiny_httpd)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run %{script}))))
 
 (rule
-  (alias runtest)
-  (package tiny_httpd)
-  (enabled_if (= %{system} "linux"))
-  (deps test_output.txt)
-  (action
-    (diff test_output.txt.expected test_output.txt)))
+ (alias runtest)
+ (package tiny_httpd)
+ (enabled_if
+  (= %{system} "linux"))
+ (deps test_output.txt)
+ (action
+  (diff test_output.txt.expected test_output.txt)))
 
 ; produce an embedded FS
-(rule
-  (targets vfs.ml)
-  (deps (source_tree files) (:out test_output.txt.expected))
-  (enabled_if (= %{system} "linux"))
-  (action (run %{bin:tiny-httpd-vfs-pack} -o %{targets}
-               --mirror=files/
-               --file=test_out.txt,%{out}
-               ; --url=example_dot_com,http://example.com ; this breaks tests in opam sandbox 😢
-               )))
 
 (rule
-  (targets vfs.ml)
-  (enabled_if (<> %{system} "linux"))
-  (action
-    (with-stdout-to
-      %{targets}
-      (progn
-        (echo "let embedded_fs = Tiny_httpd_dir.Embedded_fs.create ~mtime:0. ()")
-        (echo "let vfs = Tiny_httpd_dir.Embedded_fs.to_vfs embedded_fs")))))
+ (targets vfs.ml)
+ (deps
+  (source_tree files)
+  (:out test_output.txt.expected))
+ (enabled_if
+  (= %{system} "linux"))
+ (action
+  (run
+   %{bin:tiny-httpd-vfs-pack}
+   -o
+   %{targets}
+   --mirror=files/
+   --file=test_out.txt,%{out}
+   ; --url=example_dot_com,http://example.com ; this breaks tests in opam sandbox 😢
+   )))
+
+(rule
+ (targets vfs.ml)
+ (enabled_if
+  (<> %{system} "linux"))
+ (action
+  (with-stdout-to
+   %{targets}
+   (progn
+    (echo "let embedded_fs = Tiny_httpd_dir.Embedded_fs.create ~mtime:0. ()")
+    (echo "let vfs = Tiny_httpd_dir.Embedded_fs.to_vfs embedded_fs")))))

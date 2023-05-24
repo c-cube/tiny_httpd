@@ -1,15 +1,20 @@
 let addr = ref "127.0.0.1"
 let port = ref 8080
 let path = ref "/clock"
-
 let bufsize = 1024
 
 let () =
-  Arg.parse (Arg.align [
-      "-h", Arg.Set_string addr, " address to connect to";
-      "-p", Arg.Set_int port, " port to connect to";
-      "--alarm", Arg.Int (fun i->Unix.alarm i|>ignore), " set alarm (in seconds)";
-    ]) (fun s -> path := s) "sse_client [opt]* path?";
+  Arg.parse
+    (Arg.align
+       [
+         "-h", Arg.Set_string addr, " address to connect to";
+         "-p", Arg.Set_int port, " port to connect to";
+         ( "--alarm",
+           Arg.Int (fun i -> Unix.alarm i |> ignore),
+           " set alarm (in seconds)" );
+       ])
+    (fun s -> path := s)
+    "sse_client [opt]* path?";
 
   Format.printf "connect to %s:%d@." !addr !port;
   let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
@@ -25,7 +30,8 @@ let () =
   let buf = Bytes.create bufsize in
   while !continue do
     let n = input ic buf 0 bufsize in
-    if n=0 then continue := false;
-    output stdout buf 0 n; flush stdout
+    if n = 0 then continue := false;
+    output stdout buf 0 n;
+    flush stdout
   done;
   Format.printf "exit!@."

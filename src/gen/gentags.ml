@@ -1,146 +1,148 @@
-
 (* adapted from https://github.com/sindresorhus/html-tags (MIT licensed) *)
 
 let pf = Printf.printf
 let spf = Printf.sprintf
 
-let void = [
-  "area";
-  "base";
-  "br";
-  "col";
-  "embed";
-  "hr";
-  "img";
-  "input";
-  "link";
-  "menuitem";
-  "meta";
-  "param";
-  "source";
-  "track";
-  "wbr";
-]
+let void =
+  [
+    "area";
+    "base";
+    "br";
+    "col";
+    "embed";
+    "hr";
+    "img";
+    "input";
+    "link";
+    "menuitem";
+    "meta";
+    "param";
+    "source";
+    "track";
+    "wbr";
+  ]
 
-let normal = [
-  "a";
-  "abbr";
-  "address";
-  "area";
-  "article";
-  "aside";
-  "audio";
-  "b";
-  "base";
-  "bdi";
-  "bdo";
-  "blockquote";
-  "body";
-  "br";
-  "button";
-  "canvas";
-  "caption";
-  "cite";
-  "code";
-  "col";
-  "colgroup";
-  "data";
-  "datalist";
-  "dd";
-  "del";
-  "details";
-  "dfn";
-  "dialog";
-  "div";
-  "dl";
-  "dt";
-  "em";
-  "embed";
-  "fieldset";
-  "figcaption";
-  "figure";
-  "footer";
-  "form";
-  "h1";
-  "h2";
-  "h3";
-  "h4";
-  "h5";
-  "h6";
-  "head";
-  "header";
-  "hgroup";
-  "hr";
-  "html";
-  "i";
-  "iframe";
-  "img";
-  "input";
-  "ins";
-  "kbd";
-  "label";
-  "legend";
-  "li";
-  "link";
-  "main";
-  "map";
-  "mark";
-  "math";
-  "menu";
-  "menuitem";
-  "meta";
-  "meter";
-  "nav";
-  "noscript";
-  "object";
-  "ol";
-  "optgroup";
-  "option";
-  "output";
-  "p";
-  "param";
-  "picture";
-  "pre";
-  "progress";
-  "q";
-  "rb";
-  "rp";
-  "rt";
-  "rtc";
-  "ruby";
-  "s";
-  "samp";
-  "script";
-  "section";
-  "select";
-  "slot";
-  "small";
-  "source";
-  "span";
-  "strong";
-  "style";
-  "sub";
-  "summary";
-  "sup";
-  "svg";
-  "table";
-  "tbody";
-  "td";
-  "template";
-  "textarea";
-  "tfoot";
-  "th";
-  "thead";
-  "time";
-  "title";
-  "tr";
-  "track";
-  "u";
-  "ul";
-  "var";
-  "video";
-  "wbr";
-] |> List.filter (fun s -> not (List.mem s void))
+let normal =
+  [
+    "a";
+    "abbr";
+    "address";
+    "area";
+    "article";
+    "aside";
+    "audio";
+    "b";
+    "base";
+    "bdi";
+    "bdo";
+    "blockquote";
+    "body";
+    "br";
+    "button";
+    "canvas";
+    "caption";
+    "cite";
+    "code";
+    "col";
+    "colgroup";
+    "data";
+    "datalist";
+    "dd";
+    "del";
+    "details";
+    "dfn";
+    "dialog";
+    "div";
+    "dl";
+    "dt";
+    "em";
+    "embed";
+    "fieldset";
+    "figcaption";
+    "figure";
+    "footer";
+    "form";
+    "h1";
+    "h2";
+    "h3";
+    "h4";
+    "h5";
+    "h6";
+    "head";
+    "header";
+    "hgroup";
+    "hr";
+    "html";
+    "i";
+    "iframe";
+    "img";
+    "input";
+    "ins";
+    "kbd";
+    "label";
+    "legend";
+    "li";
+    "link";
+    "main";
+    "map";
+    "mark";
+    "math";
+    "menu";
+    "menuitem";
+    "meta";
+    "meter";
+    "nav";
+    "noscript";
+    "object";
+    "ol";
+    "optgroup";
+    "option";
+    "output";
+    "p";
+    "param";
+    "picture";
+    "pre";
+    "progress";
+    "q";
+    "rb";
+    "rp";
+    "rt";
+    "rtc";
+    "ruby";
+    "s";
+    "samp";
+    "script";
+    "section";
+    "select";
+    "slot";
+    "small";
+    "source";
+    "span";
+    "strong";
+    "style";
+    "sub";
+    "summary";
+    "sup";
+    "svg";
+    "table";
+    "tbody";
+    "td";
+    "template";
+    "textarea";
+    "tfoot";
+    "th";
+    "thead";
+    "time";
+    "title";
+    "tr";
+    "track";
+    "u";
+    "ul";
+    "var";
+    "video";
+    "wbr";
+  ]
+  |> List.filter (fun s -> not (List.mem s void))
 
 (* obtained via:
    {[
@@ -150,134 +152,136 @@ let normal = [
    ]}
    on https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes
 *)
-let attrs = [
-  "accept";
-  "accept-charset";
-  "accesskey";
-  "action";
-  "align";
-  "allow";
-  "alt";
-  "async";
-  "autocapitalize";
-  "autocomplete";
-  "autofocus";
-  "autoplay";
-  "buffered";
-  "capture";
-  "challenge";
-  "charset";
-  "checked";
-  "cite";
-  "class";
-  "code";
-  "codebase";
-  "cols";
-  "colspan";
-  "content";
-  "contenteditable";
-  "contextmenu";
-  "controls";
-  "coords";
-  "crossorigin";
-  "csp";
-  "data";
-  "data-*";
-  "datetime";
-  "decoding";
-  "default";
-  "defer";
-  "dir";
-  "dirname";
-  "disabled";
-  "download";
-  "draggable";
-  "enctype";
-  "enterkeyhint";
-  "for";
-  "form";
-  "formaction";
-  "formenctype";
-  "formmethod";
-  "formnovalidate";
-  "formtarget";
-  "headers";
-  "hidden";
-  "high";
-  "href";
-  "hreflang";
-  "http-equiv";
-  "icon";
-  "id";
-  "importance";
-  "integrity";
-  "ismap";
-  "itemprop";
-  "keytype";
-  "kind";
-  "label";
-  "lang";
-  "language";
-  "list";
-  "loop";
-  "low";
-  "manifest";
-  "max";
-  "maxlength";
-  "minlength";
-  "media";
-  "method";
-  "min";
-  "multiple";
-  "muted";
-  "name";
-  "novalidate";
-  "open";
-  "optimum";
-  "pattern";
-  "ping";
-  "placeholder";
-  "poster";
-  "preload";
-  "radiogroup";
-  "readonly";
-  "referrerpolicy";
-  "rel";
-  "required";
-  "reversed";
-  "rows";
-  "rowspan";
-  "sandbox";
-  "scope";
-  "scoped";
-  "selected";
-  "shape";
-  "size";
-  "sizes";
-  "slot";
-  "span";
-  "spellcheck";
-  "src";
-  "srcdoc";
-  "srclang";
-  "srcset";
-  "start";
-  "step";
-  "style";
-  "summary";
-  "tabindex";
-  "target";
-  "title";
-  "translate";
-  "Text";
-  "type";
-  "usemap";
-  "value";
-  "width";
-  "wrap";
-]
+let attrs =
+  [
+    "accept";
+    "accept-charset";
+    "accesskey";
+    "action";
+    "align";
+    "allow";
+    "alt";
+    "async";
+    "autocapitalize";
+    "autocomplete";
+    "autofocus";
+    "autoplay";
+    "buffered";
+    "capture";
+    "challenge";
+    "charset";
+    "checked";
+    "cite";
+    "class";
+    "code";
+    "codebase";
+    "cols";
+    "colspan";
+    "content";
+    "contenteditable";
+    "contextmenu";
+    "controls";
+    "coords";
+    "crossorigin";
+    "csp";
+    "data";
+    "data-*";
+    "datetime";
+    "decoding";
+    "default";
+    "defer";
+    "dir";
+    "dirname";
+    "disabled";
+    "download";
+    "draggable";
+    "enctype";
+    "enterkeyhint";
+    "for";
+    "form";
+    "formaction";
+    "formenctype";
+    "formmethod";
+    "formnovalidate";
+    "formtarget";
+    "headers";
+    "hidden";
+    "high";
+    "href";
+    "hreflang";
+    "http-equiv";
+    "icon";
+    "id";
+    "importance";
+    "integrity";
+    "ismap";
+    "itemprop";
+    "keytype";
+    "kind";
+    "label";
+    "lang";
+    "language";
+    "list";
+    "loop";
+    "low";
+    "manifest";
+    "max";
+    "maxlength";
+    "minlength";
+    "media";
+    "method";
+    "min";
+    "multiple";
+    "muted";
+    "name";
+    "novalidate";
+    "open";
+    "optimum";
+    "pattern";
+    "ping";
+    "placeholder";
+    "poster";
+    "preload";
+    "radiogroup";
+    "readonly";
+    "referrerpolicy";
+    "rel";
+    "required";
+    "reversed";
+    "rows";
+    "rowspan";
+    "sandbox";
+    "scope";
+    "scoped";
+    "selected";
+    "shape";
+    "size";
+    "sizes";
+    "slot";
+    "span";
+    "spellcheck";
+    "src";
+    "srcdoc";
+    "srclang";
+    "srcset";
+    "start";
+    "step";
+    "style";
+    "summary";
+    "tabindex";
+    "target";
+    "title";
+    "translate";
+    "Text";
+    "type";
+    "usemap";
+    "value";
+    "width";
+    "wrap";
+  ]
 
-let prelude = {|
+let prelude =
+  {|
 (** Output for HTML combinators.
 
     This output type is used to produce a string reasonably efficiently from
@@ -431,11 +435,17 @@ let oname = function
   | "Text" -> "text"
   | "type" -> "type_"
   | name ->
-    String.map (function '-' -> '_' | c -> c) name
+    String.map
+      (function
+        | '-' -> '_'
+        | c -> c)
+      name
 
 let emit_void name =
   let oname = oname name in
-  pf "(** tag %S, see {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/%s} mdn} *)\n"
+  pf
+    "(** tag %S, see \
+     {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/%s} mdn} *)\n"
     name name;
   pf "let %s : void = fun ?(if_=true) attrs out ->\n" oname;
   pf "  if if_ then (\n";
@@ -447,12 +457,14 @@ let emit_void name =
 let emit_normal name =
   let oname = oname name in
 
-  pf "(** tag %S, see {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/%s} mdn} *)\n"
+  pf
+    "(** tag %S, see \
+     {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/%s} mdn} *)\n"
     name name;
   pf "let %s : nary = fun ?(if_=true) attrs sub out ->\n" oname;
   pf "  if if_ then (\n";
   (* for <pre>, newlines actually matter *)
-  if name="pre" then pf "  Out.with_no_format_nl out @@ fun () ->\n";
+  if name = "pre" then pf "  Out.with_no_format_nl out @@ fun () ->\n";
   pf "    _write_tag_attrs ~void:false out %S attrs;\n" name;
   pf "    List.iter (fun sub -> Out.add_format_nl out; sub out) sub;\n";
   pf "    if sub <> [] then Out.add_format_nl out;\n";
@@ -461,21 +473,23 @@ let emit_normal name =
 
   (* block version *)
   let oname = oname ^ "'" in
-  pf "(** tag %S, see {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/%s} mdn} *)\n"
+  pf
+    "(** tag %S, see \
+     {{:https://developer.mozilla.org/en-US/docs/Web/HTML/Element/%s} mdn} *)\n"
     name name;
   pf "let %s : nary' = fun ?(if_=true) attrs l out ->\n" oname;
   pf "  if if_ then (\n";
-  if name="pre" then pf "  Out.with_no_format_nl out @@ fun () ->\n";
+  if name = "pre" then pf "  Out.with_no_format_nl out @@ fun () ->\n";
   pf "    _write_tag_attrs ~void:false out %S attrs;\n" name;
   pf "    let has_sub = _write_subs out l in\n";
   pf "    if has_sub then Out.add_format_nl out;\n";
   pf "    Out.add_string out \"</%s>\")" name;
   pf "\n\n";
 
-
   ()
 
-let doc_attrs = {|Attributes.
+let doc_attrs =
+  {|Attributes.
 
 This module contains combinator for the standard attributes.
 One can also just use a pair of strings. |}
@@ -498,4 +512,3 @@ let () =
   List.iter emit_attr attrs;
   pf "end\n";
   ()
-

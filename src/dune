@@ -1,4 +1,3 @@
-
 (library
   (name tiny_httpd)
   (public_name tiny_httpd)
@@ -7,6 +6,10 @@
   (wrapped false))
 
 (rule
-  (targets Tiny_httpd_html_.ml)
-  (deps (:bin ./gen/gentags.exe))
-  (action (with-stdout-to %{targets} (run %{bin}))))
+ (targets Tiny_httpd_html_.ml)
+ (deps
+  (:bin ./gen/gentags.exe))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run %{bin}))))

@@ -1,4 +1,3 @@
-
 (** HTTP server.
 
     This module implements a very simple, basic HTTP/1.1 server using blocking
@@ -12,17 +11,10 @@
 type buf = Tiny_httpd_buf.t
 type byte_stream = Tiny_httpd_stream.t
 
-(** {2 Methods} *)
+(** {2 HTTP Methods} *)
 
 module Meth : sig
-  type t = [
-    | `GET
-    | `PUT
-    | `POST
-    | `HEAD
-    | `DELETE
-    | `OPTIONS
-  ]
+  type t = [ `GET | `PUT | `POST | `HEAD | `DELETE | `OPTIONS ]
   (** A HTTP method.
       For now we only handle a subset of these.
 
@@ -44,10 +36,10 @@ module Headers : sig
       See https://tools.ietf.org/html/rfc7230#section-3.2 *)
 
   val empty : t
-  (** Empty list of headers
+  (** Empty list of headers.
       @since 0.5 *)
 
-  val get : ?f:(string->string) -> string -> t -> string option
+  val get : ?f:(string -> string) -> string -> t -> string option
   (** [get k headers] looks for the header field with key [k].
       @param f if provided, will transform the value before it is returned. *)
 
@@ -67,20 +59,24 @@ end
 
 (** {2 Requests}
 
-    Requests are sent by a client, e.g. a web browser or cURL. *)
+    Requests are sent by a client, e.g. a web browser or cURL.
+    From the point of view of the server, they're inputs. *)
 
 module Request : sig
   type 'body t = private {
-    meth: Meth.t;
+    meth: Meth.t;  (** HTTP method for this request. *)
     host: string;
-    headers: Headers.t;
-    http_version: int*int;
-    path: string;
+        (** Host header, mandatory. It can also be found in {!headers}. *)
+    headers: Headers.t;  (** List of headers. *)
+    http_version: int * int;
+        (** HTTP version. This should be either [1, 0] or [1, 1]. *)
+    path: string;  (** Full path of the requested URL. *)
     path_components: string list;
-    query: (string*string) list;
-    body: 'body;
+        (** Components of the path of the requested URL. *)
+    query: (string * string) list;  (** Query part of the requested URL. *)
+    body: 'body;  (** Body of the request. *)
     start_time: float;
-    (** Obtained via [get_time_s] in {!create}
+        (** Obtained via [get_time_s] in {!create}
         @since 0.11 *)
   }
   (** A request with method, path, host, headers, and a body, sent by a client.
@@ -97,23 +93,29 @@ module Request : sig
   *)
 
   val pp : Format.formatter -> string t -> unit
-  (** Pretty print the request and its body *)
+  (** Pretty print the request and its body. The exact format of this printing
+      is not specified. *)
 
   val pp_ : Format.formatter -> _ t -> unit
-  (** Pretty print the request without its body *)
+  (** Pretty print the request without its body. The exact format of this printing
+      is not specified. *)
 
   val headers : _ t -> Headers.t
-  (** List of headers of the request, including ["Host"] *)
+  (** List of headers of the request, including ["Host"]. *)
 
-  val get_header : ?f:(string->string) -> _ t -> string -> string option
+  val get_header : ?f:(string -> string) -> _ t -> string -> string option
+  (** [get_header req h] looks up header [h] in [req]. It returns [None] if the
+      header is not present. This is case insensitive and should be used
+      rather than looking up [h] verbatim in [headers]. *)
 
   val get_header_int : _ t -> string -> int option
+  (** Same as {!get_header} but also performs a string to integer conversion. *)
 
   val set_header : string -> string -> 'a t -> 'a t
   (** [set_header k v req] sets [k: v] in the request [req]'s headers. *)
 
   val update_headers : (Headers.t -> Headers.t) -> 'a t -> 'a t
-  (** Modify headers
+  (** Modify headers using the given function.
       @since 0.11 *)
 
   val set_body : 'a -> _ t -> 'a t
@@ -129,8 +131,8 @@ module Request : sig
   val path : _ t -> string
   (** Request path. *)
 
-  val query : _ t -> (string*string) list
-  (** Decode the query part of the {!path} field
+  val query : _ t -> (string * string) list
+  (** Decode the query part of the {!path} field.
       @since 0.4 *)
 
   val body : 'b t -> 'b
@@ -152,11 +154,15 @@ module Request : sig
       @param buf_size initial size of underlying buffer (since 0.11) *)
 
   (**/**)
-  (* for testing purpose, do not use *)
+
+  (* for testing purpose, do not use.  There is no guarantee of stability. *)
   module Internal_ : sig
-    val parse_req_start : ?buf:buf -> get_time_s:(unit -> float) -> byte_stream -> unit t option
+    val parse_req_start :
+      ?buf:buf -> get_time_s:(unit -> float) -> byte_stream -> unit t option
+
     val parse_body : ?buf:buf -> unit t -> byte_stream -> byte_stream t
   end
+
   (**/**)
 end
 
@@ -185,14 +191,15 @@ end
     the client to answer a {!Request.t}*)
 
 module Response : sig
-  type body = [`String of string | `Stream of byte_stream | `Void]
+  type body = [ `String of string | `Stream of byte_stream | `Void ]
   (** Body of a response, either as a simple string,
-      or a stream of bytes, or nothing (for server-sent events). *)
+      or a stream of bytes, or nothing (for server-sent events notably). *)
 
   type t = private {
-    code: Response_code.t; (** HTTP response code. See {!Response_code}. *)
-    headers: Headers.t; (** Headers of the reply. Some will be set by [Tiny_httpd] automatically. *)
-    body: body; (** Body of the response. Can be empty. *)
+    code: Response_code.t;  (** HTTP response code. See {!Response_code}. *)
+    headers: Headers.t;
+        (** Headers of the reply. Some will be set by [Tiny_httpd] automatically. *)
+    body: body;  (** Body of the response. Can be empty. *)
   }
   (** A response to send back to a client. *)
 
@@ -205,7 +212,7 @@ module Response : sig
       @since 0.11 *)
 
   val update_headers : (Headers.t -> Headers.t) -> t -> t
-  (** Modify headers
+  (** Modify headers.
       @since 0.11 *)
 
   val set_headers : Headers.t -> t -> t
@@ -216,19 +223,12 @@ module Response : sig
   (** Set the response code.
       @since 0.11 *)
 
-  val make_raw :
-    ?headers:Headers.t ->
-    code:Response_code.t ->
-    string ->
-    t
+  val make_raw : ?headers:Headers.t -> code:Response_code.t -> string -> t
   (** Make a response from its raw components, with a string body.
       Use [""] to not send a body at all. *)
 
   val make_raw_stream :
-    ?headers:Headers.t ->
-    code:Response_code.t ->
-    byte_stream ->
-    t
+    ?headers:Headers.t -> code:Response_code.t -> byte_stream -> t
   (** Same as {!make_raw} but with a stream body. The body will be sent with
       the chunked transfer-encoding. *)
 
@@ -236,9 +236,7 @@ module Response : sig
   (** Return a response without a body at all.
       @since NEXT_RELEASE *)
 
-  val make :
-    ?headers:Headers.t ->
-    (body, Response_code.t * string) result -> t
+  val make : ?headers:Headers.t -> (body, Response_code.t * string) result -> t
   (** [make r] turns a result into a response.
 
       - [make (Ok body)] replies with [200] and the body.
@@ -247,17 +245,15 @@ module Response : sig
   *)
 
   val make_string :
-    ?headers:Headers.t ->
-    (string, Response_code.t * string) result -> t
+    ?headers:Headers.t -> (string, Response_code.t * string) result -> t
   (** Same as {!make} but with a string body. *)
 
   val make_stream :
-    ?headers:Headers.t ->
-    (byte_stream, Response_code.t * string) result -> t
+    ?headers:Headers.t -> (byte_stream, Response_code.t * string) result -> t
   (** Same as {!make} but with a stream body. *)
 
-  val fail : ?headers:Headers.t -> code:int ->
-    ('a, unit, string, t) format4 -> 'a
+  val fail :
+    ?headers:Headers.t -> code:int -> ('a, unit, string, t) format4 -> 'a
   (** Make the current request fail with the given code and message.
       Example: [fail ~code:404 "oh noes, %s not found" "waldo"].
   *)
@@ -269,13 +265,16 @@ module Response : sig
   *)
 
   val pp : Format.formatter -> t -> unit
-  (** Pretty print the response. *)
+  (** Pretty print the response. The exact format is not specified. *)
 end
 
 (** {2 Routing}
 
-    Basic type-safe routing.
+    Basic type-safe routing of handlers based on URL paths. This is optional,
+    it is possible to only define the root handler with something like
+    {{: https://github.com/anuragsoni/routes/} Routes}.
     @since 0.6 *)
+
 module Route : sig
   type ('a, 'b) comp
   (** An atomic component of a path *)
@@ -308,11 +307,11 @@ module Route : sig
       This will match the entirety of the remaining route.
       @since 0.7 *)
 
-  val (@/) : ('a, 'b) comp -> ('b, 'c) t -> ('a, 'c) t
+  val ( @/ ) : ('a, 'b) comp -> ('b, 'c) t -> ('a, 'c) t
   (** [comp / route] matches ["foo/bar/…"] iff [comp] matches ["foo"],
       and [route] matches ["bar/…"]. *)
 
-  val exact_path : string -> ('a,'b) t -> ('a,'b) t
+  val exact_path : string -> ('a, 'b) t -> ('a, 'b) t
   (** [exact_path "foo/bar/..." r] is equivalent to
       [exact "foo" @/ exact "bar" @/ ... @/ r]
       @since 0.11 **)
@@ -333,6 +332,7 @@ end
 
     @since 0.11
 *)
+
 module Middleware : sig
   type handler = byte_stream Request.t -> resp:(Response.t -> unit) -> unit
   (** Handlers are functions returning a response to a request.
@@ -366,7 +366,7 @@ val create :
   ?addr:string ->
   ?port:int ->
   ?sock:Unix.file_descr ->
-  ?middlewares:([`Encoding | `Stage of int] * Middleware.t) list ->
+  ?middlewares:([ `Encoding | `Stage of int ] * Middleware.t) list ->
   unit ->
   t
 (** Create a new webserver.
@@ -409,15 +409,18 @@ val is_ipv6 : t -> bool
     @since 0.3 *)
 
 val port : t -> int
-(** Port on which the server listens. *)
+(** Port on which the server listens. Note that this might be different than
+    the port initially given if the port was [0] (meaning that the OS picks a
+    port for us). *)
 
 val active_connections : t -> int
-(** Number of active connections *)
+(** Number of currently active connections. *)
 
 val add_decode_request_cb :
   t ->
-  (unit Request.t -> (unit Request.t * (byte_stream -> byte_stream)) option) -> unit
-[@@deprecated "use add_middleware"]
+  (unit Request.t -> (unit Request.t * (byte_stream -> byte_stream)) option) ->
+  unit
+  [@@deprecated "use add_middleware"]
 (** Add a callback for every request.
     The callback can provide a stream transformer and a new request (with
     modified headers, typically).
@@ -427,9 +430,9 @@ val add_decode_request_cb :
     @deprecated use {!add_middleware} instead
 *)
 
-val add_encode_response_cb:
+val add_encode_response_cb :
   t -> (unit Request.t -> Response.t -> Response.t option) -> unit
-[@@deprecated "use add_middleware"]
+  [@@deprecated "use add_middleware"]
 (** Add a callback for every request/response pair.
     Similarly to {!add_encode_response_cb} the callback can return a new
     response, for example to compress it.
@@ -440,8 +443,7 @@ val add_encode_response_cb:
 *)
 
 val add_middleware :
-  stage:[`Encoding | `Stage of int] ->
-  t -> Middleware.t -> unit
+  stage:[ `Encoding | `Stage of int ] -> t -> Middleware.t -> unit
 (** Add a middleware to every request/response pair.
     @param stage specify when middleware applies.
       Encoding comes first (outermost layer), then stages in increasing order.
@@ -463,7 +465,8 @@ val add_route_handler :
   ?middlewares:Middleware.t list ->
   ?meth:Meth.t ->
   t ->
-  ('a, string Request.t -> Response.t) Route.t -> 'a ->
+  ('a, string Request.t -> Response.t) Route.t ->
+  'a ->
   unit
 (** [add_route_handler server Route.(exact "path" @/ string @/ int @/ return) f]
     calls [f "foo" 42 request] when a [request] with path "path/foo/42/"
@@ -489,7 +492,8 @@ val add_route_handler_stream :
   ?middlewares:Middleware.t list ->
   ?meth:Meth.t ->
   t ->
-  ('a, byte_stream Request.t -> Response.t) Route.t -> 'a ->
+  ('a, byte_stream Request.t -> Response.t) Route.t ->
+  'a ->
   unit
 (** Similar to {!add_route_handler}, but where the body of the request
     is a stream of bytes that has not been read yet.
@@ -517,11 +521,7 @@ module type SERVER_SENT_GENERATOR = sig
       already sent too). *)
 
   val send_event :
-    ?event:string ->
-    ?id:string ->
-    ?retry:string ->
-    data:string ->
-    unit -> unit
+    ?event:string -> ?id:string -> ?retry:string -> data:string -> unit -> unit
   (** Send an event from the server.
       If data is a multiline string, it will be sent on separate "data:" lines. *)
 
@@ -531,13 +531,15 @@ module type SERVER_SENT_GENERATOR = sig
 end
 
 type server_sent_generator = (module SERVER_SENT_GENERATOR)
-(** Server-sent event generator
+(** Server-sent event generator. This generates events that are forwarded to
+    the client (e.g. the browser).
     @since 0.9 *)
 
 val add_route_server_sent_handler :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
   t ->
-  ('a, string Request.t -> server_sent_generator -> unit) Route.t -> 'a ->
+  ('a, string Request.t -> server_sent_generator -> unit) Route.t ->
+  'a ->
   unit
 (** Add a handler on an endpoint, that serves server-sent events.
 
@@ -558,17 +560,23 @@ val stop : t -> unit
 (** Ask the server to stop. This might not have an immediate effect
     as {!run} might currently be waiting on IO. *)
 
-val run : t -> (unit, exn) result
+val run : ?after_init:(unit -> unit) -> t -> (unit, exn) result
 (** Run the main loop of the server, listening on a socket
     described at the server's creation time, using [new_thread] to
     start a thread for each new client.
 
     This returns [Ok ()] if the server exits gracefully, or [Error e] if
-    it exits with an error. *)
+    it exits with an error.
+
+    @param after_init is called after the server starts listening. @since NEXT_RELEASE .
+
+*)
 
 (**/**)
 
-val _debug : ((('a, out_channel, unit, unit, unit, unit) format6 -> 'a) -> unit) -> unit
-val _enable_debug: bool -> unit
+val _debug :
+  ((('a, out_channel, unit, unit, unit, unit) format6 -> 'a) -> unit) -> unit
+
+val _enable_debug : bool -> unit
 
 (**/**)
