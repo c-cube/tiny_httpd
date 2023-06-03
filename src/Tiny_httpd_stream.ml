@@ -1,4 +1,5 @@
 module Buf = Tiny_httpd_buf
+module IO = Tiny_httpd_io
 
 let spf = Printf.sprintf
 
@@ -45,37 +46,32 @@ let make ?(bs = Bytes.create @@ (16 * 1024)) ?(close = ignore) ~consume ~fill ()
   in
   self
 
-let of_chan_ ?(buf_size = 16 * 1024) ~close ic : t =
+let of_input ?(buf_size = 16 * 1024) (ic : IO.In_channel.t) : t =
   make ~bs:(Bytes.create buf_size)
-    ~close:(fun _ -> close ic)
+    ~close:(fun _ -> IO.In_channel.close ic)
     ~consume:(fun self n ->
       self.off <- self.off + n;
       self.len <- self.len - n)
     ~fill:(fun self ->
       if self.off >= self.len then (
         self.off <- 0;
-        self.len <- input ic self.bs 0 (Bytes.length self.bs)
+        self.len <- IO.In_channel.input ic self.bs 0 (Bytes.length self.bs)
       ))
     ()
 
-let of_chan = of_chan_ ~close:close_in
-let of_chan_close_noerr = of_chan_ ~close:close_in_noerr
+let of_chan_ ?buf_size ic ~close_noerr : t =
+  let inc = IO.In_channel.of_in_channel ~close_noerr ic in
+  of_input ?buf_size inc
 
-let of_fd_ ?(buf_size = 16 * 1024) ~close ic : t =
-  make ~bs:(Bytes.create buf_size)
-    ~close:(fun _ -> close ic)
-    ~consume:(fun self n ->
-      self.off <- self.off + n;
-      self.len <- self.len - n)
-    ~fill:(fun self ->
-      if self.off >= self.len then (
-        self.off <- 0;
-        self.len <- Unix.read ic self.bs 0 (Bytes.length self.bs)
-      ))
-    ()
+let of_chan ?buf_size ic = of_chan_ ?buf_size ic ~close_noerr:false
+let of_chan_close_noerr ?buf_size ic = of_chan_ ?buf_size ic ~close_noerr:true
 
-let of_fd = of_fd_ ~close:Unix.close
-let of_fd_close_noerr = of_fd_ ~close:(fun f -> try Unix.close f with _ -> ())
+let of_fd_ ?buf_size ~close_noerr ic : t =
+  let inc = IO.In_channel.of_unix_fd ~close_noerr ic in
+  of_input ?buf_size inc
+
+let of_fd ?buf_size fd : t = of_fd_ ?buf_size ~close_noerr:false fd
+let of_fd_close_noerr ?buf_size fd : t = of_fd_ ?buf_size ~close_noerr:true fd
 
 let rec iter f (self : t) : unit =
   self.fill_buf ();
@@ -89,6 +85,9 @@ let rec iter f (self : t) : unit =
 
 let to_chan (oc : out_channel) (self : t) =
   iter (fun s i len -> output oc s i len) self
+
+let to_chan' (oc : IO.Out_channel.t) (self : t) =
+  iter (fun s i len -> IO.Out_channel.output oc s i len) self
 
 let of_bytes ?(i = 0) ?len (bs : bytes) : t =
   (* invariant: !i+!len is constant *)
@@ -298,19 +297,22 @@ let read_chunked ?(buf = Buf.create ()) ~fail (bs : t) : t =
       refill := false)
     ()
 
-(* print a stream as a series of chunks *)
-let output_chunked (oc : out_channel) (self : t) : unit =
+let output_chunked' (oc : IO.Out_channel.t) (self : t) : unit =
   let continue = ref true in
   while !continue do
     (* next chunk *)
     self.fill_buf ();
     let n = self.len in
-    Printf.fprintf oc "%x\r\n" n;
-    output oc self.bs self.off n;
+    IO.Out_channel.output_string oc (Printf.sprintf "%x\r\n" n);
+    IO.Out_channel.output oc self.bs self.off n;
     self.consume n;
     if n = 0 then continue := false;
-    output_string oc "\r\n"
+    IO.Out_channel.output_string oc "\r\n"
   done;
   (* write another crlf after the stream (see #56) *)
-  output_string oc "\r\n";
+  IO.Out_channel.output_string oc "\r\n";
   ()
+
+(* print a stream as a series of chunks *)
+let output_chunked (oc : out_channel) (self : t) : unit =
+  output_chunked' (IO.Out_channel.of_out_channel oc) self

@@ -85,6 +85,10 @@ module Buf = Tiny_httpd_buf
 
 module Byte_stream = Tiny_httpd_stream
 
+(** {2 IO Abstraction} *)
+
+module IO = Tiny_httpd_io
+
 (** {2 Main Server Type} *)
 
 (** @inline *)
