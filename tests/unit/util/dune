@@ -1,0 +1,5 @@
+
+(library
+  (name test_util)
+  (modules test_util)
+  (libraries qcheck-core qcheck-core.runner))
