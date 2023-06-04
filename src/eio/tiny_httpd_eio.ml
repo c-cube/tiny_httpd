@@ -120,10 +120,7 @@ let io_backend ?(addr = "127.0.0.1") ?(port = 8080) ?max_connections
   let module M = struct
     let init_addr () = addr
     let init_port () = port
-
-    let get_time_s () =
-      let clock = Eio.Stdenv.clock stdenv in
-      Eio.Time.now clock
+    let get_time_s () = Unix.gettimeofday ()
 
     let tcp_server () : IO.TCP_server.builder =
       {
