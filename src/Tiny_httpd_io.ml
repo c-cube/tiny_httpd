@@ -8,6 +8,8 @@
     @since NEXT_RELEASE
 *)
 
+module Buf = Tiny_httpd_buf
+
 module In_channel = struct
   type t = {
     input: bytes -> int -> int -> int;
@@ -67,6 +69,11 @@ module Out_channel = struct
     self.output (Bytes.unsafe_of_string str) 0 (String.length str)
 
   let[@inline] close self : unit = self.close ()
+  let[@inline] flush self : unit = self.flush ()
+
+  let output_buf (self : t) (buf : Buf.t) : unit =
+    let b = Buf.bytes_slice buf in
+    output self b 0 (Buf.size buf)
 end
 
 (** A TCP server abstraction *)
@@ -77,9 +84,20 @@ module TCP_server = struct
   }
 
   type t = {
-    listen: handle:conn_handler -> unit -> unit;
-        (** Blocking call to start listening for incoming connections.
-            Uses the connection handler to handle individual client connections. *)
-    endpoint: unit -> Unix.inet_addr * int;  (** Endpoint we listen on *)
+    endpoint: unit -> string * int;
+        (** Endpoint we listen on. This can only be called from within [serve]. *)
+    active_connections: unit -> int;
+        (** Number of connections currently active *)
+    running: unit -> bool;  (** Is the server currently running? *)
+    stop: unit -> unit;
+        (** Ask the server to stop. This might not take effect immediately. *)
   }
+  (** Running server. *)
+
+  type builder = {
+    serve: after_init:(t -> unit) -> handle:conn_handler -> unit -> unit;
+        (** Blocking call to listen for incoming connections and handle them.
+            Uses the connection handler to handle individual client connections. *)
+  }
+  (** A TCP server implementation. *)
 end

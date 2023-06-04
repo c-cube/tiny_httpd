@@ -24,3 +24,11 @@ val contents_and_clear : t -> string
 val add_bytes : t -> bytes -> int -> int -> unit
 (** Append given bytes slice to the buffer.
     @since 0.5 *)
+
+val add_string : t -> string -> unit
+(** Add string.
+    @since NEXT_RELEASE *)
+
+val add_buffer : t -> Buffer.t -> unit
+(** Append bytes from buffer.
+    @since NEXT_RELEASE *)
