@@ -631,11 +631,6 @@ module type IO_BACKEND = sig
   val init_addr : unit -> string
   val init_port : unit -> int
 
-  val spawn : (unit -> unit) -> unit
-  (** function used to spawn a new thread to handle a
-    new client connection. By default it is {!Thread.create} but one
-    could use a thread pool instead.*)
-
   val get_time_s : unit -> float
   (** obtain the current timestamp in seconds. *)
 
@@ -959,7 +954,6 @@ let create ?(masksigpipe = true) ?max_connections ?(timeout = 0.0) ?buf_size
     let init_addr () = addr
     let init_port () = port
     let get_time_s = get_time_s
-    let spawn f = new_thread f
     let tcp_server () = tcp_server_builder
   end in
   let backend = (module B : IO_BACKEND) in
