@@ -55,7 +55,9 @@ let () =
 
   (* create server *)
   let server : S.t =
-    S_eio.create ~port:!port_ ~max_connections:!j ~stdenv ~sw ()
+    S_eio.create ~port:!port_ ~max_connections:!j
+      ~stdenv:(stdenv :> Eio.Stdenv.t)
+      ~sw ()
   in
 
   (* TODO: re-enable
