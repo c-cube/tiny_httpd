@@ -120,9 +120,9 @@ let () =
   (* stats *)
   S.add_route_handler server
     S.Route.(exact "stats" @/ return)
-      (fun _req ->
-        let stats = get_stats () in
-        S.Response.make_string @@ Ok stats);
+    (fun _req ->
+      let stats = get_stats () in
+      S.Response.make_string @@ Ok stats);
 
   S.add_route_handler server ~meth:`POST
     S.Route.(exact "quit" @/ return)
@@ -183,11 +183,19 @@ let () =
                       ];
                     li []
                       [
-                        pre []
+                        pre
+                          [ A.style "display: inline" ]
                           [
-                            a [ A.href "/quit/" ] [ txt "/quit (POST)" ];
-                            txt " have the server stop";
+                            a [ A.href "/quit" ] [ txt "/quit" ];
+                            txt " (POST) to stop server";
                           ];
+                        form
+                          [
+                            A.style "display: inline";
+                            A.action "/quit";
+                            A.method_ "POST";
+                          ]
+                          [ button [ A.type_ "submit" ] [ txt "quit" ] ];
                       ];
                   ];
               ];
