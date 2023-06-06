@@ -100,6 +100,10 @@ end
 
 module Util = Tiny_httpd_util
 
+(** {2 Resource pool} *)
+
+module Pool = Pool
+
 (** {2 Static directory serving} *)
 
 module Dir = Tiny_httpd_dir
