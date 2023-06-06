@@ -5,3 +5,4 @@ module Util = Tiny_httpd_util
 module Dir = Tiny_httpd_dir
 module Html = Tiny_httpd_html
 module IO = Tiny_httpd_io
+module Pool = Pool
