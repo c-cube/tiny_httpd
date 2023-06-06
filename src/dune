@@ -18,3 +18,12 @@
   (with-stdout-to
    %{targets}
    (run %{bin}))))
+
+(rule
+ (targets Tiny_httpd_atomic_.ml)
+ (deps
+  (:bin ./gen/mkshims.exe))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run %{bin}))))
