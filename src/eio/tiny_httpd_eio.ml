@@ -46,28 +46,6 @@ let ic_of_flow (flow : Eio.Net.stream_socket) : IO.In_channel.t =
   let close () = flow#shutdown `Receive in
   { IO.In_channel.input; close }
 
-(*
-
-  let output buf i len =
-    let i = ref i in
-    let len = ref len in
-
-    while !len > 0 do
-      let available = Cstruct.length cstruct - !offset in
-      let n = min !len available in
-      Cstruct.blit_from_bytes buf !i cstruct !offset n;
-      offset := !offset + n;
-      i := !i + n;
-      len := !len - n;
-
-      if !offset = Cstruct.length cstruct then (
-        flow#write [ cstruct ];
-        offset := 0
-      )
-    done
-  in
-  *)
-
 let oc_of_flow (flow : Eio.Net.stream_socket) : IO.Out_channel.t =
   (* write buffer *)
   let wbuf = Bytes.create buf_size in
@@ -144,7 +122,10 @@ let io_backend ?(addr = "127.0.0.1") ?(port = 8080) ?max_connections
             let tcp_server : IO.TCP_server.t =
               {
                 running = (fun () -> Atomic.get running);
-                stop = (fun () -> Atomic.set running false);
+                stop =
+                  (fun () ->
+                    Atomic.set running false;
+                    Eio.Switch.fail sw Exit);
                 endpoint =
                   (fun () ->
                     (* TODO: find the real port *)
