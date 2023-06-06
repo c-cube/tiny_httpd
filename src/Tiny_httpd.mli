@@ -102,7 +102,7 @@ module Util = Tiny_httpd_util
 
 (** {2 Resource pool} *)
 
-module Pool = Pool
+module Pool = Tiny_httpd_pool
 
 (** {2 Static directory serving} *)
 

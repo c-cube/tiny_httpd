@@ -1,5 +1,6 @@
 module IO = Tiny_httpd_io
 module H = Tiny_httpd_server
+module Pool = Tiny_httpd_pool
 
 let ( let@ ) = ( @@ )
 
@@ -17,8 +18,9 @@ let get_max_connection_ ?(max_connections = 64) () : int =
 
 let buf_size = 16 * 1024
 
-let ic_of_flow (flow : Eio.Net.stream_socket) : IO.In_channel.t =
-  let cstruct = Cstruct.create buf_size in
+let ic_of_flow ~buf_pool:ic_pool (flow : Eio.Net.stream_socket) :
+    IO.In_channel.t =
+  Pool.with_resource ic_pool @@ fun cstruct ->
   let len_slice = ref 0 in
   let offset = ref 0 in
 
@@ -46,9 +48,10 @@ let ic_of_flow (flow : Eio.Net.stream_socket) : IO.In_channel.t =
   let close () = flow#shutdown `Receive in
   { IO.In_channel.input; close }
 
-let oc_of_flow (flow : Eio.Net.stream_socket) : IO.Out_channel.t =
+let oc_of_flow ~buf_pool:oc_pool (flow : Eio.Net.stream_socket) :
+    IO.Out_channel.t =
   (* write buffer *)
-  let wbuf = Bytes.create buf_size in
+  Pool.with_resource oc_pool @@ fun wbuf ->
   let offset = ref 0 in
 
   let flush () =
@@ -100,6 +103,8 @@ let io_backend ?(addr = "127.0.0.1") ?(port = 8080) ?max_connections
     let init_addr () = addr
     let init_port () = port
     let get_time_s () = Unix.gettimeofday ()
+    let ic_pool = Pool.create ~mk_item:(fun () -> Cstruct.create buf_size) ()
+    let oc_pool = Pool.create ~mk_item:(fun () -> Bytes.create buf_size) ()
 
     let tcp_server () : IO.TCP_server.builder =
       {
@@ -151,8 +156,8 @@ let io_backend ?(addr = "127.0.0.1") ?(port = 8080) ?max_connections
                             k "Tiny_httpd_eio: client handler returned");
                         Atomic.decr active_conns)
                   in
-                  let ic = ic_of_flow flow in
-                  let oc = oc_of_flow flow in
+                  let ic = ic_of_flow ~buf_pool:ic_pool flow in
+                  let oc = oc_of_flow ~buf_pool:oc_pool flow in
                   handle.handle ic oc)
             done);
       }
