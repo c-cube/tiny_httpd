@@ -120,9 +120,15 @@ let () =
   (* stats *)
   S.add_route_handler server
     S.Route.(exact "stats" @/ return)
+      (fun _req ->
+        let stats = get_stats () in
+        S.Response.make_string @@ Ok stats);
+
+  S.add_route_handler server ~meth:`POST
+    S.Route.(exact "quit" @/ return)
     (fun _req ->
-      let stats = get_stats () in
-      S.Response.make_string @@ Ok stats);
+      S.stop server;
+      S.Response.make_string (Ok "quitting"));
 
   (* main page *)
   S.add_route_handler server
@@ -175,6 +181,14 @@ let () =
                             txt " (GET) to access a VFS embedded in the binary";
                           ];
                       ];
+                    li []
+                      [
+                        pre []
+                          [
+                            a [ A.href "/quit/" ] [ txt "/quit (POST)" ];
+                            txt " have the server stop";
+                          ];
+                      ];
                   ];
               ];
           ]
@@ -183,6 +197,8 @@ let () =
       S.Response.make_string ~headers:[ "content-type", "text/html" ] @@ Ok s);
 
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);
-  match S.run server with
+  let res = S.run server in
+  Gc.print_stat stdout;
+  match res with
   | Ok () -> ()
   | Error e -> raise e
