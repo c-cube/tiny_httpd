@@ -7,7 +7,7 @@ type 'a with_args =
   ?addr:string ->
   ?port:int ->
   ?max_connections:int ->
-  stdenv:Eio.Stdenv.t ->
+  stdenv:Eio_unix.Stdenv.base ->
   sw:Eio.Switch.t ->
   'a
 
@@ -94,7 +94,8 @@ let oc_of_flow (flow : Eio.Net.stream_socket) : IO.Out_channel.t =
   { IO.Out_channel.close; flush; output }
 
 let io_backend ?(addr = "127.0.0.1") ?(port = 8080) ?max_connections
-    ~(stdenv : Eio.Stdenv.t) ~(sw : Eio.Switch.t) () : (module H.IO_BACKEND) =
+    ~(stdenv : Eio_unix.Stdenv.base) ~(sw : Eio.Switch.t) () :
+    (module H.IO_BACKEND) =
   let module M = struct
     let init_addr () = addr
     let init_port () = port

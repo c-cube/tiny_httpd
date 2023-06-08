@@ -56,7 +56,7 @@ let () =
   (* create server *)
   let server : S.t =
     S_eio.create ~port:!port_ ~max_connections:!j
-      ~stdenv:(stdenv :> Eio.Stdenv.t)
+      ~stdenv:(stdenv :> Eio_unix.Stdenv.base)
       ~sw ()
   in
 

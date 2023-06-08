@@ -4,7 +4,7 @@ type 'a with_args =
   ?addr:string ->
   ?port:int ->
   ?max_connections:int ->
-  stdenv:Eio.Stdenv.t ->
+  stdenv:Eio_unix.Stdenv.base ->
   sw:Eio.Switch.t ->
   'a
 
