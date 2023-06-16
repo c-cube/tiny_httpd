@@ -27,8 +27,7 @@ type t = {
   _rest: hidden;  (** Use {!make} to build a stream. *)
 }
 (** A buffered stream, with a view into the current buffer (or refill if empty),
-    and a function to consume [n] bytes.
-    See {!Byte_stream} for more details. *)
+    and a function to consume [n] bytes. *)
 
 val close : t -> unit
 (** Close stream *)
