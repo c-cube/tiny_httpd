@@ -13,7 +13,7 @@ depends: [
   "dune" { >= "2.0" }
   "camlzip" {>= "1.06"}
   "tiny_httpd" { = version }
-  "ocaml" { >= "4.04.0" }
+  "ocaml" { >= "4.05.0" }
   "odoc" {with-doc}
 ]
 tags: [ "http" "thread" "server" "gzip" "camlzip" ]
