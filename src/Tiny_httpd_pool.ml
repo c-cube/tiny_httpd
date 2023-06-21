@@ -41,4 +41,11 @@ let release_ self x : unit =
 
 let with_resource (self : _ t) f =
   let x = acquire_ self in
-  Fun.protect ~finally:(fun () -> release_ self x) (fun () -> f x)
+  try
+    let res = f x in
+    release_ self x;
+    res
+  with e ->
+    let bt = Printexc.get_raw_backtrace () in
+    release_ self x;
+    Printexc.raise_with_backtrace e bt
