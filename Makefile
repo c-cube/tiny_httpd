@@ -15,7 +15,7 @@ clean:
 doc:
 	@dune build @doc
 
-WATCH?= "@install @runtest"
+WATCH?= @install @runtest
 watch:
 	@dune build $(OPTS) $(WATCH) -w
 
