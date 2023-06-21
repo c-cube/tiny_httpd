@@ -14,8 +14,9 @@ clean:
 doc:
 	@dune build @doc
 
+WATCH?= "@install @runtest"
 watch:
-	@dune build @all -w
+	@dune build $(WATCH) -w
 
 .PHONY: benchs tests build watch
 
