@@ -449,6 +449,12 @@ val port : t -> int
 val active_connections : t -> int
 (** Number of currently active connections. *)
 
+val dropped_connections : t -> int
+(** Number of connections that were dropped because the maximum number of
+    active connections was reached.
+    See {!create} with the [max_connections] parameter.
+    @since NEXT_RELEASE *)
+
 val add_decode_request_cb :
   t ->
   (unit Request.t -> (unit Request.t * (byte_stream -> byte_stream)) option) ->

@@ -137,6 +137,7 @@ let io_backend ?(addr = "127.0.0.1") ?(port = 8080) ?max_connections
                     (* TODO: find the real port *)
                     addr, port);
                 active_connections = (fun () -> Atomic.get active_conns);
+                dropped_connections = (fun () -> 0);
               }
             in
 

@@ -88,6 +88,8 @@ module TCP_server = struct
         (** Endpoint we listen on. This can only be called from within [serve]. *)
     active_connections: unit -> int;
         (** Number of connections currently active *)
+    dropped_connections: unit -> int;
+        (** Number of connections dropped so far *)
     running: unit -> bool;  (** Is the server currently running? *)
     stop: unit -> unit;
         (** Ask the server to stop. This might not take effect immediately. *)
