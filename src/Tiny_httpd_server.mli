@@ -369,7 +369,7 @@ val create :
   ?middlewares:([ `Encoding | `Stage of int ] * Middleware.t) list ->
   unit ->
   t
-(** Create a new webserver.
+(** Create a new webserver using UNIX abstractions.
 
     The server will not do anything until {!run} is called on it.
     Before starting the server, one can use {!add_path_handler} and
@@ -399,6 +399,41 @@ val create :
 
     @param get_time_s obtain the current timestamp in seconds.
       This parameter exists since 0.11.
+*)
+
+(** A backend that provides IO operations, network operations, etc. *)
+module type IO_BACKEND = sig
+  val init_addr : unit -> string
+  val init_port : unit -> int
+
+  val spawn : (unit -> unit) -> unit
+  (** function used to spawn a new thread to handle a
+    new client connection. By default it is {!Thread.create} but one
+    could use a thread pool instead.*)
+
+  val get_time_s : unit -> float
+  (** obtain the current timestamp in seconds. *)
+
+  val tcp_server : unit -> Tiny_httpd_io.TCP_server.builder
+  (** Server  that can listen on a port and handle clients. *)
+end
+
+val create_from :
+  ?buf_size:int ->
+  ?middlewares:([ `Encoding | `Stage of int ] * Middleware.t) list ->
+  backend:(module IO_BACKEND) ->
+  unit ->
+  t
+(** Create a new webserver using provided backend.
+
+    The server will not do anything until {!run} is called on it.
+    Before starting the server, one can use {!add_path_handler} and
+    {!set_top_handler} to specify how to handle incoming requests.
+
+    @param buf_size size for buffers (since 0.11)
+    @param middlewares see {!add_middleware} for more details.
+
+    @since NEXT_RELEASE
 *)
 
 val addr : t -> string
@@ -555,6 +590,10 @@ val add_route_server_sent_handler :
     @since 0.9 *)
 
 (** {2 Run the server} *)
+
+val running : t -> bool
+(** Is the server running?
+    @since NEXT_RELEASE *)
 
 val stop : t -> unit
 (** Ask the server to stop. This might not have an immediate effect

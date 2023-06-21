@@ -1,25 +1,6 @@
-module Q = QCheck
-
-(* test utils *)
-let pp_res f = function
-  | Ok x -> f x
-  | Error e -> e
-
-let pp_res_query = Q.Print.(pp_res (list (pair string string)))
-
-let err_map f = function
-  | Ok x -> Ok (f x)
-  | Error e -> Error e
-
-let sort_l l = List.sort compare l
-let eq_sorted a b = err_map sort_l a = err_map sort_l b
-let is_ascii_char c = Char.code c < 128
-let assert_eq ?(cmp = ( = )) a b = assert (cmp a b)
-
+open Test_util
 open Tiny_httpd_util
 
-let qchecks = ref []
-let add_qcheck f = qchecks := f :: !qchecks
 let () = assert_eq "hello%20world" (percent_encode "hello world")
 let () = assert_eq "%23%25^%24%40^%40" (percent_encode "#%^$@^@")
 
@@ -67,4 +48,4 @@ let () =
          in
          eq_sorted (Ok l) (parse_query s))
 
-let () = exit @@ QCheck_base_runner.run_tests ~colors:false !qchecks
+let () = run_qcheck_and_exit ()

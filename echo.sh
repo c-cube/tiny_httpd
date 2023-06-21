@@ -1,2 +1,2 @@
 #!/bin/sh
-exec dune exec --profile=release "examples/echo.exe" -- $@
+exec dune exec --display=quiet --profile=release "examples/echo.exe" -- $@

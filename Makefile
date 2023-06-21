@@ -2,11 +2,12 @@
 
 all: build test
 
+OPTS?=--profile=release
 build:
-	@dune build @install
+	@dune build @install $(OPTS)
 
 test:
-	@dune runtest --no-buffer --force
+	@dune runtest --no-buffer --force $(OPTS)
 
 clean:
 	@dune clean
@@ -16,7 +17,7 @@ doc:
 
 WATCH?= "@install @runtest"
 watch:
-	@dune build $(WATCH) -w
+	@dune build $(OPTS) $(WATCH) -w
 
 .PHONY: benchs tests build watch
 
