@@ -1,4 +1,11 @@
-(** Resource pool *)
+(** Resource pool.
+
+    This pool is used for buffers. It can be used for other resources
+    but do note that it assumes resources are still reasonably
+    cheap to produce and discard, and will never block waiting for
+    a resource — it's not a good pool for DB connections.
+
+    @since NEXT_RELEASE. *)
 
 type 'a t
 (** Pool of values of type ['a] *)
