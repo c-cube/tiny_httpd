@@ -1,4 +1,4 @@
-name: build
+name: build (ocaml 5)
 
 on:
   pull_request:
@@ -17,8 +17,7 @@ jobs:
             #- macos-latest
             #- windows-latest
         ocaml-compiler:
-          - 4.05
-          - 4.14
+          - 5.0.x
 
     runs-on: ${{ matrix.os }}
 
@@ -30,14 +29,11 @@ jobs:
         uses: ocaml/setup-ocaml@v2
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
-          opam-local-packages: |
-            ./tiny_httpd.opam
-            ./tiny_httpd_camlzip.opam
           opam-depext-flags: --with-test
 
-      - run: opam install ./tiny_httpd.opam ./tiny_httpd_camlzip.opam --deps-only --with-test
+      - run: opam install . --deps-only --with-test
 
-      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
+      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_eio
 
       - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd
         if: ${{ matrix.os == 'ubuntu-latest' }}

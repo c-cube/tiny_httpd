@@ -1,36 +1,8 @@
 module S = Tiny_httpd
+module S_eio = Tiny_httpd_eio
 
 let now_ = Unix.gettimeofday
-
-let alice_text =
-  "CHAPTER I. Down the Rabbit-Hole  Alice was beginning to get very tired of \
-   sitting by her sister on the bank, and of having nothing to do: once or \
-   twice she had peeped into the book her sister was reading, but it had no \
-   pictures or conversations in it, <and what is the use of a book,> thought \
-   Alice <without pictures or conversations?> So she was considering in her \
-   own mind (as well as she could, for the hot day made her feel very sleepy \
-   and stupid), whether the pleasure of making a daisy-chain would be worth \
-   the trouble of getting up and picking the daisies, when suddenly a White \
-   Rabbit with pink eyes ran close by her. There was nothing so very \
-   remarkable in that; nor did Alice think it so very much out of the way to \
-   hear the Rabbit say to itself, <Oh dear! Oh dear! I shall be late!> (when \
-   she thought it over afterwards, it occurred to her that she ought to have \
-   wondered at this, but at the time it all seemed quite natural); but when \
-   the Rabbit actually took a watch out of its waistcoat-pocket, and looked at \
-   it, and then hurried on, Alice started to her feet, for it flashed across \
-   her mind that she had never before seen a rabbit with either a \
-   waistcoat-pocket, or a watch to take out of it, and burning with curiosity, \
-   she ran across the field after it, and fortunately was just in time to see \
-   it pop down a large rabbit-hole under the hedge. In another moment down \
-   went Alice after it, never once considering how in the world she was to get \
-   out again. The rabbit-hole went straight on like a tunnel for some way, and \
-   then dipped suddenly down, so suddenly that Alice had not a moment to think \
-   about stopping herself before she found herself falling down a very deep \
-   well. Either the well was very deep, or she fell very slowly, for she had \
-   plenty of time as she went down to look about her and to wonder what was \
-   going to happen next. First, she tried to look down and make out what she \
-   was coming to, but it was too dark to see anything; then she looked at the \
-   sides of the well, and noticed that they were filled with cupboards......"
+let ( let@ ) = ( @@ )
 
 (* util: a little middleware collecting statistics *)
 let middleware_stat () : S.Middleware.t * (unit -> string) =
@@ -63,15 +35,35 @@ let middleware_stat () : S.Middleware.t * (unit -> string) =
   in
   m, get_stat
 
-(* ugly AF *)
-let base64 x =
-  let ic, oc = Unix.open_process "base64" in
-  output_string oc x;
-  flush oc;
-  close_out oc;
-  let r = input_line ic in
-  ignore (Unix.close_process (ic, oc));
-  r
+let alice_text =
+  "CHAPTER I. Down the Rabbit-Hole  Alice was beginning to get very tired of \
+   sitting by her sister on the bank, and of having nothing to do: once or \
+   twice she had peeped into the book her sister was reading, but it had no \
+   pictures or conversations in it, <and what is the use of a book,> thought \
+   Alice <without pictures or conversations?> So she was considering in her \
+   own mind (as well as she could, for the hot day made her feel very sleepy \
+   and stupid), whether the pleasure of making a daisy-chain would be worth \
+   the trouble of getting up and picking the daisies, when suddenly a White \
+   Rabbit with pink eyes ran close by her. There was nothing so very \
+   remarkable in that; nor did Alice think it so very much out of the way to \
+   hear the Rabbit say to itself, <Oh dear! Oh dear! I shall be late!> (when \
+   she thought it over afterwards, it occurred to her that she ought to have \
+   wondered at this, but at the time it all seemed quite natural); but when \
+   the Rabbit actually took a watch out of its waistcoat-pocket, and looked at \
+   it, and then hurried on, Alice started to her feet, for it flashed across \
+   her mind that she had never before seen a rabbit with either a \
+   waistcoat-pocket, or a watch to take out of it, and burning with curiosity, \
+   she ran across the field after it, and fortunately was just in time to see \
+   it pop down a large rabbit-hole under the hedge. In another moment down \
+   went Alice after it, never once considering how in the world she was to get \
+   out again. The rabbit-hole went straight on like a tunnel for some way, and \
+   then dipped suddenly down, so suddenly that Alice had not a moment to think \
+   about stopping herself before she found herself falling down a very deep \
+   well. Either the well was very deep, or she fell very slowly, for she had \
+   plenty of time as she went down to look about her and to wonder what was \
+   going to happen next. First, she tried to look down and make out what she \
+   was coming to, but it was too dark to see anything; then she looked at the \
+   sides of the well, and noticed that they were filled with cupboards......"
 
 let () =
   let port_ = ref 8080 in
@@ -87,9 +79,18 @@ let () =
     (fun _ -> raise (Arg.Bad ""))
     "echo [option]*";
 
-  let server = S.create ~port:!port_ ~max_connections:!j () in
-  Tiny_httpd_camlzip.setup ~compress_above:1024 ~buf_size:(16 * 1024) server;
+  (* use eio *)
+  let@ stdenv = Eio_posix.run in
+  let@ sw = Eio.Switch.run in
 
+  (* create server *)
+  let server : S.t =
+    S_eio.create ~port:!port_ ~max_connections:!j
+      ~stdenv:(stdenv :> Eio_unix.Stdenv.base)
+      ~sw ()
+  in
+
+  Tiny_httpd_camlzip.setup ~compress_above:1024 ~buf_size:(16 * 1024) server;
   let m_stats, get_stats = middleware_stat () in
   S.add_middleware server ~stage:(`Stage 1) m_stats;
 
@@ -146,35 +147,6 @@ let () =
         S.Response.fail ~code:500 "couldn't upload file: %s"
           (Printexc.to_string e));
 
-  (* protected by login *)
-  S.add_route_handler server
-    S.Route.(exact "protected" @/ return)
-    (fun req ->
-      let ok =
-        match S.Request.get_header req "authorization" with
-        | Some v ->
-          S._debug (fun k -> k "authenticate with %S" v);
-          v = "Basic " ^ base64 "user:foobar"
-        | None -> false
-      in
-      if ok then (
-        (* FIXME: a logout link *)
-        let s =
-          "<p>hello, this is super secret!</p><a href=\"/logout\">log out</a>"
-        in
-        S.Response.make_string (Ok s)
-      ) else (
-        let headers =
-          S.Headers.(empty |> set "www-authenticate" "basic realm=\"echo\"")
-        in
-        S.Response.fail ~code:401 ~headers "invalid"
-      ));
-
-  (* logout *)
-  S.add_route_handler server
-    S.Route.(exact "logout" @/ return)
-    (fun _req -> S.Response.fail ~code:401 "logged out");
-
   (* stats *)
   S.add_route_handler server
     S.Route.(exact "stats" @/ return)
@@ -182,16 +154,15 @@ let () =
       let stats = get_stats () in
       S.Response.make_string @@ Ok stats);
 
+  S.add_route_handler server ~meth:`POST
+    S.Route.(exact "quit" @/ return)
+    (fun _req ->
+      S.stop server;
+      S.Response.make_string (Ok "quitting"));
+
   S.add_route_handler server
     S.Route.(exact "alice" @/ return)
     (fun _req -> S.Response.make_string (Ok alice_text));
-
-  (* VFS *)
-  Tiny_httpd_dir.add_vfs server
-    ~config:
-      (Tiny_httpd_dir.config ~download:true
-         ~dir_behavior:Tiny_httpd_dir.Index_or_lists ())
-    ~vfs:Vfs.vfs ~prefix:"vfs";
 
   (* main page *)
   S.add_route_handler server
@@ -246,21 +217,19 @@ let () =
                       ];
                     li []
                       [
-                        pre []
+                        pre
+                          [ A.style "display: inline" ]
                           [
-                            a [ A.href "/protected" ] [ txt "/protected" ];
-                            txt
-                              " (GET) to see a protected page (login: user, \
-                               password: foobar)";
+                            a [ A.href "/quit" ] [ txt "/quit" ];
+                            txt " (POST) to stop server";
                           ];
-                      ];
-                    li []
-                      [
-                        pre []
+                        form
                           [
-                            a [ A.href "/logout" ] [ txt "/logout" ];
-                            txt " (POST) to log out";
-                          ];
+                            A.style "display: inline";
+                            A.action "/quit";
+                            A.method_ "POST";
+                          ]
+                          [ button [ A.type_ "submit" ] [ txt "quit" ] ];
                       ];
                   ];
               ];
@@ -270,6 +239,8 @@ let () =
       S.Response.make_string ~headers:[ "content-type", "text/html" ] @@ Ok s);
 
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);
-  match S.run server with
+  let res = S.run server in
+  Gc.print_stat stdout;
+  match res with
   | Ok () -> ()
   | Error e -> raise e

@@ -19,6 +19,7 @@ let _debug k =
 module Buf = Tiny_httpd_buf
 module Byte_stream = Tiny_httpd_stream
 module IO = Tiny_httpd_io
+module Pool = Tiny_httpd_pool
 
 exception Bad_req of int * string
 
@@ -325,9 +326,13 @@ module Request = struct
     | Bad_req (c, s) -> Error (c, s)
     | e -> Error (400, Printexc.to_string e)
 
-  let read_body_full ?buf_size (self : byte_stream t) : string t =
+  let read_body_full ?buf ?buf_size (self : byte_stream t) : string t =
     try
-      let buf = Buf.create ?size:buf_size () in
+      let buf =
+        match buf with
+        | Some b -> b
+        | None -> Buf.create ?size:buf_size ()
+      in
       let body = Byte_stream.read_all ~buf self.body in
       { self with body }
     with
@@ -424,12 +429,12 @@ module Response = struct
     Format.fprintf out "{@[code=%d;@ headers=[@[%a@]];@ body=%a@]}" self.code
       Headers.pp self.headers pp_body self.body
 
-  let output_ ?(buf = Buf.create ~size:256 ()) (oc : IO.Out_channel.t)
-      (self : t) : unit =
+  let output_ ~buf (oc : IO.Out_channel.t) (self : t) : unit =
     (* double indirection:
        - print into [buffer] using [bprintf]
        - transfer to [buf_] so we can output from there *)
     let tmp_buffer = Buffer.create 32 in
+    Buf.clear buf;
 
     (* write start of reply *)
     Printf.bprintf tmp_buffer "HTTP/1.1 %d %s\r\n" self.code
@@ -631,11 +636,6 @@ module type IO_BACKEND = sig
   val init_addr : unit -> string
   val init_port : unit -> int
 
-  val spawn : (unit -> unit) -> unit
-  (** function used to spawn a new thread to handle a
-    new client connection. By default it is {!Thread.create} but one
-    could use a thread pool instead.*)
-
   val get_time_s : unit -> float
   (** obtain the current timestamp in seconds. *)
 
@@ -655,6 +655,7 @@ type t = {
   mutable path_handlers:
     (unit Request.t -> cb_path_handler resp_result option) list;
       (** path handlers *)
+  buf_pool: Buf.t Pool.t;
 }
 
 let get_addr_ sock =
@@ -746,7 +747,11 @@ let add_route_handler_ ?(accept = fun _req -> Ok ()) ?(middlewares = []) ?meth
 let add_route_handler (type a) ?accept ?middlewares ?meth self
     (route : (a, _) Route.t) (f : _) : unit =
   let tr_req _oc req ~resp f =
-    resp (f (Request.read_body_full ~buf_size:self.buf_size req))
+    let req =
+      Pool.with_resource self.buf_pool @@ fun buf ->
+      Request.read_body_full ~buf req
+    in
+    resp (f req)
   in
   add_route_handler_ ?accept ?middlewares ?meth self route ~tr_req f
 
@@ -763,7 +768,10 @@ exception Exit_SSE
 
 let add_route_server_sent_handler ?accept self route f =
   let tr_req (oc : IO.Out_channel.t) req ~resp f =
-    let req = Request.read_body_full ~buf_size:self.buf_size req in
+    let req =
+      Pool.with_resource self.buf_pool @@ fun buf ->
+      Request.read_body_full ~buf req
+    in
     let headers =
       ref Headers.(empty |> set "content-type" "text/event-stream")
     in
@@ -826,6 +834,10 @@ let create_from ?(buf_size = 16 * 1_024) ?(middlewares = []) ~backend () : t =
       path_handlers = [];
       middlewares = [];
       middlewares_sorted = lazy [];
+      buf_pool =
+        Pool.create ~clear:Buf.clear
+          ~mk_item:(fun () -> Buf.create ~size:buf_size ())
+          ();
     }
   in
   List.iter (fun (stage, m) -> add_middleware self ~stage m) middlewares;
@@ -959,7 +971,6 @@ let create ?(masksigpipe = true) ?max_connections ?(timeout = 0.0) ?buf_size
     let init_addr () = addr
     let init_port () = port
     let get_time_s = get_time_s
-    let spawn f = new_thread f
     let tcp_server () = tcp_server_builder
   end in
   let backend = (module B : IO_BACKEND) in
@@ -987,7 +998,8 @@ let find_map f l =
 
 (* handle client on [ic] and [oc] *)
 let client_handle_for (self : t) ic oc : unit =
-  let buf = Buf.create ~size:self.buf_size () in
+  Pool.with_resource self.buf_pool @@ fun buf ->
+  Pool.with_resource self.buf_pool @@ fun buf_res ->
   let is = Byte_stream.of_input ~buf_size:self.buf_size ic in
   let continue = ref true in
   while !continue && running self do
@@ -998,7 +1010,7 @@ let client_handle_for (self : t) ic oc : unit =
     | Error (c, s) ->
       (* connection error, close *)
       let res = Response.make_raw ~code:c s in
-      (try Response.output_ oc res with Sys_error _ -> ());
+      (try Response.output_ ~buf:buf_res oc res with Sys_error _ -> ());
       continue := false
     | Ok (Some req) ->
       _debug (fun k -> k "req: %s" (Format.asprintf "@[%a@]" Request.pp_ req));
@@ -1013,7 +1025,8 @@ let client_handle_for (self : t) ic oc : unit =
            | None ->
              fun _oc req ~resp ->
                let body_str =
-                 Request.read_body_full ~buf_size:self.buf_size req
+                 Pool.with_resource self.buf_pool @@ fun buf ->
+                 Request.read_body_full ~buf req
                in
                resp (self.handler body_str)
          in
@@ -1022,7 +1035,7 @@ let client_handle_for (self : t) ic oc : unit =
          (match Request.get_header ~f:String.trim req "Expect" with
          | Some "100-continue" ->
            _debug (fun k -> k "send back: 100 CONTINUE");
-           Response.output_ oc (Response.make_raw ~code:100 "")
+           Response.output_ ~buf:buf_res oc (Response.make_raw ~code:100 "")
          | Some s -> bad_reqf 417 "unknown expectation %s" s
          | None -> ());
 
@@ -1047,7 +1060,7 @@ let client_handle_for (self : t) ic oc : unit =
            try
              if Headers.get "connection" r.Response.headers = Some "close" then
                continue := false;
-             Response.output_ oc r
+             Response.output_ ~buf:buf_res oc r
            with Sys_error _ -> continue := false
          in
 
@@ -1058,10 +1071,10 @@ let client_handle_for (self : t) ic oc : unit =
       (* connection broken somehow *)
       | Bad_req (code, s) ->
         continue := false;
-        Response.output_ oc @@ Response.make_raw ~code s
+        Response.output_ ~buf:buf_res oc @@ Response.make_raw ~code s
       | e ->
         continue := false;
-        Response.output_ oc
+        Response.output_ ~buf:buf_res oc
         @@ Response.fail ~code:500 "server error: %s" (Printexc.to_string e))
   done
 

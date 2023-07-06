@@ -148,10 +148,13 @@ module Request : sig
       @since 0.3
   *)
 
-  val read_body_full : ?buf_size:int -> byte_stream t -> string t
+  val read_body_full :
+    ?buf:Tiny_httpd_buf.t -> ?buf_size:int -> byte_stream t -> string t
   (** Read the whole body into a string. Potentially blocking.
 
-      @param buf_size initial size of underlying buffer (since 0.11) *)
+      @param buf_size initial size of underlying buffer (since 0.11)
+      @param buf the initial buffer (since NEXT_RELEASE)
+      *)
 
   (**/**)
 
@@ -405,11 +408,6 @@ val create :
 module type IO_BACKEND = sig
   val init_addr : unit -> string
   val init_port : unit -> int
-
-  val spawn : (unit -> unit) -> unit
-  (** function used to spawn a new thread to handle a
-    new client connection. By default it is {!Thread.create} but one
-    could use a thread pool instead.*)
 
   val get_time_s : unit -> float
   (** obtain the current timestamp in seconds. *)

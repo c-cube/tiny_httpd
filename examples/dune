@@ -14,6 +14,13 @@
  (modules echo vfs)
  (libraries tiny_httpd tiny_httpd_camlzip))
 
+(executable
+ (name echo_eio)
+ (flags :standard -warn-error -a+8)
+ (modules echo_eio)
+ (libraries tiny_httpd tiny_httpd_camlzip
+            tiny_httpd_eio eio eio_posix))
+
 (rule
  (targets test_output.txt)
  (deps

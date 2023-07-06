@@ -14,9 +14,10 @@ depends: [
   "base-threads"
   "result"
   "seq"
-  "ocaml" { >= "4.04.0" }
+  "ocaml" { >= "4.05.0" }
   "odoc" {with-doc}
   "conf-libcurl" {with-test}
+  "ptime" {with-test}
   "qcheck-core" {with-test & >= "0.9" }
   "ptime" {with-test}
 ]

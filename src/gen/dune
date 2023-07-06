@@ -1,2 +1,2 @@
-(executable
- (name gentags))
+(executables
+ (names gentags mkshims))
