@@ -17,6 +17,7 @@ module In_channel = struct
         channel is closed. *)
     close: unit -> unit;
   }
+  (** An input channel, i.e an incoming stream of bytes. *)
 
   let of_in_channel ?(close_noerr = false) (ic : in_channel) : t =
     {
@@ -50,6 +51,7 @@ module Out_channel = struct
     flush: unit -> unit;  (** Flush underlying buffer *)
     close: unit -> unit;
   }
+  (** An output channel, ie. a place into which we can write bytes. *)
 
   let of_out_channel ?(close_noerr = false) (oc : out_channel) : t =
     {
@@ -74,6 +76,47 @@ module Out_channel = struct
   let output_buf (self : t) (buf : Buf.t) : unit =
     let b = Buf.bytes_slice buf in
     output self b 0 (Buf.size buf)
+
+  (** [chunk_encoding oc] makes a new channel that outputs its content into [oc]
+      in chunk encoding form.
+      @param close_rec if true, closing the result will also close [oc]
+      *)
+  let chunk_encoding ~close_rec (self : t) : t =
+    let flush = self.flush in
+    let close () =
+      (* write another crlf after the stream (see #56) *)
+      output_string self "\r\n";
+      self.flush ();
+      if close_rec then self.close ()
+    in
+    let output buf i n =
+      if n > 0 then (
+        output_string self (Printf.sprintf "%x\r\n" n);
+        self.output buf i n
+      )
+    in
+    { flush; close; output }
+end
+
+(** A writer abstraction.
+
+    A writer is a push-based stream of bytes. Give it an output channel and it will write
+    the bytes in it. *)
+module Writer = struct
+  type t = { write: Out_channel.t -> unit } [@@unboxed]
+  (** Writer. *)
+
+  let[@inline] make ~write () : t = { write }
+
+  (** Write into the channel. *)
+  let[@inline] write (oc : Out_channel.t) (self : t) : unit = self.write oc
+
+  let empty : t = { write = ignore }
+
+  (** A writer that just emits the bytes from the given string. *)
+  let of_string (str : string) : t =
+    let write oc = Out_channel.output_string oc str in
+    { write }
 end
 
 (** A TCP server abstraction *)

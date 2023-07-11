@@ -1,5 +1,7 @@
 module S = Tiny_httpd_server
 module BS = Tiny_httpd_stream
+module W = Tiny_httpd_io.Writer
+module Out = Tiny_httpd_io.Out_channel
 
 let decode_deflate_stream_ ~buf_size (is : S.byte_stream) : S.byte_stream =
   S._debug (fun k -> k "wrap stream with deflate.decode");
@@ -40,67 +42,70 @@ let decode_deflate_stream_ ~buf_size (is : S.byte_stream) : S.byte_stream =
       ))
     ()
 
-let encode_deflate_stream_ ~buf_size (is : S.byte_stream) : S.byte_stream =
-  S._debug (fun k -> k "wrap stream with deflate.encode");
-  let refill = ref true in
+let encode_deflate_writer_ ~buf_size (w : W.t) : W.t =
+  S._debug (fun k -> k "wrap writer with deflate.encode");
   let zlib_str = Zlib.deflate_init 4 false in
-  BS.make ~bs:(Bytes.create buf_size)
-    ~close:(fun _self ->
-      S._debug (fun k -> k "deflate: close");
-      Zlib.deflate_end zlib_str;
-      BS.close is)
-    ~consume:(fun self n ->
-      self.off <- self.off + n;
-      self.len <- self.len - n)
-    ~fill:(fun self ->
-      let rec loop () =
-        S._debug (fun k ->
-            k "deflate.fill.iter out_off=%d out_len=%d" self.off self.len);
-        if self.len > 0 then
-          ()
-        (* still the same slice, not consumed entirely by output *)
-        else if not !refill then
-          ()
-        (* empty slice, no refill *)
-        else (
-          (* the output was entirely consumed, we need to do more work *)
-          is.BS.fill_buf ();
-          if is.len > 0 then (
-            (* try to decompress from input buffer *)
-            let _finished, used_in, used_out =
-              Zlib.deflate zlib_str is.bs is.off is.len self.bs 0
-                (Bytes.length self.bs) Zlib.Z_NO_FLUSH
-            in
-            self.off <- 0;
-            self.len <- used_out;
-            is.consume used_in;
-            S._debug (fun k ->
-                k "encode %d bytes as %d bytes using deflate (finished: %b)"
-                  used_in used_out _finished);
-            if _finished then (
-              S._debug (fun k -> k "deflate: finished");
-              refill := false
-            );
-            loop ()
-          ) else (
-            (* [is] is done, finish sending the data in current buffer *)
-            let _finished, used_in, used_out =
-              Zlib.deflate zlib_str is.bs is.off is.len self.bs 0
-                (Bytes.length self.bs) Zlib.Z_FULL_FLUSH
-            in
-            assert (used_in = 0);
-            self.off <- 0;
-            self.len <- used_out;
-            if used_out = 0 then refill := false;
-            loop ()
-          )
-        )
+
+  let o_buf = Bytes.create buf_size in
+  let o_off = ref 0 in
+  let o_len = ref 0 in
+
+  (* write output buffer to out *)
+  let write_out (oc : Out.t) =
+    if !o_len > 0 then (
+      Out.output oc o_buf !o_off !o_len;
+      o_off := 0;
+      o_len := 0
+    )
+  in
+
+  (* Zlib.Z_NO_FLUSH *)
+  let flush_zlib ~flush (oc : Out.t) =
+    let continue = ref true in
+    while !continue do
+      let finished, used_in, used_out =
+        Zlib.deflate zlib_str Bytes.empty 0 0 o_buf 0 (Bytes.length o_buf) flush
       in
-      try loop ()
-      with Zlib.Error (e1, e2) ->
-        S.Response.fail_raise ~code:400
-          "deflate: error during compression:\n%s %s" e1 e2)
-    ()
+      assert (used_in = 0);
+      o_len := !o_len + used_out;
+      if finished then continue := false;
+      write_out oc
+    done
+  in
+
+  (* compress and consume input buffer *)
+  let write_zlib ~flush (oc : Out.t) buf i len =
+    let i = ref i in
+    let len = ref len in
+    while !len > 0 do
+      let _finished, used_in, used_out =
+        Zlib.deflate zlib_str buf !i !len o_buf 0 (Bytes.length o_buf) flush
+      in
+      i := !i + used_in;
+      len := !len - used_in;
+      o_len := !o_len + used_out;
+      write_out oc
+    done
+  in
+
+  let write (oc : Out.t) : unit =
+    let output buf i len = write_zlib ~flush:Zlib.Z_NO_FLUSH oc buf i len in
+    let flush () =
+      flush_zlib oc ~flush:Zlib.Z_SYNC_FLUSH;
+      oc.flush ()
+    in
+    let close () =
+      flush_zlib oc ~flush:Zlib.Z_FULL_FLUSH;
+      assert (!o_len = 0);
+      Zlib.deflate_end zlib_str;
+      oc.close ()
+    in
+    (* new output channel that compresses on the fly *)
+    let oc' = { Out.flush; close; output } in
+    w.write oc'
+  in
+
+  W.make ~write ()
 
 let split_on_char ?(f = fun x -> x) c s : string list =
   let rec loop acc i =
@@ -161,15 +166,21 @@ let compress_resp_stream_ ~compress_above ~buf_size (req : _ S.Request.t)
       S._debug (fun k ->
           k "encode str response with deflate (size %d, threshold %d)"
             (String.length s) compress_above);
-      let body = encode_deflate_stream_ ~buf_size @@ BS.of_string s in
+      let body = encode_deflate_writer_ ~buf_size @@ W.of_string s in
       resp
       |> S.Response.update_headers update_headers
-      |> S.Response.set_body (`Stream body)
+      |> S.Response.set_body (`Writer body)
     | `Stream str ->
       S._debug (fun k -> k "encode stream response with deflate");
+      let w = BS.to_writer str in
       resp
       |> S.Response.update_headers update_headers
-      |> S.Response.set_body (`Stream (encode_deflate_stream_ ~buf_size str))
+      |> S.Response.set_body (`Writer (encode_deflate_writer_ ~buf_size w))
+    | `Writer w ->
+      S._debug (fun k -> k "encode writer response with deflate");
+      resp
+      |> S.Response.update_headers update_headers
+      |> S.Response.set_body (`Writer (encode_deflate_writer_ ~buf_size w))
     | `String _ | `Void -> resp
   ) else
     resp

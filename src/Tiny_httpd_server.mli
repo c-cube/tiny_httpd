@@ -194,9 +194,21 @@ end
     the client to answer a {!Request.t}*)
 
 module Response : sig
-  type body = [ `String of string | `Stream of byte_stream | `Void ]
+  type body =
+    [ `String of string
+    | `Stream of byte_stream
+    | `Writer of Tiny_httpd_io.Writer.t
+    | `Void ]
   (** Body of a response, either as a simple string,
-      or a stream of bytes, or nothing (for server-sent events notably). *)
+      or a stream of bytes, or nothing (for server-sent events notably).
+
+      - [`String str] replies with a body set to this string, and a known content-length.
+      - [`Stream str] replies with a body made from this string, using chunked encoding.
+      - [`Void] replies with no body.
+      - [`Writer w] replies with a body created by the writer [w], using
+          a chunked encoding.
+        It is available since NEXT_RELEASE.
+  *)
 
   type t = private {
     code: Response_code.t;  (** HTTP response code. See {!Response_code}. *)
@@ -250,6 +262,12 @@ module Response : sig
   val make_string :
     ?headers:Headers.t -> (string, Response_code.t * string) result -> t
   (** Same as {!make} but with a string body. *)
+
+  val make_writer :
+    ?headers:Headers.t ->
+    (Tiny_httpd_io.Writer.t, Response_code.t * string) result ->
+    t
+  (** Same as {!make} but with a writer body. *)
 
   val make_stream :
     ?headers:Headers.t -> (byte_stream, Response_code.t * string) result -> t

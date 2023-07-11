@@ -98,6 +98,10 @@ val to_chan' : Tiny_httpd_io.Out_channel.t -> t -> unit
 (** Write to the IO channel.
     @since NEXT_RELEASE *)
 
+val to_writer : t -> Tiny_httpd_io.Writer.t
+(** Turn this stream into a writer.
+    @since NEXT_RELEASE *)
+
 val make :
   ?bs:bytes ->
   ?close:(t -> unit) ->
