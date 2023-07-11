@@ -386,6 +386,8 @@ val create :
     @param new_thread a function used to spawn a new thread to handle a
     new client connection. By default it is {!Thread.create} but one
     could use a thread pool instead.
+    See for example {{: https://github.com/c-cube/tiny-httpd-moonpool-bench/blob/0dcbbffb4fe34ea4ad79d46343ad0cebb69ca69f/examples/t1.ml#L31}
+      this use of moonpool}.
 
     @param middlewares see {!add_middleware} for more details.
 
@@ -404,16 +406,25 @@ val create :
       This parameter exists since 0.11.
 *)
 
-(** A backend that provides IO operations, network operations, etc. *)
+(** A backend that provides IO operations, network operations, etc.
+
+    This is used to decouple tiny_httpd from the scheduler/IO library used to
+    actually open a TCP server and talk to clients. The classic way is
+    based on {!Unix} and blocking IOs, but it's also possible to
+    use an OCaml 5 library using effects and non blocking IOs. *)
 module type IO_BACKEND = sig
   val init_addr : unit -> string
+  (** Initial TCP address *)
+
   val init_port : unit -> int
+  (** Initial port *)
 
   val get_time_s : unit -> float
-  (** obtain the current timestamp in seconds. *)
+  (** Obtain the current timestamp in seconds. *)
 
   val tcp_server : unit -> Tiny_httpd_io.TCP_server.builder
-  (** Server  that can listen on a port and handle clients. *)
+  (** TCP server builder, to create servers that can listen
+      on a port and handle clients. *)
 end
 
 val create_from :
