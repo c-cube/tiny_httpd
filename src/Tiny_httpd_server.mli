@@ -606,8 +606,12 @@ val run : ?after_init:(unit -> unit) -> t -> (unit, exn) result
     it exits with an error.
 
     @param after_init is called after the server starts listening. since 0.13 .
-
 *)
+
+val run_exn : ?after_init:(unit -> unit) -> t -> unit
+(** [run_exn s] is like [run s] but re-raises an exception if the server exits
+    with an error.
+    @since NEXT_RELEASE *)
 
 (**/**)
 

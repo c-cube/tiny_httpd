@@ -1085,15 +1085,14 @@ let is_ipv6 (self : t) =
   let (module B) = self.backend in
   is_ipv6_str (B.init_addr ())
 
-(* TODO: init TCP server *)
-let run ?(after_init = ignore) (self : t) : (unit, _) result =
-  try
-    let (module B) = self.backend in
-    let server = B.tcp_server () in
-    server.serve
-      ~after_init:(fun tcp_server ->
-        self.tcp_server <- Some tcp_server;
-        after_init ())
-      ~handle:(client_handler self) ();
-    Ok ()
-  with e -> Error e
+let run_exn ?(after_init = ignore) (self : t) : unit =
+  let (module B) = self.backend in
+  let server = B.tcp_server () in
+  server.serve
+    ~after_init:(fun tcp_server ->
+      self.tcp_server <- Some tcp_server;
+      after_init ())
+    ~handle:(client_handler self) ()
+
+let run ?after_init self : _ result =
+  try Ok (run_exn ?after_init self) with e -> Error e
