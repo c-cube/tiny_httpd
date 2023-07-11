@@ -27,7 +27,36 @@ type t = {
   _rest: hidden;  (** Use {!make} to build a stream. *)
 }
 (** A buffered stream, with a view into the current buffer (or refill if empty),
-    and a function to consume [n] bytes. *)
+    and a function to consume [n] bytes.
+
+    The point of this type is that it gives the caller access to its internal buffer
+    ([bs], with the slice [off,len]). This is convenient for things like line
+    reading where one needs to peek ahead.
+
+    Some core invariant for this type of stream are:
+      - [off,len] delimits a valid slice in [bs] (indices: [off, off+1, … off+len-1])
+      - if [fill_buf()] was just called, then either [len=0] which indicates the end
+        of stream; or [len>0] and the slice contains some data.
+
+    To actually move forward in the stream, you can call [consume n]
+    to consume [n] bytes (where [n <= len]). If [len] gets to [0], calling
+    [fill_buf()] is required, so it can try to obtain a new slice.
+
+    To emulate a classic OCaml reader with a [read: bytes -> int -> int -> int] function,
+    the simplest is:
+
+    {[
+    let read (self:t) buf offset max_len : int =
+      self.fill_buf();
+      let len = min max_len self.len in
+      if len > 0 then (
+        Bytes.blit self.bs self.off buf offset len;
+        self.consume len;
+      );
+      len
+
+    ]}
+*)
 
 val close : t -> unit
 (** Close stream *)
