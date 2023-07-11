@@ -84,6 +84,8 @@ module Out_channel = struct
   let chunk_encoding ~close_rec (self : t) : t =
     let flush = self.flush in
     let close () =
+      (* write an empty chunk to close the stream *)
+      output_string self "0\r\n";
       (* write another crlf after the stream (see #56) *)
       output_string self "\r\n";
       self.flush ();
@@ -92,7 +94,8 @@ module Out_channel = struct
     let output buf i n =
       if n > 0 then (
         output_string self (Printf.sprintf "%x\r\n" n);
-        self.output buf i n
+        self.output buf i n;
+        output_string self "\r\n"
       )
     in
     { flush; close; output }

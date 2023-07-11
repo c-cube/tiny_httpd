@@ -478,7 +478,7 @@ module Response = struct
     let self = { self with headers; body } in
     _debug (fun k ->
         k "output response: %s"
-          (Format.asprintf "%a" pp { self with body = `String "<…>" }));
+          (Format.asprintf "%a" pp { self with body = `String "<...>" }));
 
     (* write headers *)
     List.iter

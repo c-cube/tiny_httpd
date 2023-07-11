@@ -83,11 +83,10 @@ let rec iter f (self : t) : unit =
     (iter [@tailcall]) f self
   )
 
-let to_chan (oc : out_channel) (self : t) =
-  iter (fun s i len -> output oc s i len) self
+let to_chan (oc : out_channel) (self : t) = iter (output oc) self
 
 let to_chan' (oc : IO.Out_channel.t) (self : t) =
-  iter (fun s i len -> IO.Out_channel.output oc s i len) self
+  iter (IO.Out_channel.output oc) self
 
 let to_writer (self : t) : Tiny_httpd_io.Writer.t =
   { write = (fun oc -> to_chan' oc self) }
