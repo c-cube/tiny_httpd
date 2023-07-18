@@ -21,6 +21,10 @@ val contents_and_clear : t -> string
 (** Get contents of the buffer and clear it.
     @since 0.5 *)
 
+val add_char : t -> char -> unit
+(** Add a single char.
+    @since NEXT_RELEASE *)
+
 val add_bytes : t -> bytes -> int -> int -> unit
 (** Append given bytes slice to the buffer.
     @since 0.5 *)
