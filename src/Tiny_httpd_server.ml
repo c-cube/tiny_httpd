@@ -490,8 +490,6 @@ module Response = struct
 
     IO.Out_channel.output_buf oc buf;
     IO.Out_channel.output_string oc "\r\n";
-    (* flush after writing headers *)
-    IO.Out_channel.flush oc;
     Buf.clear buf;
 
     (match body with
