@@ -113,10 +113,30 @@ module Out_channel = struct
   (** [chunk_encoding oc] makes a new channel that outputs its content into [oc]
       in chunk encoding form.
       @param close_rec if true, closing the result will also close [oc]
+      @param buf a buffer used to accumulate data into chunks.
+        Chunks are emitted when [buf]'s size gets over a certain threshold,
+        or when [flush] is called.
       *)
-  let chunk_encoding ~close_rec (self : t) : t =
-    let flush = self.flush in
+  let chunk_encoding ?(buf = Buf.create ()) ~close_rec (self : t) : t =
+    (* write content of [buf] as a chunk if it's big enough.
+       If [force=true] then write content of [buf] if it's simply non empty. *)
+    let write_buf ~force () =
+      let n = Buf.size buf in
+      if (force && n > 0) || n > 4_096 then (
+        output_string self (Printf.sprintf "%x\r\n" n);
+        self.output (Buf.bytes_slice buf) 0 n;
+        output_string self "\r\n";
+        Buf.clear buf
+      )
+    in
+
+    let flush () =
+      write_buf ~force:true ();
+      self.flush ()
+    in
+
     let close () =
+      write_buf ~force:true ();
       (* write an empty chunk to close the stream *)
       output_string self "0\r\n";
       (* write another crlf after the stream (see #56) *)
@@ -124,19 +144,14 @@ module Out_channel = struct
       self.flush ();
       if close_rec then self.close ()
     in
-    let output buf i n =
-      if n > 0 then (
-        output_string self (Printf.sprintf "%x\r\n" n);
-        self.output buf i n;
-        output_string self "\r\n"
-      )
+    let output b i n =
+      Buf.add_bytes buf b i n;
+      write_buf ~force:false ()
     in
 
-    (* terrible terrible. *)
-    let bchar = Bytes.create 1 in
     let output_char c =
-      Bytes.set bchar 0 c;
-      output bchar 0 1
+      Buf.add_char buf c;
+      write_buf ~force:false ()
     in
     { output_char; flush; close; output }
 end
