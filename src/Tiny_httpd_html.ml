@@ -19,7 +19,8 @@ include Tiny_httpd_html_
 let to_out_channel ?(top = false) (self : elt) (out : IO.Out_channel.t) : unit =
   let out = Out.create_of_out out in
   if top then Out.add_string out "<!DOCTYPE html>\n";
-  self out
+  self out;
+  Out.flush out
 
 (** Convert a HTML element to a string.
     @param top if true, add DOCTYPE at the beginning. The top element should then
@@ -49,6 +50,13 @@ let to_string_top = to_string ~top:true
 (** Write a toplevel element to an output channel.
     @since NEXT_RELEASE *)
 let to_out_channel_top = to_out_channel ~top:true
+
+(** Produce a streaming writer from this HTML element.
+    @param top if true, add a DOCTYPE. See {!to_out_channel}.
+    @since NEXT_RELEASE *)
+let to_writer ?top (self : elt) : IO.Writer.t =
+  let write oc = to_out_channel ?top self oc in
+  IO.Writer.make ~write ()
 
 (** Convert a HTML element to a stream. This might just convert
     it to a string first, do not assume it to be more efficient. *)
