@@ -79,6 +79,11 @@ module Out_channel = struct
             close_out oc);
     }
 
+  (** [of_buffer buf] is an output channel that writes directly into [buf].
+        [flush] and [close] have no effect. *)
+  let of_buffer (buf : Buffer.t) : t =
+    { output = Buffer.add_subbytes buf; flush = ignore; close = ignore }
+
   (** Output the buffer slice into this channel *)
   let[@inline] output (self : t) buf i len : unit = self.output buf i len
 
