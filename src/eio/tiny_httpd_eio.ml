@@ -93,8 +93,16 @@ let oc_of_flow ~buf_pool:oc_pool (flow : Eio.Net.stream_socket) :
       if !offset = Bytes.length wbuf then flush ()
     done
   in
+
+  let output_char c =
+    if !offset = Bytes.length wbuf then flush ();
+    Bytes.set wbuf !offset c;
+    incr offset;
+    if !offset = Bytes.length wbuf then flush ()
+  in
+
   let close () = flow#shutdown `Send in
-  { IO.Out_channel.close; flush; output }
+  { IO.Out_channel.close; flush; output; output_char }
 
 let io_backend ?(addr = "127.0.0.1") ?(port = 8080) ?max_connections
     ~(stdenv : Eio_unix.Stdenv.base) ~(sw : Eio.Switch.t) () :

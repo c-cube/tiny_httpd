@@ -89,6 +89,13 @@ let encode_deflate_writer_ ~buf_size (w : W.t) : W.t =
 
   let write (oc : Out.t) : unit =
     let output buf i len = write_zlib ~flush:Zlib.Z_NO_FLUSH oc buf i len in
+
+    let bchar = Bytes.create 1 in
+    let output_char c =
+      Bytes.set bchar 0 c;
+      output bchar 0 1
+    in
+
     let flush () =
       flush_zlib oc ~flush:Zlib.Z_FINISH;
       assert (!o_len = 0);
@@ -100,7 +107,7 @@ let encode_deflate_writer_ ~buf_size (w : W.t) : W.t =
       oc.close ()
     in
     (* new output channel that compresses on the fly *)
-    let oc' = { Out.flush; close; output } in
+    let oc' = { Out.flush; close; output; output_char } in
     w.write oc';
     oc'.close ()
   in

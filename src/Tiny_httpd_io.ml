@@ -56,6 +56,7 @@ end
 (** Output channel (byte sink) *)
 module Out_channel = struct
   type t = {
+    output_char: char -> unit;  (** Output a single char *)
     output: bytes -> int -> int -> unit;  (** Output slice *)
     flush: unit -> unit;  (** Flush underlying buffer *)
     close: unit -> unit;  (** Close the output. Must be idempotent. *)
@@ -69,6 +70,7 @@ module Out_channel = struct
       instead of [close_out] to close [oc] *)
   let of_out_channel ?(close_noerr = false) (oc : out_channel) : t =
     {
+      output_char = (fun c -> output_char oc c);
       output = (fun buf i len -> output oc buf i len);
       flush = (fun () -> flush oc);
       close =
@@ -82,7 +84,15 @@ module Out_channel = struct
   (** [of_buffer buf] is an output channel that writes directly into [buf].
         [flush] and [close] have no effect. *)
   let of_buffer (buf : Buffer.t) : t =
-    { output = Buffer.add_subbytes buf; flush = ignore; close = ignore }
+    {
+      output_char = Buffer.add_char buf;
+      output = Buffer.add_subbytes buf;
+      flush = ignore;
+      close = ignore;
+    }
+
+  (** Output the buffer slice into this channel *)
+  let[@inline] output_char (self : t) c : unit = self.output_char c
 
   (** Output the buffer slice into this channel *)
   let[@inline] output (self : t) buf i len : unit = self.output buf i len
@@ -121,7 +131,14 @@ module Out_channel = struct
         output_string self "\r\n"
       )
     in
-    { flush; close; output }
+
+    (* terrible terrible. *)
+    let bchar = Bytes.create 1 in
+    let output_char c =
+      Bytes.set bchar 0 c;
+      output bchar 0 1
+    in
+    { output_char; flush; close; output }
 end
 
 (** A writer abstraction. *)
