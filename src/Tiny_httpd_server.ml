@@ -480,7 +480,7 @@ module Response = struct
         k "output response: %s"
           (Format.asprintf "%a" pp { self with body = `String "<...>" }));
 
-    (* write headers *)
+    (* write headers, using [buf] to batch writes *)
     List.iter
       (fun (k, v) ->
         Printf.bprintf tmp_buffer "%s: %s\r\n" k v;
@@ -490,12 +490,16 @@ module Response = struct
 
     IO.Out_channel.output_buf oc buf;
     IO.Out_channel.output_string oc "\r\n";
+    (* flush after writing headers *)
+    IO.Out_channel.flush oc;
+    Buf.clear buf;
 
     (match body with
     | `String "" | `Void -> ()
     | `String s -> IO.Out_channel.output_string oc s
     | `Writer w ->
-      let oc' = IO.Out_channel.chunk_encoding ~close_rec:false oc in
+      (* use buffer to chunk encode [w] *)
+      let oc' = IO.Out_channel.chunk_encoding ~buf ~close_rec:false oc in
       (try
          IO.Writer.write oc' w;
          IO.Out_channel.close oc'
@@ -504,7 +508,7 @@ module Response = struct
          raise e)
     | `Stream str ->
       (try
-         Byte_stream.output_chunked' oc str;
+         Byte_stream.output_chunked' ~buf oc str;
          Byte_stream.close str
        with e ->
          Byte_stream.close str;

@@ -149,9 +149,11 @@ val read_exactly :
     @param too_short is called if [bs] closes with still [n] bytes remaining
 *)
 
-val output_chunked : out_channel -> t -> unit
-(** Write the stream into the channel, using the chunked encoding. *)
+val output_chunked : ?buf:Tiny_httpd_buf.t -> out_channel -> t -> unit
+(** Write the stream into the channel, using the chunked encoding.
+    @param buf optional buffer for chunking (since NEXT_RELEASE) *)
 
-val output_chunked' : Tiny_httpd_io.Out_channel.t -> t -> unit
+val output_chunked' :
+  ?buf:Tiny_httpd_buf.t -> Tiny_httpd_io.Out_channel.t -> t -> unit
 (** Write the stream into the channel, using the chunked encoding.
     @since NEXT_RELEASE *)

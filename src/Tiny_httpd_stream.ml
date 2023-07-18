@@ -299,11 +299,11 @@ let read_chunked ?(buf = Buf.create ()) ~fail (bs : t) : t =
       refill := false)
     ()
 
-let output_chunked' (oc : IO.Out_channel.t) (self : t) : unit =
-  let oc' = IO.Out_channel.chunk_encoding oc ~close_rec:false in
+let output_chunked' ?buf (oc : IO.Out_channel.t) (self : t) : unit =
+  let oc' = IO.Out_channel.chunk_encoding ?buf oc ~close_rec:false in
   to_chan' oc' self;
   IO.Out_channel.close oc'
 
 (* print a stream as a series of chunks *)
-let output_chunked (oc : out_channel) (self : t) : unit =
-  output_chunked' (IO.Out_channel.of_out_channel oc) self
+let output_chunked ?buf (oc : out_channel) (self : t) : unit =
+  output_chunked' ?buf (IO.Out_channel.of_out_channel oc) self
