@@ -20,6 +20,7 @@ let to_out_channel ?(top = false) (self : elt) (out : IO.Out_channel.t) : unit =
   let out = Out.create_of_out out in
   if top then Out.add_string out "<!DOCTYPE html>\n";
   self out;
+  Out.add_format_nl out;
   Out.flush out
 
 (** Convert a HTML element to a string.
