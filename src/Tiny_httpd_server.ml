@@ -930,6 +930,7 @@ module Unix_tcp_server_ = struct
             Sem_.acquire 1 self.sem_max_connections;
             try
               let client_sock, _ = Unix.accept sock in
+              Unix.setsockopt client_sock Unix.TCP_NODELAY true;
               self.new_thread (fun () ->
                   try
                     handle_client_unix_ client_sock;
