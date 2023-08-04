@@ -970,6 +970,9 @@ module Unix_tcp_server_ = struct
                   k "Unix.accept or Thread.create raised an exception: %s"
                     (Printexc.to_string e))
           done;
+
+          (* Wait for all threads to be done: this only works if all threads are done. *)
+          Sem_.acquire self.sem_max_connections.max self.sem_max_connections;
           ());
     }
 end
