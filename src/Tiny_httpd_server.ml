@@ -935,7 +935,6 @@ module Unix_tcp_server_ = struct
 
           (* how to handle a single client *)
           let handle_client_unix_ (client_sock : Unix.file_descr) : unit =
-            ignore Unix.(sigprocmask SIG_BLOCK Sys.[ sigint; sighup ]);
             Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout);
             Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout);
             let oc =
@@ -958,6 +957,7 @@ module Unix_tcp_server_ = struct
             try
               let client_sock, _ = Unix.accept sock in
               Unix.setsockopt client_sock Unix.TCP_NODELAY true;
+              ignore Unix.(sigprocmask SIG_BLOCK Sys.[ sigint; sighup ]);
               self.new_thread (fun () ->
                   try
                     handle_client_unix_ client_sock;
@@ -965,7 +965,8 @@ module Unix_tcp_server_ = struct
                   with e ->
                     (try Unix.close client_sock with _ -> ());
                     Sem_.release 1 self.sem_max_connections;
-                    raise e)
+                    raise e);
+              ignore Unix.(sigprocmask SIG_UNBLOCK Sys.[ sigint; sighup ]);
             with e ->
               Sem_.release 1 self.sem_max_connections;
               _debug (fun k ->
