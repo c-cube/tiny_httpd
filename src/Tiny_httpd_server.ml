@@ -935,6 +935,7 @@ module Unix_tcp_server_ = struct
 
           (* how to handle a single client *)
           let handle_client_unix_ (client_sock : Unix.file_descr) : unit =
+            ignore Unix.(sigprocmask SIG_BLOCK Sys.[ sigint; sighup ]);
             Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout);
             Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout);
             let oc =
