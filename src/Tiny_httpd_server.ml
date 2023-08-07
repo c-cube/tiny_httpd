@@ -972,6 +972,7 @@ module Unix_tcp_server_ = struct
           done;
 
           (* Wait for all threads to be done: this only works if all threads are done. *)
+          Unix.close sock;
           Sem_.acquire self.sem_max_connections.max self.sem_max_connections;
           ());
     }
