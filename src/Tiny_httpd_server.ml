@@ -405,27 +405,27 @@ module Response = struct
     else
       make_raw ~headers ~code "" (* invalid to not have a body *)
 
-  let make_string ?headers r =
+  let make_string ?headers ?(code=200) r =
     match r with
-    | Ok body -> make_raw ?headers ~code:200 body
+    | Ok body -> make_raw ?headers ~code body
     | Error (code, msg) -> make_raw ?headers ~code msg
 
-  let make_stream ?headers r =
+  let make_stream ?headers ?(code=200) r =
     match r with
-    | Ok body -> make_raw_stream ?headers ~code:200 body
+    | Ok body -> make_raw_stream ?headers ~code body
     | Error (code, msg) -> make_raw ?headers ~code msg
 
-  let make_writer ?headers r : t =
+  let make_writer ?headers ?(code=200) r : t =
     match r with
-    | Ok body -> make_raw_writer ?headers ~code:200 body
+    | Ok body -> make_raw_writer ?headers ~code body
     | Error (code, msg) -> make_raw ?headers ~code msg
 
-  let make ?headers r : t =
+  let make ?headers ?(code=200) r : t =
     match r with
-    | Ok (`String body) -> make_raw ?headers ~code:200 body
-    | Ok (`Stream body) -> make_raw_stream ?headers ~code:200 body
-    | Ok `Void -> make_void ?headers ~code:200 ()
-    | Ok (`Writer f) -> make_raw_writer ?headers ~code:200 f
+    | Ok (`String body) -> make_raw ?headers ~code body
+    | Ok (`Stream body) -> make_raw_stream ?headers ~code body
+    | Ok `Void -> make_void ?headers ~code ()
+    | Ok (`Writer f) -> make_raw_writer ?headers ~code f
     | Error (code, msg) -> make_raw ?headers ~code msg
 
   let fail ?headers ~code fmt =
