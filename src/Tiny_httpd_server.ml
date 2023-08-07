@@ -164,6 +164,7 @@ module Request = struct
   type 'body t = {
     meth: Meth.t;
     host: string;
+    client_addr: Unix.sockaddr option;
     headers: Headers.t;
     http_version: int * int;
     path: string;
@@ -245,7 +246,7 @@ module Request = struct
         bad_reqf 400 "body is too short by %d bytes" size)
 
   (* parse request, but not body (yet) *)
-  let parse_req_start ~get_time_s ~buf (bs : byte_stream) :
+  let parse_req_start ?client_addr ~get_time_s ~buf (bs : byte_stream) :
       unit t option resp_result =
     try
       let line = Byte_stream.read_line ~buf bs in
@@ -281,6 +282,7 @@ module Request = struct
           meth;
           query;
           host;
+          client_addr;
           path;
           path_components;
           headers;
@@ -934,7 +936,7 @@ module Unix_tcp_server_ = struct
           after_init tcp_server;
 
           (* how to handle a single client *)
-          let handle_client_unix_ (client_sock : Unix.file_descr) : unit =
+          let handle_client_unix_ (client_sock : Unix.file_descr) (client_addr : Unix.sockaddr) : unit =
             Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout);
             Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout);
             let oc =
@@ -942,7 +944,7 @@ module Unix_tcp_server_ = struct
               @@ Unix.out_channel_of_descr client_sock
             in
             let ic = IO.In_channel.of_unix_fd client_sock in
-            handle.handle ic oc;
+            handle.handle ~client_addr ic oc;
             _debug (fun k -> k "done with client, exiting");
             (try Unix.close client_sock
              with e ->
@@ -955,11 +957,11 @@ module Unix_tcp_server_ = struct
             (* limit concurrency *)
             Sem_.acquire 1 self.sem_max_connections;
             try
-              let client_sock, _ = Unix.accept sock in
+              let client_sock, client_addr = Unix.accept sock in
               Unix.setsockopt client_sock Unix.TCP_NODELAY true;
               self.new_thread (fun () ->
                   try
-                    handle_client_unix_ client_sock;
+                    handle_client_unix_ client_sock client_addr;
                     Sem_.release 1 self.sem_max_connections
                   with e ->
                     (try Unix.close client_sock with _ -> ());
@@ -1024,7 +1026,7 @@ let find_map f l =
   aux f l
 
 (* handle client on [ic] and [oc] *)
-let client_handle_for (self : t) ic oc : unit =
+let client_handle_for (self : t) ?client_addr ic oc : unit =
   Pool.with_resource self.buf_pool @@ fun buf ->
   Pool.with_resource self.buf_pool @@ fun buf_res ->
   let is = Byte_stream.of_input ~buf_size:self.buf_size ic in
@@ -1032,7 +1034,7 @@ let client_handle_for (self : t) ic oc : unit =
   while !continue && running self do
     _debug (fun k -> k "read next request");
     let (module B) = self.backend in
-    match Request.parse_req_start ~get_time_s:B.get_time_s ~buf is with
+    match Request.parse_req_start ?client_addr ~get_time_s:B.get_time_s ~buf is with
     | Ok None -> continue := false (* client is done *)
     | Error (c, s) ->
       (* connection error, close *)

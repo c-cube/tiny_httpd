@@ -67,6 +67,7 @@ module Request : sig
     meth: Meth.t;  (** HTTP method for this request. *)
     host: string;
         (** Host header, mandatory. It can also be found in {!headers}. *)
+    client_addr : Unix.sockaddr option;  (** Client address. *)
     headers: Headers.t;  (** List of headers. *)
     http_version: int * int;
         (** HTTP version. This should be either [1, 0] or [1, 1]. *)
