@@ -366,7 +366,12 @@ end
 *)
 
 module Response = struct
-  type body = [ `String of string | `Stream of byte_stream | `Void ]
+  type body =
+    [ `String of string
+    | `Stream of byte_stream
+    | `Writer of IO.Writer.t
+    | `Void ]
+
   type t = { code: Response_code.t; headers: Headers.t; body: body }
 
   let set_body body self = { self with body }
@@ -383,9 +388,12 @@ module Response = struct
     { code; headers; body = `String body }
 
   let make_raw_stream ?(headers = []) ~code body : t =
-    (* add content length to response *)
     let headers = Headers.set "Transfer-Encoding" "chunked" headers in
     { code; headers; body = `Stream body }
+
+  let make_raw_writer ?(headers = []) ~code body : t =
+    let headers = Headers.set "Transfer-Encoding" "chunked" headers in
+    { code; headers; body = `Writer body }
 
   let make_void_force_ ?(headers = []) ~code () : t =
     { code; headers; body = `Void }
@@ -407,11 +415,17 @@ module Response = struct
     | Ok body -> make_raw_stream ?headers ~code:200 body
     | Error (code, msg) -> make_raw ?headers ~code msg
 
+  let make_writer ?headers r : t =
+    match r with
+    | Ok body -> make_raw_writer ?headers ~code:200 body
+    | Error (code, msg) -> make_raw ?headers ~code msg
+
   let make ?headers r : t =
     match r with
     | Ok (`String body) -> make_raw ?headers ~code:200 body
     | Ok (`Stream body) -> make_raw_stream ?headers ~code:200 body
     | Ok `Void -> make_void ?headers ~code:200 ()
+    | Ok (`Writer f) -> make_raw_writer ?headers ~code:200 f
     | Error (code, msg) -> make_raw ?headers ~code msg
 
   let fail ?headers ~code fmt =
@@ -424,6 +438,7 @@ module Response = struct
     let pp_body out = function
       | `String s -> Format.fprintf out "%S" s
       | `Stream _ -> Format.pp_print_string out "<stream>"
+      | `Writer _ -> Format.pp_print_string out "<writer>"
       | `Void -> ()
     in
     Format.fprintf out "{@[code=%d;@ headers=[@[%a@]];@ body=%a@]}" self.code
@@ -446,9 +461,10 @@ module Response = struct
       match self.body with
       | `String s when String.length s > 1024 * 500 ->
         (* chunk-encode large bodies *)
-        `Stream (Byte_stream.of_string s), true
+        `Writer (IO.Writer.of_string s), true
       | `String _ as b -> b, false
       | `Stream _ as b -> b, true
+      | `Writer _ as b -> b, true
       | `Void as b -> b, false
     in
     let headers =
@@ -462,9 +478,9 @@ module Response = struct
     let self = { self with headers; body } in
     _debug (fun k ->
         k "output response: %s"
-          (Format.asprintf "%a" pp { self with body = `String "<…>" }));
+          (Format.asprintf "%a" pp { self with body = `String "<...>" }));
 
-    (* write headers *)
+    (* write headers, using [buf] to batch writes *)
     List.iter
       (fun (k, v) ->
         Printf.bprintf tmp_buffer "%s: %s\r\n" k v;
@@ -474,13 +490,23 @@ module Response = struct
 
     IO.Out_channel.output_buf oc buf;
     IO.Out_channel.output_string oc "\r\n";
+    Buf.clear buf;
 
     (match body with
     | `String "" | `Void -> ()
     | `String s -> IO.Out_channel.output_string oc s
+    | `Writer w ->
+      (* use buffer to chunk encode [w] *)
+      let oc' = IO.Out_channel.chunk_encoding ~buf ~close_rec:false oc in
+      (try
+         IO.Writer.write oc' w;
+         IO.Out_channel.close oc'
+       with e ->
+         IO.Out_channel.close oc';
+         raise e)
     | `Stream str ->
       (try
-         Byte_stream.output_chunked' oc str;
+         Byte_stream.output_chunked' ~buf oc str;
          Byte_stream.close str
        with e ->
          Byte_stream.close str;

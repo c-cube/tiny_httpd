@@ -105,6 +105,32 @@ it allows downloading the files, and listing directories.
 If a directory contains `index.html` then this will be served
 instead of listing the content.
 
+## Steaming response body
+
+Tiny_httpd provides multiple ways of returning a body in a response.
+The response body type is:
+
+```ocaml
+type body =
+  [ `String of string
+  | `Stream of byte_stream
+  | `Writer of Tiny_httpd_io.Writer.t
+  | `Void ]
+```
+
+The simplest way is to return, say, `` `String "hello" ``. The response
+will have a set content-length header and its body is just the string.
+Some responses don't have a body at all, which is where `` `Void `` is useful.
+
+The `` `Stream _ `` case is more advanced and really only intended for experts.
+
+The `` `Writer w `` is new, and is intended as an easy way to write the
+body in a streaming fashion. See 'examples/writer.ml' to see a full example.
+Typically the idea is to create the body with `Tiny_httpd_io.Writer.make ~write ()`
+where `write` will be called with an output channel (the connection to the client),
+and can write whatever it wants to this channel. Once the `write` function returns
+the body has been fully sent and the next request can be processed.
+
 ## Socket activation
 
 Since version 0.10, socket activation is supported indirectly, by allowing a

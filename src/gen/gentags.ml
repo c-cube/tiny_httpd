@@ -287,28 +287,31 @@ let prelude =
     This output type is used to produce a string reasonably efficiently from
     a tree of combinators.
 
+    {b NOTE}: this is experimental and an unstable API.
+
     @since 0.12
     @open *)
 module Out : sig
   type t
-  val create : unit -> t
-  val clear : t -> unit
+  val create_of_buffer : Buffer.t -> t
+  val create_of_out: Tiny_httpd_io.Out_channel.t -> t
+  val flush : t -> unit
   val add_char : t -> char -> unit
   val add_string : t -> string -> unit
   val add_format_nl : t -> unit
   val with_no_format_nl : t -> (unit -> 'a) -> 'a
-  val to_string : t -> string
 end = struct
+  module IO = Tiny_httpd_io
   type t = {
-    buf: Buffer.t;
-    mutable fmt_nl: bool; (* if true, we print \b around to format the html *)
+    out: IO.Out_channel.t;
+    mutable fmt_nl: bool; (* if true, we print [\n] around tags to format the html *)
   }
-  let create () = {buf=Buffer.create 256; fmt_nl=true}
-  let clear self = Buffer.clear self.buf; self.fmt_nl <- true
-  let[@inline] add_char self c = Buffer.add_char self.buf c
-  let[@inline] add_string self s = Buffer.add_string self.buf s
-  let add_format_nl self = if self.fmt_nl then add_char self '\n'
-  let to_string self = add_format_nl self; Buffer.contents self.buf
+  let create_of_out out = {out; fmt_nl=true}
+  let create_of_buffer buf : t = create_of_out (IO.Out_channel.of_buffer buf)
+  let[@inline] flush self : unit = IO.Out_channel.flush self.out
+  let[@inline] add_char self c = IO.Out_channel.output_char self.out c
+  let[@inline] add_string self s = IO.Out_channel.output_string self.out s
+  let[@inline] add_format_nl self = if self.fmt_nl then add_char self '\n'
   let with_no_format_nl self f =
     if self.fmt_nl then (
       self.fmt_nl <- false;

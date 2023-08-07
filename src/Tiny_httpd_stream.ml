@@ -83,11 +83,13 @@ let rec iter f (self : t) : unit =
     (iter [@tailcall]) f self
   )
 
-let to_chan (oc : out_channel) (self : t) =
-  iter (fun s i len -> output oc s i len) self
+let to_chan (oc : out_channel) (self : t) = iter (output oc) self
 
 let to_chan' (oc : IO.Out_channel.t) (self : t) =
-  iter (fun s i len -> IO.Out_channel.output oc s i len) self
+  iter (IO.Out_channel.output oc) self
+
+let to_writer (self : t) : Tiny_httpd_io.Writer.t =
+  { write = (fun oc -> to_chan' oc self) }
 
 let of_bytes ?(i = 0) ?len (bs : bytes) : t =
   (* invariant: !i+!len is constant *)
@@ -297,22 +299,11 @@ let read_chunked ?(buf = Buf.create ()) ~fail (bs : t) : t =
       refill := false)
     ()
 
-let output_chunked' (oc : IO.Out_channel.t) (self : t) : unit =
-  let continue = ref true in
-  while !continue do
-    (* next chunk *)
-    self.fill_buf ();
-    let n = self.len in
-    IO.Out_channel.output_string oc (Printf.sprintf "%x\r\n" n);
-    IO.Out_channel.output oc self.bs self.off n;
-    self.consume n;
-    if n = 0 then continue := false;
-    IO.Out_channel.output_string oc "\r\n"
-  done;
-  (* write another crlf after the stream (see #56) *)
-  IO.Out_channel.output_string oc "\r\n";
-  ()
+let output_chunked' ?buf (oc : IO.Out_channel.t) (self : t) : unit =
+  let oc' = IO.Out_channel.chunk_encoding ?buf oc ~close_rec:false in
+  to_chan' oc' self;
+  IO.Out_channel.close oc'
 
 (* print a stream as a series of chunks *)
-let output_chunked (oc : out_channel) (self : t) : unit =
-  output_chunked' (IO.Out_channel.of_out_channel oc) self
+let output_chunked ?buf (oc : out_channel) (self : t) : unit =
+  output_chunked' ?buf (IO.Out_channel.of_out_channel oc) self

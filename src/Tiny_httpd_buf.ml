@@ -1,18 +1,31 @@
-type t = { mutable bytes: bytes; mutable i: int }
+type t = { mutable bytes: bytes; mutable i: int; original: bytes }
 
-let create ?(size = 4_096) () : t = { bytes = Bytes.make size ' '; i = 0 }
-let size self = self.i
-let bytes_slice self = self.bytes
+let create ?(size = 4_096) () : t =
+  let bytes = Bytes.make size ' ' in
+  { bytes; i = 0; original = bytes }
+
+let[@inline] size self = self.i
+let[@inline] bytes_slice self = self.bytes
 
 let clear self : unit =
-  if Bytes.length self.bytes > 4_096 * 1_024 then
-    self.bytes <- Bytes.make 4096 ' ' (* free big buffer *);
+  if
+    Bytes.length self.bytes > 500 * 1_024
+    && Bytes.length self.bytes > Bytes.length self.original
+  then
+    (* free big buffer *)
+    self.bytes <- self.original;
   self.i <- 0
 
 let resize self new_size : unit =
   let new_buf = Bytes.make new_size ' ' in
   Bytes.blit self.bytes 0 new_buf 0 self.i;
   self.bytes <- new_buf
+
+let add_char self c : unit =
+  if self.i + 1 >= Bytes.length self.bytes then
+    resize self (self.i + (self.i / 2) + 10);
+  Bytes.set self.bytes self.i c;
+  self.i <- 1 + self.i
 
 let add_bytes (self : t) s i len : unit =
   if self.i + len >= Bytes.length self.bytes then
