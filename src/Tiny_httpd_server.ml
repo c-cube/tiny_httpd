@@ -349,22 +349,6 @@ module Request = struct
   end
 end
 
-(*$R
-  let q = "GET hello HTTP/1.1\r\nHost: coucou\r\nContent-Length: 11\r\n\r\nsalutationsSOMEJUNK" in
-  let str = Tiny_httpd.Byte_stream.of_string q in
-  let r = Request.Internal_.parse_req_start ~get_time_s:(fun _ -> 0.) str in
-  match r with
-  | None -> assert_failure "should parse"
-  | Some req ->
-    assert_equal (Some "coucou") (Headers.get "Host" req.Request.headers);
-    assert_equal (Some "coucou") (Headers.get "host" req.Request.headers);
-    assert_equal (Some "11") (Headers.get "content-length" req.Request.headers);
-    assert_equal "hello" req.Request.path;
-    let req = Request.Internal_.parse_body req str |> Request.read_body_full in
-    assert_equal ~printer:(fun s->s) "salutations" req.Request.body;
-    ()
-*)
-
 module Response = struct
   type body =
     [ `String of string
@@ -967,7 +951,7 @@ module Unix_tcp_server_ = struct
                     (try Unix.close client_sock with _ -> ());
                     Sem_.release 1 self.sem_max_connections;
                     raise e);
-              ignore Unix.(sigprocmask SIG_UNBLOCK Sys.[ sigint; sighup ]);
+              ignore Unix.(sigprocmask SIG_UNBLOCK Sys.[ sigint; sighup ])
             with e ->
               Sem_.release 1 self.sem_max_connections;
               _debug (fun k ->
