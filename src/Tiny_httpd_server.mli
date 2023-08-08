@@ -252,7 +252,11 @@ module Response : sig
   (** Return a response without a body at all.
       @since 0.13 *)
 
-  val make : ?headers:Headers.t -> (body, Response_code.t * string) result -> t
+  val make :
+    ?headers:Headers.t ->
+    ?code:int ->
+    (body, Response_code.t * string) result ->
+    t
   (** [make r] turns a result into a response.
 
       - [make (Ok body)] replies with [200] and the body.
@@ -261,17 +265,24 @@ module Response : sig
   *)
 
   val make_string :
-    ?headers:Headers.t -> (string, Response_code.t * string) result -> t
+    ?headers:Headers.t ->
+    ?code:int ->
+    (string, Response_code.t * string) result ->
+    t
   (** Same as {!make} but with a string body. *)
 
   val make_writer :
     ?headers:Headers.t ->
+    ?code:int ->
     (Tiny_httpd_io.Writer.t, Response_code.t * string) result ->
     t
   (** Same as {!make} but with a writer body. *)
 
   val make_stream :
-    ?headers:Headers.t -> (byte_stream, Response_code.t * string) result -> t
+    ?headers:Headers.t ->
+    ?code:int ->
+    (byte_stream, Response_code.t * string) result ->
+    t
   (** Same as {!make} but with a stream body. *)
 
   val fail :

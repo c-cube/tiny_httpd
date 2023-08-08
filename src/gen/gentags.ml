@@ -294,7 +294,7 @@ let prelude =
 module Out : sig
   type t
   val create_of_buffer : Buffer.t -> t
-  val create_of_out: Tiny_httpd_io.Out_channel.t -> t
+  val create_of_out: Tiny_httpd_io.Output.t -> t
   val flush : t -> unit
   val add_char : t -> char -> unit
   val add_string : t -> string -> unit
@@ -303,14 +303,14 @@ module Out : sig
 end = struct
   module IO = Tiny_httpd_io
   type t = {
-    out: IO.Out_channel.t;
+    out: IO.Output.t;
     mutable fmt_nl: bool; (* if true, we print [\n] around tags to format the html *)
   }
   let create_of_out out = {out; fmt_nl=true}
-  let create_of_buffer buf : t = create_of_out (IO.Out_channel.of_buffer buf)
-  let[@inline] flush self : unit = IO.Out_channel.flush self.out
-  let[@inline] add_char self c = IO.Out_channel.output_char self.out c
-  let[@inline] add_string self s = IO.Out_channel.output_string self.out s
+  let create_of_buffer buf : t = create_of_out (IO.Output.of_buffer buf)
+  let[@inline] flush self : unit = IO.Output.flush self.out
+  let[@inline] add_char self c = IO.Output.output_char self.out c
+  let[@inline] add_string self s = IO.Output.output_string self.out s
   let[@inline] add_format_nl self = if self.fmt_nl then add_char self '\n'
   let with_no_format_nl self f =
     if self.fmt_nl then (

@@ -16,7 +16,7 @@ include Tiny_httpd_html_
     be a "html" tag.
     @since NEXT_RELEASE
     *)
-let to_out_channel ?(top = false) (self : elt) (out : IO.Out_channel.t) : unit =
+let to_out_channel ?(top = false) (self : elt) (out : IO.Output.t) : unit =
   let out = Out.create_of_out out in
   if top then Out.add_string out "<!DOCTYPE html>\n";
   self out;
@@ -28,7 +28,7 @@ let to_out_channel ?(top = false) (self : elt) (out : IO.Out_channel.t) : unit =
     be a "html" tag. *)
 let to_string ?top (self : elt) : string =
   let buf = Buffer.create 64 in
-  let out = IO.Out_channel.of_buffer buf in
+  let out = IO.Output.of_buffer buf in
   to_out_channel ?top self out;
   Buffer.contents buf
 
