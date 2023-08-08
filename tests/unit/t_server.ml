@@ -10,7 +10,8 @@ let () =
      salutationsSOMEJUNK"
   in
   let str = Tiny_httpd.Byte_stream.of_string q in
-  let r = Request.Internal_.parse_req_start ~get_time_s:(fun _ -> 0.) str in
+  let client_addr = Unix.(ADDR_INET (inet_addr_loopback, 1024)) in
+  let r = Request.Internal_.parse_req_start ~client_addr ~get_time_s:(fun _ -> 0.) str in
   match r with
   | None -> failwith "should parse"
   | Some req ->
