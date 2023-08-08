@@ -537,7 +537,12 @@ val set_top_handler : t -> (byte_stream Request.t -> Response.t) -> unit
 
     This handler is called with any request not accepted by any handler
     installed via {!add_path_handler}.
-    If no top handler is installed, unhandled paths will return a [404] not found. *)
+    If no top handler is installed, unhandled paths will return a [404] not found
+
+    This used to take a [string Request.t] but it now takes a [byte_stream Request.t]
+    since NEXT_RELEASE . Use {!Request.read_body_full} to read the body into
+    a string if needed.
+*)
 
 val add_route_handler :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
