@@ -405,22 +405,22 @@ module Response = struct
     else
       make_raw ~headers ~code "" (* invalid to not have a body *)
 
-  let make_string ?headers ?(code=200) r =
+  let make_string ?headers ?(code = 200) r =
     match r with
     | Ok body -> make_raw ?headers ~code body
     | Error (code, msg) -> make_raw ?headers ~code msg
 
-  let make_stream ?headers ?(code=200) r =
+  let make_stream ?headers ?(code = 200) r =
     match r with
     | Ok body -> make_raw_stream ?headers ~code body
     | Error (code, msg) -> make_raw ?headers ~code msg
 
-  let make_writer ?headers ?(code=200) r : t =
+  let make_writer ?headers ?(code = 200) r : t =
     match r with
     | Ok body -> make_raw_writer ?headers ~code body
     | Error (code, msg) -> make_raw ?headers ~code msg
 
-  let make ?headers ?(code=200) r : t =
+  let make ?headers ?(code = 200) r : t =
     match r with
     | Ok (`String body) -> make_raw ?headers ~code body
     | Ok (`Stream body) -> make_raw_stream ?headers ~code body
