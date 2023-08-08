@@ -33,7 +33,7 @@ jobs:
 
       - run: opam install . --deps-only --with-test
 
-      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_eio
+      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
 
       - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd
         if: ${{ matrix.os == 'ubuntu-latest' }}
