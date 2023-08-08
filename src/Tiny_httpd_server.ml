@@ -659,7 +659,7 @@ type t = {
   backend: (module IO_BACKEND);
   mutable tcp_server: IO.TCP_server.t option;
   buf_size: int;
-  mutable handler: string Request.t -> Response.t;
+  mutable handler: byte_stream Request.t -> Response.t;
       (** toplevel handler, if any *)
   mutable middlewares: (int * Middleware.t) list;  (** Global middlewares *)
   mutable middlewares_sorted: (int * Middleware.t) list lazy_t;
@@ -920,7 +920,8 @@ module Unix_tcp_server_ = struct
           after_init tcp_server;
 
           (* how to handle a single client *)
-          let handle_client_unix_ (client_sock : Unix.file_descr) (client_addr : Unix.sockaddr) : unit =
+          let handle_client_unix_ (client_sock : Unix.file_descr)
+              (client_addr : Unix.sockaddr) : unit =
             Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout);
             Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout);
             let oc =
@@ -1025,7 +1026,9 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
   while !continue && running self do
     _debug (fun k -> k "read next request");
     let (module B) = self.backend in
-    match Request.parse_req_start ~client_addr ~get_time_s:B.get_time_s ~buf is with
+    match
+      Request.parse_req_start ~client_addr ~get_time_s:B.get_time_s ~buf is
+    with
     | Ok None -> continue := false (* client is done *)
     | Error (c, s) ->
       (* connection error, close *)
@@ -1042,13 +1045,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
          let base_handler =
            match find_map (fun ph -> ph req) self.path_handlers with
            | Some f -> unwrap_resp_result f
-           | None ->
-             fun _oc req ~resp ->
-               let body_str =
-                 Pool.with_resource self.buf_pool @@ fun buf ->
-                 Request.read_body_full ~buf req
-               in
-               resp (self.handler body_str)
+           | None -> fun _oc req ~resp -> resp (self.handler req)
          in
 
          (* handle expect/continue *)
