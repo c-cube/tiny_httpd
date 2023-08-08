@@ -444,7 +444,7 @@ module Response = struct
     Format.fprintf out "{@[code=%d;@ headers=[@[%a@]];@ body=%a@]}" self.code
       Headers.pp self.headers pp_body self.body
 
-  let output_ ~buf (oc : IO.Out_channel.t) (self : t) : unit =
+  let output_ ~buf (oc : IO.Output.t) (self : t) : unit =
     (* double indirection:
        - print into [buffer] using [bprintf]
        - transfer to [buf_] so we can output from there *)
@@ -488,21 +488,21 @@ module Response = struct
         Buffer.clear tmp_buffer)
       headers;
 
-    IO.Out_channel.output_buf oc buf;
-    IO.Out_channel.output_string oc "\r\n";
+    IO.Output.output_buf oc buf;
+    IO.Output.output_string oc "\r\n";
     Buf.clear buf;
 
     (match body with
     | `String "" | `Void -> ()
-    | `String s -> IO.Out_channel.output_string oc s
+    | `String s -> IO.Output.output_string oc s
     | `Writer w ->
       (* use buffer to chunk encode [w] *)
-      let oc' = IO.Out_channel.chunk_encoding ~buf ~close_rec:false oc in
+      let oc' = IO.Output.chunk_encoding ~buf ~close_rec:false oc in
       (try
          IO.Writer.write oc' w;
-         IO.Out_channel.close oc'
+         IO.Output.close oc'
        with e ->
-         IO.Out_channel.close oc';
+         IO.Output.close oc';
          raise e)
     | `Stream str ->
       (try
@@ -511,7 +511,7 @@ module Response = struct
        with e ->
          Byte_stream.close str;
          raise e));
-    IO.Out_channel.flush oc
+    IO.Output.flush oc
 end
 
 (* semaphore, for limiting concurrency. *)
@@ -645,7 +645,7 @@ module Middleware = struct
 end
 
 (* a request handler. handles a single request. *)
-type cb_path_handler = IO.Out_channel.t -> Middleware.handler
+type cb_path_handler = IO.Output.t -> Middleware.handler
 
 module type SERVER_SENT_GENERATOR = sig
   val set_headers : Headers.t -> unit
@@ -793,7 +793,7 @@ let[@inline] _opt_iter ~f o =
 exception Exit_SSE
 
 let add_route_server_sent_handler ?accept self route f =
-  let tr_req (oc : IO.Out_channel.t) req ~resp f =
+  let tr_req (oc : IO.Output.t) req ~resp f =
     let req =
       Pool.with_resource self.buf_pool @@ fun buf ->
       Request.read_body_full ~buf req
@@ -816,7 +816,7 @@ let add_route_server_sent_handler ?accept self route f =
     in
 
     let[@inline] writef fmt =
-      Printf.ksprintf (IO.Out_channel.output_string oc) fmt
+      Printf.ksprintf (IO.Output.output_string oc) fmt
     in
 
     let send_event ?event ?id ?retry ~data () : unit =
@@ -826,9 +826,9 @@ let add_route_server_sent_handler ?accept self route f =
       _opt_iter retry ~f:(fun e -> writef "retry: %s\n" e);
       let l = String.split_on_char '\n' data in
       List.iter (fun s -> writef "data: %s\n" s) l;
-      IO.Out_channel.output_string oc "\n";
+      IO.Output.output_string oc "\n";
       (* finish group *)
-      IO.Out_channel.flush oc
+      IO.Output.flush oc
     in
     let module SSG = struct
       let set_headers h =
@@ -841,7 +841,7 @@ let add_route_server_sent_handler ?accept self route f =
       let close () = raise Exit_SSE
     end in
     try f req (module SSG : SERVER_SENT_GENERATOR)
-    with Exit_SSE -> IO.Out_channel.close oc
+    with Exit_SSE -> IO.Output.close oc
   in
   add_route_handler_ self ?accept ~meth:`GET route ~tr_req f
 
@@ -938,10 +938,9 @@ module Unix_tcp_server_ = struct
             Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout);
             Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout);
             let oc =
-              IO.Out_channel.of_out_channel
-              @@ Unix.out_channel_of_descr client_sock
+              IO.Output.of_out_channel @@ Unix.out_channel_of_descr client_sock
             in
-            let ic = IO.In_channel.of_unix_fd client_sock in
+            let ic = IO.Input.of_unix_fd client_sock in
             handle.handle ic oc;
             _debug (fun k -> k "done with client, exiting");
             (try Unix.close client_sock

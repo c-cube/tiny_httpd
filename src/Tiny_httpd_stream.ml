@@ -46,28 +46,28 @@ let make ?(bs = Bytes.create @@ (16 * 1024)) ?(close = ignore) ~consume ~fill ()
   in
   self
 
-let of_input ?(buf_size = 16 * 1024) (ic : IO.In_channel.t) : t =
+let of_input ?(buf_size = 16 * 1024) (ic : IO.Input.t) : t =
   make ~bs:(Bytes.create buf_size)
-    ~close:(fun _ -> IO.In_channel.close ic)
+    ~close:(fun _ -> IO.Input.close ic)
     ~consume:(fun self n ->
       self.off <- self.off + n;
       self.len <- self.len - n)
     ~fill:(fun self ->
       if self.off >= self.len then (
         self.off <- 0;
-        self.len <- IO.In_channel.input ic self.bs 0 (Bytes.length self.bs)
+        self.len <- IO.Input.input ic self.bs 0 (Bytes.length self.bs)
       ))
     ()
 
 let of_chan_ ?buf_size ic ~close_noerr : t =
-  let inc = IO.In_channel.of_in_channel ~close_noerr ic in
+  let inc = IO.Input.of_in_channel ~close_noerr ic in
   of_input ?buf_size inc
 
 let of_chan ?buf_size ic = of_chan_ ?buf_size ic ~close_noerr:false
 let of_chan_close_noerr ?buf_size ic = of_chan_ ?buf_size ic ~close_noerr:true
 
 let of_fd_ ?buf_size ~close_noerr ic : t =
-  let inc = IO.In_channel.of_unix_fd ~close_noerr ic in
+  let inc = IO.Input.of_unix_fd ~close_noerr ic in
   of_input ?buf_size inc
 
 let of_fd ?buf_size fd : t = of_fd_ ?buf_size ~close_noerr:false fd
@@ -84,9 +84,7 @@ let rec iter f (self : t) : unit =
   )
 
 let to_chan (oc : out_channel) (self : t) = iter (output oc) self
-
-let to_chan' (oc : IO.Out_channel.t) (self : t) =
-  iter (IO.Out_channel.output oc) self
+let to_chan' (oc : IO.Output.t) (self : t) = iter (IO.Output.output oc) self
 
 let to_writer (self : t) : Tiny_httpd_io.Writer.t =
   { write = (fun oc -> to_chan' oc self) }
@@ -299,11 +297,11 @@ let read_chunked ?(buf = Buf.create ()) ~fail (bs : t) : t =
       refill := false)
     ()
 
-let output_chunked' ?buf (oc : IO.Out_channel.t) (self : t) : unit =
-  let oc' = IO.Out_channel.chunk_encoding ?buf oc ~close_rec:false in
+let output_chunked' ?buf (oc : IO.Output.t) (self : t) : unit =
+  let oc' = IO.Output.chunk_encoding ?buf oc ~close_rec:false in
   to_chan' oc' self;
-  IO.Out_channel.close oc'
+  IO.Output.close oc'
 
 (* print a stream as a series of chunks *)
 let output_chunked ?buf (oc : out_channel) (self : t) : unit =
-  output_chunked' ?buf (IO.Out_channel.of_out_channel oc) self
+  output_chunked' ?buf (IO.Output.of_out_channel oc) self
