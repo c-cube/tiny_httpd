@@ -68,7 +68,7 @@ module Request : sig
     host: string;
         (** Host header, mandatory. It can also be found in {!headers}. *)
     client_addr: Unix.sockaddr;
-        (** Client address. Available since NEXT_RELEASE. *)
+        (** Client address. Available since 0.14. *)
     headers: Headers.t;  (** List of headers. *)
     http_version: int * int;
         (** HTTP version. This should be either [1, 0] or [1, 1]. *)
@@ -155,7 +155,7 @@ module Request : sig
   (** Read the whole body into a string. Potentially blocking.
 
       @param buf_size initial size of underlying buffer (since 0.11)
-      @param buf the initial buffer (since NEXT_RELEASE)
+      @param buf the initial buffer (since 0.14)
       *)
 
   (**/**)
@@ -213,7 +213,7 @@ module Response : sig
       - [`Void] replies with no body.
       - [`Writer w] replies with a body created by the writer [w], using
           a chunked encoding.
-        It is available since NEXT_RELEASE.
+        It is available since 0.14.
   *)
 
   type t = private {
@@ -477,7 +477,7 @@ val create_from :
     @param buf_size size for buffers (since 0.11)
     @param middlewares see {!add_middleware} for more details.
 
-    @since NEXT_RELEASE
+    @since 0.14
 *)
 
 val addr : t -> string
@@ -540,7 +540,7 @@ val set_top_handler : t -> (byte_stream Request.t -> Response.t) -> unit
     If no top handler is installed, unhandled paths will return a [404] not found
 
     This used to take a [string Request.t] but it now takes a [byte_stream Request.t]
-    since NEXT_RELEASE . Use {!Request.read_body_full} to read the body into
+    since 0.14 . Use {!Request.read_body_full} to read the body into
     a string if needed.
 *)
 
@@ -642,7 +642,7 @@ val add_route_server_sent_handler :
 
 val running : t -> bool
 (** Is the server running?
-    @since NEXT_RELEASE *)
+    @since 0.14 *)
 
 val stop : t -> unit
 (** Ask the server to stop. This might not have an immediate effect
@@ -662,7 +662,7 @@ val run : ?after_init:(unit -> unit) -> t -> (unit, exn) result
 val run_exn : ?after_init:(unit -> unit) -> t -> unit
 (** [run_exn s] is like [run s] but re-raises an exception if the server exits
     with an error.
-    @since NEXT_RELEASE *)
+    @since 0.14 *)
 
 (**/**)
 

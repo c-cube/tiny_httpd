@@ -5,7 +5,7 @@
     cheap to produce and discard, and will never block waiting for
     a resource — it's not a good pool for DB connections.
 
-    @since NEXT_RELEASE. *)
+    @since 0.14. *)
 
 type 'a t
 (** Pool of values of type ['a] *)

@@ -1,3 +1,22 @@
+
+## 0.14
+
+- breaking: `set_top_handler` takes a stream request, for more generality
+
+- Don't let client handling threads handle SIGINT/SIGHUP
+- improve termination behavior (wait for threads to terminate when shutting down server)
+- Preserve client address down to Request.t
+- add `Tiny_httpd_io` module, abstraction over IOs (output/input) as better IO channels
+    than the stdlib's
+- add `Tiny_httpd_html.to_writer`
+- add `IO.Writer.t`, a push based stream.
+- add `Server.run_exn`
+- add `Tiny_httpd_pool`
+- server: add `IO_BACKEND` abstraction; implement a unix version of it
+
+- perf: use TCP_NODELAY for client sockets
+- perf: use a resource pool to recycle buffers, improves memory consumption and GC pressure
+
 ## 0.13
 
 - feat: `Server.run` takes `?after_init` parameter

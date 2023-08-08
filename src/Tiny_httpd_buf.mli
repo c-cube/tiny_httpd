@@ -23,7 +23,7 @@ val contents_and_clear : t -> string
 
 val add_char : t -> char -> unit
 (** Add a single char.
-    @since NEXT_RELEASE *)
+    @since 0.14 *)
 
 val add_bytes : t -> bytes -> int -> int -> unit
 (** Append given bytes slice to the buffer.
@@ -31,8 +31,8 @@ val add_bytes : t -> bytes -> int -> int -> unit
 
 val add_string : t -> string -> unit
 (** Add string.
-    @since NEXT_RELEASE *)
+    @since 0.14 *)
 
 val add_buffer : t -> Buffer.t -> unit
 (** Append bytes from buffer.
-    @since NEXT_RELEASE *)
+    @since 0.14 *)

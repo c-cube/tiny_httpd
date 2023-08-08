@@ -5,7 +5,7 @@
 
     {b NOTE}: experimental.
 
-    @since NEXT_RELEASE
+    @since 0.14
 *)
 
 module Buf = Tiny_httpd_buf
@@ -167,7 +167,7 @@ module Writer = struct
     This is useful for responses: an http endpoint can return a writer
     as its response's body, and output into it as if it were a regular
     [out_channel], including controlling calls to [flush].
-    @since NEXT_RELEASE
+    @since 0.14
     *)
 
   let[@inline] make ~write () : t = { write }

@@ -66,7 +66,7 @@ val empty : t
 
 val of_input : ?buf_size:int -> Tiny_httpd_io.Input.t -> t
 (** Make a buffered stream from the given channel.
-    @since NEXT_RELEASE *)
+    @since 0.14 *)
 
 val of_chan : ?buf_size:int -> in_channel -> t
 (** Make a buffered stream from the given channel. *)
@@ -96,11 +96,11 @@ val to_chan : out_channel -> t -> unit
 
 val to_chan' : Tiny_httpd_io.Output.t -> t -> unit
 (** Write to the IO channel.
-    @since NEXT_RELEASE *)
+    @since 0.14 *)
 
 val to_writer : t -> Tiny_httpd_io.Writer.t
 (** Turn this stream into a writer.
-    @since NEXT_RELEASE *)
+    @since 0.14 *)
 
 val make :
   ?bs:bytes ->
@@ -151,9 +151,9 @@ val read_exactly :
 
 val output_chunked : ?buf:Tiny_httpd_buf.t -> out_channel -> t -> unit
 (** Write the stream into the channel, using the chunked encoding.
-    @param buf optional buffer for chunking (since NEXT_RELEASE) *)
+    @param buf optional buffer for chunking (since 0.14) *)
 
 val output_chunked' :
   ?buf:Tiny_httpd_buf.t -> Tiny_httpd_io.Output.t -> t -> unit
 (** Write the stream into the channel, using the chunked encoding.
-    @since NEXT_RELEASE *)
+    @since 0.14 *)

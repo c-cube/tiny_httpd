@@ -14,7 +14,7 @@ include Tiny_httpd_html_
 (** Write an HTML element to this output.
     @param top if true, add DOCTYPE at the beginning. The top element should then
     be a "html" tag.
-    @since NEXT_RELEASE
+    @since 0.14
     *)
 let to_output ?(top = false) (self : elt) (out : IO.Output.t) : unit =
   let out = Out.create_of_out out in
@@ -49,12 +49,12 @@ let to_string_l (l : elt list) =
 let to_string_top = to_string ~top:true
 
 (** Write a toplevel element to an output channel.
-    @since NEXT_RELEASE *)
+    @since 0.14 *)
 let to_out_channel_top = to_output ~top:true
 
 (** Produce a streaming writer from this HTML element.
     @param top if true, add a DOCTYPE. See {!to_out_channel}.
-    @since NEXT_RELEASE *)
+    @since 0.14 *)
 let to_writer ?top (self : elt) : IO.Writer.t =
   let write oc = to_output ?top self oc in
   IO.Writer.make ~write ()
