@@ -164,7 +164,7 @@ module Request = struct
   type 'body t = {
     meth: Meth.t;
     host: string;
-    client_addr: Unix.sockaddr option;
+    client_addr: Unix.sockaddr;
     headers: Headers.t;
     http_version: int * int;
     path: string;
@@ -246,7 +246,7 @@ module Request = struct
         bad_reqf 400 "body is too short by %d bytes" size)
 
   (* parse request, but not body (yet) *)
-  let parse_req_start ?client_addr ~get_time_s ~buf (bs : byte_stream) :
+  let parse_req_start ~client_addr ~get_time_s ~buf (bs : byte_stream) :
       unit t option resp_result =
     try
       let line = Byte_stream.read_line ~buf bs in
@@ -342,8 +342,8 @@ module Request = struct
     | e -> bad_reqf 500 "failed to read body: %s" (Printexc.to_string e)
 
   module Internal_ = struct
-    let parse_req_start ?(buf = Buf.create ()) ~get_time_s bs =
-      parse_req_start ~get_time_s ~buf bs |> unwrap_resp_result
+    let parse_req_start ?(buf = Buf.create ()) ~client_addr ~get_time_s bs =
+      parse_req_start ~client_addr ~get_time_s ~buf bs |> unwrap_resp_result
 
     let parse_body ?(buf = Buf.create ()) req bs : _ t =
       parse_body_ ~tr_stream:(fun s -> s) ~buf { req with body = bs }
@@ -1017,7 +1017,7 @@ let find_map f l =
   aux f l
 
 (* handle client on [ic] and [oc] *)
-let client_handle_for (self : t) ?client_addr ic oc : unit =
+let client_handle_for (self : t) ~client_addr ic oc : unit =
   Pool.with_resource self.buf_pool @@ fun buf ->
   Pool.with_resource self.buf_pool @@ fun buf_res ->
   let is = Byte_stream.of_input ~buf_size:self.buf_size ic in
@@ -1025,7 +1025,7 @@ let client_handle_for (self : t) ?client_addr ic oc : unit =
   while !continue && running self do
     _debug (fun k -> k "read next request");
     let (module B) = self.backend in
-    match Request.parse_req_start ?client_addr ~get_time_s:B.get_time_s ~buf is with
+    match Request.parse_req_start ~client_addr ~get_time_s:B.get_time_s ~buf is with
     | Ok None -> continue := false (* client is done *)
     | Error (c, s) ->
       (* connection error, close *)

@@ -187,7 +187,7 @@ end
 (** A TCP server abstraction. *)
 module TCP_server = struct
   type conn_handler = {
-    handle: ?client_addr:Unix.sockaddr -> Input.t -> Output.t -> unit;  (** Handle client connection *)
+    handle: client_addr:Unix.sockaddr -> Input.t -> Output.t -> unit;  (** Handle client connection *)
   }
 
   type t = {

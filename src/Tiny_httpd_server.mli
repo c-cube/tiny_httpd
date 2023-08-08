@@ -67,7 +67,7 @@ module Request : sig
     meth: Meth.t;  (** HTTP method for this request. *)
     host: string;
         (** Host header, mandatory. It can also be found in {!headers}. *)
-    client_addr : Unix.sockaddr option;  (** Client address. Available since NEXT_RELEASE. *)
+    client_addr : Unix.sockaddr;  (** Client address. Available since NEXT_RELEASE. *)
     headers: Headers.t;  (** List of headers. *)
     http_version: int * int;
         (** HTTP version. This should be either [1, 0] or [1, 1]. *)
@@ -162,7 +162,7 @@ module Request : sig
   (* for testing purpose, do not use.  There is no guarantee of stability. *)
   module Internal_ : sig
     val parse_req_start :
-      ?buf:buf -> get_time_s:(unit -> float) -> byte_stream -> unit t option
+      ?buf:buf -> client_addr:Unix.sockaddr -> get_time_s:(unit -> float) -> byte_stream -> unit t option
 
     val parse_body : ?buf:buf -> unit t -> byte_stream -> byte_stream t
   end
