@@ -1,7 +1,7 @@
 module S = Tiny_httpd_server
 module BS = Tiny_httpd_stream
 module W = Tiny_httpd_io.Writer
-module Out = Tiny_httpd_io.Out_channel
+module Out = Tiny_httpd_io.Output
 
 let decode_deflate_stream_ ~buf_size (is : S.byte_stream) : S.byte_stream =
   S._debug (fun k -> k "wrap stream with deflate.decode");

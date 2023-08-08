@@ -11,7 +11,7 @@
 module Buf = Tiny_httpd_buf
 
 (** Input channel (byte source) *)
-module In_channel = struct
+module Input = struct
   type t = {
     input: bytes -> int -> int -> int;
         (** Read into the slice. Returns [0] only if the
@@ -54,7 +54,7 @@ module In_channel = struct
 end
 
 (** Output channel (byte sink) *)
-module Out_channel = struct
+module Output = struct
   type t = {
     output_char: char -> unit;  (** Output a single char *)
     output: bytes -> int -> int -> unit;  (** Output slice *)
@@ -65,7 +65,7 @@ module Out_channel = struct
 
       This can be a [Buffer.t], an [out_channel], a [Unix.file_descr], etc. *)
 
-  (** [of_out_channel oc] wraps the channel into a {!Out_channel.t}.
+  (** [of_out_channel oc] wraps the channel into a {!Output.t}.
       @param close_noerr if true, then closing the result uses [close_out_noerr]
       instead of [close_out] to close [oc] *)
   let of_out_channel ?(close_noerr = false) (oc : out_channel) : t =
@@ -158,7 +158,7 @@ end
 
 (** A writer abstraction. *)
 module Writer = struct
-  type t = { write: Out_channel.t -> unit } [@@unboxed]
+  type t = { write: Output.t -> unit } [@@unboxed]
   (** Writer.
 
     A writer is a push-based stream of bytes.
@@ -173,22 +173,21 @@ module Writer = struct
   let[@inline] make ~write () : t = { write }
 
   (** Write into the channel. *)
-  let[@inline] write (oc : Out_channel.t) (self : t) : unit = self.write oc
+  let[@inline] write (oc : Output.t) (self : t) : unit = self.write oc
 
   (** Empty writer, will output 0 bytes. *)
   let empty : t = { write = ignore }
 
   (** A writer that just emits the bytes from the given string. *)
   let[@inline] of_string (str : string) : t =
-    let write oc = Out_channel.output_string oc str in
+    let write oc = Output.output_string oc str in
     { write }
 end
 
 (** A TCP server abstraction. *)
 module TCP_server = struct
   type conn_handler = {
-    handle: In_channel.t -> Out_channel.t -> unit;
-        (** Handle client connection *)
+    handle: Input.t -> Output.t -> unit;  (** Handle client connection *)
   }
 
   type t = {
