@@ -957,6 +957,8 @@ module Unix_tcp_server_ = struct
             try
               let client_sock, _ = Unix.accept sock in
               Unix.setsockopt client_sock Unix.TCP_NODELAY true;
+              (* Block INT/HUP while cloning to avoid children handling them.
+                 When thread gets them, our Unix.accept raises neatly. *)
               ignore Unix.(sigprocmask SIG_BLOCK Sys.[ sigint; sighup ]);
               self.new_thread (fun () ->
                   try
