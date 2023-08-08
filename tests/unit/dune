@@ -1,5 +1,5 @@
 
 (tests
-  (names t_util t_buf)
+  (names t_util t_buf t_server)
   (package tiny_httpd)
   (libraries tiny_httpd qcheck-core qcheck-core.runner test_util))

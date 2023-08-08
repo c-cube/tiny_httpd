@@ -351,22 +351,6 @@ module Request = struct
   end
 end
 
-(*$R
-  let q = "GET hello HTTP/1.1\r\nHost: coucou\r\nContent-Length: 11\r\n\r\nsalutationsSOMEJUNK" in
-  let str = Tiny_httpd.Byte_stream.of_string q in
-  let r = Request.Internal_.parse_req_start ~get_time_s:(fun _ -> 0.) str in
-  match r with
-  | None -> assert_failure "should parse"
-  | Some req ->
-    assert_equal (Some "coucou") (Headers.get "Host" req.Request.headers);
-    assert_equal (Some "coucou") (Headers.get "host" req.Request.headers);
-    assert_equal (Some "11") (Headers.get "content-length" req.Request.headers);
-    assert_equal "hello" req.Request.path;
-    let req = Request.Internal_.parse_body req str |> Request.read_body_full in
-    assert_equal ~printer:(fun s->s) "salutations" req.Request.body;
-    ()
-*)
-
 module Response = struct
   type body =
     [ `String of string
@@ -958,6 +942,9 @@ module Unix_tcp_server_ = struct
             try
               let client_sock, client_addr = Unix.accept sock in
               Unix.setsockopt client_sock Unix.TCP_NODELAY true;
+              (* Block INT/HUP while cloning to avoid children handling them.
+                 When thread gets them, our Unix.accept raises neatly. *)
+              ignore Unix.(sigprocmask SIG_BLOCK Sys.[ sigint; sighup ]);
               self.new_thread (fun () ->
                   try
                     handle_client_unix_ client_sock client_addr;
@@ -965,13 +952,18 @@ module Unix_tcp_server_ = struct
                   with e ->
                     (try Unix.close client_sock with _ -> ());
                     Sem_.release 1 self.sem_max_connections;
-                    raise e)
+                    raise e);
+              ignore Unix.(sigprocmask SIG_UNBLOCK Sys.[ sigint; sighup ])
             with e ->
               Sem_.release 1 self.sem_max_connections;
               _debug (fun k ->
                   k "Unix.accept or Thread.create raised an exception: %s"
                     (Printexc.to_string e))
           done;
+
+          (* Wait for all threads to be done: this only works if all threads are done. *)
+          Unix.close sock;
+          Sem_.acquire self.sem_max_connections.max self.sem_max_connections;
           ());
     }
 end
