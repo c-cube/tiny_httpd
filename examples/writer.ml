@@ -4,10 +4,10 @@ let serve_zeroes server : unit =
   H.add_route_handler server H.(Route.(exact "zeroes" @/ int @/ return))
   @@ fun n _req ->
   (* stream [n] zeroes *)
-  let write (oc : H.IO.Out_channel.t) : unit =
+  let write (oc : H.IO.Output.t) : unit =
     let buf = Bytes.make 1 '0' in
     for _i = 1 to n do
-      H.IO.Out_channel.output oc buf 0 1
+      H.IO.Output.output oc buf 0 1
     done
   in
   let writer = H.IO.Writer.make ~write () in
@@ -24,7 +24,7 @@ let serve_file server : unit =
       Fun.protect ~finally:(fun () -> close_in_noerr ic) @@ fun () ->
       while
         let n = input ic buf 0 (Bytes.length buf) in
-        if n > 0 then H.IO.Out_channel.output oc buf 0 n;
+        if n > 0 then H.IO.Output.output oc buf 0 n;
         n > 0
       do
         ()
