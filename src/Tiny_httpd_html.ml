@@ -11,12 +11,12 @@ module IO = Tiny_httpd_io
 include Tiny_httpd_html_
 (** @inline *)
 
-(** Write an HTML element to this out channel.
+(** Write an HTML element to this output.
     @param top if true, add DOCTYPE at the beginning. The top element should then
     be a "html" tag.
     @since NEXT_RELEASE
     *)
-let to_out_channel ?(top = false) (self : elt) (out : IO.Output.t) : unit =
+let to_output ?(top = false) (self : elt) (out : IO.Output.t) : unit =
   let out = Out.create_of_out out in
   if top then Out.add_string out "<!DOCTYPE html>\n";
   self out;
@@ -29,7 +29,7 @@ let to_out_channel ?(top = false) (self : elt) (out : IO.Output.t) : unit =
 let to_string ?top (self : elt) : string =
   let buf = Buffer.create 64 in
   let out = IO.Output.of_buffer buf in
-  to_out_channel ?top self out;
+  to_output ?top self out;
   Buffer.contents buf
 
 (** Convert a list of HTML elements to a string.
@@ -50,13 +50,13 @@ let to_string_top = to_string ~top:true
 
 (** Write a toplevel element to an output channel.
     @since NEXT_RELEASE *)
-let to_out_channel_top = to_out_channel ~top:true
+let to_out_channel_top = to_output ~top:true
 
 (** Produce a streaming writer from this HTML element.
     @param top if true, add a DOCTYPE. See {!to_out_channel}.
     @since NEXT_RELEASE *)
 let to_writer ?top (self : elt) : IO.Writer.t =
-  let write oc = to_out_channel ?top self oc in
+  let write oc = to_output ?top self oc in
   IO.Writer.make ~write ()
 
 (** Convert a HTML element to a stream. This might just convert
