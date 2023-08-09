@@ -165,8 +165,10 @@ module Writer = struct
     Give it an output channel and it will write the bytes in it.
 
     This is useful for responses: an http endpoint can return a writer
-    as its response's body, and output into it as if it were a regular
+    as its response's body; the writer is given access to the connection
+    to the client and can write into it as if it were a regular
     [out_channel], including controlling calls to [flush].
+    Tiny_httpd will convert these writes into valid HTTP chunks.
     @since 0.14
     *)
 
@@ -187,7 +189,8 @@ end
 (** A TCP server abstraction. *)
 module TCP_server = struct
   type conn_handler = {
-    handle: client_addr:Unix.sockaddr -> Input.t -> Output.t -> unit;  (** Handle client connection *)
+    handle: client_addr:Unix.sockaddr -> Input.t -> Output.t -> unit;
+        (** Handle client connection *)
   }
 
   type t = {
