@@ -16,6 +16,10 @@ let clear self : unit =
     self.bytes <- self.original;
   self.i <- 0
 
+let clear_and_zero self =
+  clear self;
+  Bytes.fill self.bytes 0 (Bytes.length self.bytes) '\x00'
+
 let resize self new_size : unit =
   let new_buf = Bytes.make new_size ' ' in
   Bytes.blit self.bytes 0 new_buf 0 self.i;

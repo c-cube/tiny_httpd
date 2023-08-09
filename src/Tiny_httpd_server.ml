@@ -847,7 +847,7 @@ let create_from ?(buf_size = 16 * 1_024) ?(middlewares = []) ~backend () : t =
       middlewares = [];
       middlewares_sorted = lazy [];
       buf_pool =
-        Pool.create ~clear:Buf.clear
+        Pool.create ~clear:Buf.clear_and_zero
           ~mk_item:(fun () -> Buf.create ~size:buf_size ())
           ();
     }

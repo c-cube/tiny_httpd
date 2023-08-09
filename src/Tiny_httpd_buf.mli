@@ -13,6 +13,10 @@ val clear : t -> unit
 val create : ?size:int -> unit -> t
 val contents : t -> string
 
+val clear_and_zero : t -> unit
+(** Clear the buffer and zero out its storage.
+    @since NEXT_RELEASE *)
+
 val bytes_slice : t -> bytes
 (** Access underlying slice of bytes.
     @since 0.5 *)
