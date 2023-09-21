@@ -117,6 +117,10 @@ Each entry in the VFS can be added from the command line using:
 --url=foo/bar,https://something.com/ to add an entry foo/bar in the VFS
   with the content of the URL (downloaded using curl).
 
+--mirror=prefix,some/dir/ copies the entire directory into the VFS
+  under prefix path "prefix". If prefix is empty, the directory is copied
+  directly into the root.
+
 -F=file reads lines from file. Each line is a pair vfs_path,actual_path
 and is processed as previously. If actual_path looks like an http(s) URL
 it is treated as such.
