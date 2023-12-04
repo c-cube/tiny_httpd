@@ -937,11 +937,14 @@ module Unix_tcp_server_ = struct
             ()
           in
 
+          Unix.set_nonblock sock;
           while self.running do
-            (* limit concurrency *)
-            Sem_.acquire 1 self.sem_max_connections;
-            try
-              let client_sock, client_addr = Unix.accept sock in
+            ignore (Unix.select [ sock ] [] [ sock ] 1.0 : _ * _ * _);
+            match Unix.accept sock with
+            | client_sock, client_addr ->
+              (* limit concurrency *)
+              Sem_.acquire 1 self.sem_max_connections;
+
               Unix.setsockopt client_sock Unix.TCP_NODELAY true;
               (* Block INT/HUP while cloning to avoid children handling them.
                  When thread gets them, our Unix.accept raises neatly. *)
@@ -955,8 +958,10 @@ module Unix_tcp_server_ = struct
                     Sem_.release 1 self.sem_max_connections;
                     raise e);
               ignore Unix.(sigprocmask SIG_UNBLOCK Sys.[ sigint; sighup ])
-            with e ->
-              Sem_.release 1 self.sem_max_connections;
+            | exception Unix.Unix_error ((Unix.EAGAIN | Unix.EWOULDBLOCK), _, _)
+              ->
+              ()
+            | exception e ->
               _debug (fun k ->
                   k "Unix.accept or Thread.create raised an exception: %s"
                     (Printexc.to_string e))
