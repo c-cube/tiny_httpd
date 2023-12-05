@@ -1,4 +1,10 @@
 
+## 0.15
+
+- fix: do not block in `accept`, enabling more graceful shutdown
+- improve help message for tiny-httpd-vfs-pack
+- security: zero out buffers from pool before reusing them
+
 ## 0.14
 
 - breaking: `set_top_handler` takes a stream request, for more generality
