@@ -30,6 +30,7 @@ jobs:
         uses: ocaml/setup-ocaml@v2
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          allow-prerelease-opam: true
           opam-local-packages: |
             ./tiny_httpd.opam
             ./tiny_httpd_camlzip.opam

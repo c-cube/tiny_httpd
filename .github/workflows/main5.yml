@@ -17,7 +17,7 @@ jobs:
             #- macos-latest
             #- windows-latest
         ocaml-compiler:
-          - 5.0.x
+          - 5.1.x
 
     runs-on: ${{ matrix.os }}
 
@@ -30,6 +30,7 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           opam-depext-flags: --with-test
+          allow-prerelease-opam: true
 
       - run: opam install . --deps-only --with-test
 
