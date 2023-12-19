@@ -176,6 +176,7 @@ module Request = struct
 
   let headers self = self.headers
   let host self = self.host
+  let client_addr self = self.client_addr
   let meth self = self.meth
   let path self = self.path
   let body self = self.body

@@ -127,6 +127,10 @@ module Request : sig
   val host : _ t -> string
   (** Host field of the request. It also appears in the headers. *)
 
+  val client_addr : _ t -> Unix.sockaddr
+  (** Client address of the request.
+      @since NEXT_RELEASE *)
+
   val meth : _ t -> Meth.t
   (** Method for the request. *)
 
