@@ -133,7 +133,7 @@ module Histogram = struct
         else
           string_of_float thresh
       in
-      bpf buf "%s%a %d\n" self.name emit_tags_
+      bpf buf "%s_bucket%a %d\n" self.name emit_tags_
         (("le", name) :: self.tags)
         !count
     done;
