@@ -227,5 +227,5 @@ module GC_metrics = struct
     let stats = Gc.quick_stat () in
     Counter.incr_to self.major_coll stats.major_collections;
     Counter.incr_to self.compactions stats.compactions;
-    Gauge.set self.major_heap (int_of_float (stats.major_words *. 8.))
+    Gauge.set self.major_heap (stats.heap_words * 8)
 end
