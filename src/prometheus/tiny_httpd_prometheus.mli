@@ -49,3 +49,10 @@ end
 *)
 
 val http_middleware : Registry.t -> Tiny_httpd.Middleware.t
+(** Middleware to get basic metrics about HTTP requests *)
+
+val add_route_to_server : Tiny_httpd.t -> Registry.t -> unit
+(** Add a "/metrics" route to the server *)
+
+val instrument_server : Tiny_httpd.t -> Registry.t -> unit
+(** Add middleware and route *)

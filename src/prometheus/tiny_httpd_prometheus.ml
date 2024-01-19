@@ -104,3 +104,12 @@ let http_middleware (reg : Registry.t) : H.Middleware.t =
          let code = response.code in
          if code < 200 || code >= 300 then Counter.incr c_err;
          resp response)
+
+let add_route_to_server (server : H.t) (reg : registry) : unit =
+  H.add_route_handler server H.Route.(exact "metrics" @/ return) @@ fun _req ->
+  let str = Registry.emit_str reg in
+  H.Response.make_string @@ Ok str
+
+let instrument_server (server : H.t) reg : unit =
+  H.add_middleware ~stage:(`Stage 1) server (http_middleware global);
+  add_route_to_server server reg
