@@ -24,10 +24,10 @@ module Counter : sig
   (** A counter, monotonically increasing *)
 
   val create : Registry.t -> ?tags:tags -> ?descr:string -> string -> t
-  val inc : t -> unit
-  val inc_by : t -> int -> unit
-  val dec : t -> unit
-  val dec_by : t -> int -> unit
+  val incr : t -> unit
+  val incr_by : t -> int -> unit
+  val decr : t -> unit
+  val decr_by : t -> int -> unit
 end
 
 (** Gauges *)
@@ -37,13 +37,15 @@ module Gauge : sig
 
   val create : Registry.t -> ?tags:tags -> ?descr:string -> string -> t
   val set : t -> int -> unit
-  val inc : t -> unit
-  val inc_by : t -> int -> unit
-  val dec : t -> unit
-  val dec_by : t -> int -> unit
+  val incr : t -> unit
+  val incr_by : t -> int -> unit
+  val decr : t -> unit
+  val decr_by : t -> int -> unit
 end
 
 (* TODO:
    module Histogram : sig
    end
 *)
+
+val http_middleware : Registry.t -> Tiny_httpd.Middleware.t

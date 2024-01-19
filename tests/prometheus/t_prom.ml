@@ -8,16 +8,16 @@ let g1 = P.Gauge.create reg ~tags:[ "level", "max" ] "yolo_gauge"
 
 let () =
   print_endline "==== first try ====";
-  P.Counter.inc_by c1 42;
-  P.Counter.inc c2;
+  P.Counter.incr_by c1 42;
+  P.Counter.incr c2;
   P.Gauge.set g1 2525;
 
   pf "```\n%s\n```\n" @@ P.Registry.emit_str reg
 
 let () =
   print_endline "==== second try====";
-  P.Counter.inc_by c1 11;
-  P.Counter.inc c2;
+  P.Counter.incr_by c1 11;
+  P.Counter.incr c2;
   P.Gauge.set g1 42_000;
 
   pf "```\n%s\n```\n" @@ P.Registry.emit_str reg
