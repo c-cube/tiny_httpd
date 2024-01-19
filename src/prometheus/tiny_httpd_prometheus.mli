@@ -43,6 +43,21 @@ module Gauge : sig
   val decr_by : t -> int -> unit
 end
 
+module Histogram : sig
+  type t
+  (** Histogram *)
+
+  val create :
+    Registry.t ->
+    ?tags:tags ->
+    ?descr:string ->
+    buckets:float list ->
+    string ->
+    t
+
+  val add : t -> float -> unit
+end
+
 (* TODO:
    module Histogram : sig
    end

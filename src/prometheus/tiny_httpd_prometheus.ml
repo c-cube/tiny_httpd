@@ -9,7 +9,20 @@ let bpf = Printf.bprintf
 type tags = (string * string) list
 type counter = { name: string; tags: tags; descr: string option; c: int A.t }
 type gauge = { name: string; tags: tags; descr: string option; g: int A.t }
-type registry = { mutable counters: counter list; mutable gauges: gauge list }
+
+type histogram = {
+  name: string;
+  tags: tags;
+  descr: string option;
+  sum: float A.t;
+  buckets: (float * int A.t) array;
+}
+
+type registry = {
+  mutable counters: counter list;
+  mutable gauges: gauge list;
+  mutable hists: histogram list;
+}
 
 let validate_descr_ what s =
   if String.contains s '\n' then
@@ -73,14 +86,71 @@ module Gauge = struct
   let[@inline] decr_by self n = ignore (A.fetch_and_add self.g (-n) : int)
 end
 
+module Histogram = struct
+  type t = histogram
+
+  let create reg ?(tags = []) ?descr ~buckets name : t =
+    opt_iter_ (validate_descr_ "histogram") descr;
+    let buckets =
+      List.sort Float.compare buckets
+      |> List.map (fun thresh -> thresh, A.make 0)
+    in
+    let buckets = Array.of_list @@ buckets @ [ infinity, A.make 0 ] in
+    let self : t = { name; descr; tags; sum = A.make 0.; buckets } in
+    reg.hists <- self :: reg.hists;
+    self
+
+  let add (self : t) n =
+    while
+      let old = A.get self.sum in
+      not (A.compare_and_set self.sum old (old +. n))
+    do
+      ()
+    done;
+    let i = ref 0 in
+    let continue = ref true in
+    while !continue && !i < Array.length self.buckets do
+      let thresh, count = self.buckets.(!i) in
+      if n <= thresh then (
+        continue := false;
+        A.incr count
+      ) else
+        incr i
+    done
+
+  let emit buf (self : t) : unit =
+    opt_iter_ (bpf buf "# HELP %s %s\n" self.name) self.descr;
+    bpf buf "# TYPE %s histogram\n" self.name;
+
+    let count = ref 0 in
+    for i = 0 to Array.length self.buckets - 1 do
+      let thresh, buck_count = self.buckets.(i) in
+      count := !count + A.get buck_count;
+
+      let name =
+        if thresh = infinity then
+          "+Inf"
+        else
+          string_of_float thresh
+      in
+      bpf buf "%s%a %d\n" self.name emit_tags_
+        (("le", name) :: self.tags)
+        !count
+    done;
+    bpf buf "%s_count%a %d\n" self.name emit_tags_ self.tags !count;
+    bpf buf "%s_sum%a %.3f\n" self.name emit_tags_ self.tags (A.get self.sum);
+    ()
+end
+
 module Registry = struct
   type t = registry
 
-  let create () : t = { counters = []; gauges = [] }
+  let create () : t = { counters = []; gauges = []; hists = [] }
 
   let emit (buf : Buffer.t) (self : t) : unit =
     List.iter (Gauge.emit buf) self.gauges;
     List.iter (Counter.emit buf) self.counters;
+    List.iter (Histogram.emit buf) self.hists;
     ()
 
   let emit_str (self : t) : string =
@@ -100,12 +170,22 @@ let http_middleware (reg : Registry.t) : H.Middleware.t =
   let c_err =
     Counter.create reg "tiny_httpd_errors" ~descr:"number of HTTP errors"
   in
+  let h_latency =
+    Histogram.create reg "tiny_httpd_latency" ~descr:"latency of HTTP responses"
+      ~buckets:[ 0.001; 0.01; 0.1; 0.5; 1.; 5.; 10. ]
+  in
 
   fun h : H.Middleware.handler ->
     fun req ~resp : unit ->
+     let start = Time_.now_us () in
      Counter.incr c_req;
      h req ~resp:(fun (response : H.Response.t) ->
          let code = response.code in
+
+         let elapsed_us = Time_.now_us () -. start in
+         let elapsed_s = elapsed_us /. 1e6 in
+         Histogram.add h_latency elapsed_s;
+
          if code < 200 || code >= 300 then Counter.incr c_err;
          resp response)
 

@@ -7,6 +7,16 @@ yolo_gauge{level="max"} 2525
 t_c2 1
 # TYPE t_c1 counter
 t_c1 42
+# HELP latency latency
+# TYPE latency histogram
+latency{le="0.01"} 2
+latency{le="0.1"} 4
+latency{le="0.5"} 7
+latency{le="1."} 8
+latency{le="10."} 9
+latency{le="+Inf"} 10
+latency_count 10
+latency_sum 31.530
 
 ```
 ==== second try====
@@ -18,5 +28,15 @@ yolo_gauge{level="max"} 42000
 t_c2 2
 # TYPE t_c1 counter
 t_c1 53
+# HELP latency latency
+# TYPE latency histogram
+latency{le="0.01"} 2
+latency{le="0.1"} 4
+latency{le="0.5"} 8
+latency{le="1."} 9
+latency{le="10."} 10
+latency{le="+Inf"} 12
+latency_count 12
+latency_sum 54.930
 
 ```

@@ -21,6 +21,9 @@ depends: [
   "ptime" {with-test}
   "qcheck-core" {>= "0.9" & with-test}
 ]
+depopts: [
+  "mtime" {>= "2.0"}
+]
 build: [
   ["dune" "subst"] {dev}
   [
