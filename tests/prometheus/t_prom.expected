@@ -1,0 +1,22 @@
+==== first try ====
+```
+# TYPE yolo_gauge gauge
+yolo_gauge{level="max"} 2525
+# HELP t_c2 more awesome than c1
+# TYPE t_c2 counter
+t_c2 1
+# TYPE t_c1 counter
+t_c1 42
+
+```
+==== second try====
+```
+# TYPE yolo_gauge gauge
+yolo_gauge{level="max"} 42000
+# HELP t_c2 more awesome than c1
+# TYPE t_c2 counter
+t_c2 2
+# TYPE t_c1 counter
+t_c1 53
+
+```

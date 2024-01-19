@@ -1,0 +1,4 @@
+
+(test
+  (name t_prom)
+  (libraries tiny_httpd.prometheus))
