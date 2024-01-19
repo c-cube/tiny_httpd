@@ -26,8 +26,10 @@ module Counter : sig
   val create : Registry.t -> ?tags:tags -> ?descr:string -> string -> t
   val incr : t -> unit
   val incr_by : t -> int -> unit
-  val decr : t -> unit
-  val decr_by : t -> int -> unit
+
+  val incr_to : t -> int -> unit
+  (** Increment to the given number. If it's lower than the current
+      value this does nothing *)
 end
 
 (** Gauges *)
@@ -71,3 +73,10 @@ val add_route_to_server : Tiny_httpd.t -> Registry.t -> unit
 
 val instrument_server : Tiny_httpd.t -> Registry.t -> unit
 (** Add middleware and route *)
+
+module GC_metrics : sig
+  type t
+
+  val create : Registry.t -> t
+  val update : t -> unit
+end

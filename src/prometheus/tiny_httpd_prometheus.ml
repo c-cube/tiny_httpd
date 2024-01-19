@@ -60,8 +60,17 @@ module Counter = struct
 
   let[@inline] incr self = A.incr self.c
   let[@inline] incr_by self n = ignore (A.fetch_and_add self.c n : int)
-  let[@inline] decr self = A.decr self.c
-  let[@inline] decr_by self n = ignore (A.fetch_and_add self.c (-n) : int)
+
+  let incr_to self n =
+    while
+      let old = A.get self.c in
+      if old < n then
+        not (A.compare_and_set self.c old n)
+      else
+        false
+    do
+      ()
+    done
 end
 
 module Gauge = struct
@@ -197,3 +206,26 @@ let add_route_to_server (server : H.t) (reg : registry) : unit =
 let instrument_server (server : H.t) reg : unit =
   H.add_middleware ~stage:(`Stage 1) server (http_middleware global);
   add_route_to_server server reg
+
+module GC_metrics = struct
+  type t = { major_coll: counter; major_heap: gauge; compactions: counter }
+
+  let create reg : t =
+    let major_coll =
+      Counter.create reg ~descr:"major GC collections" "ocaml_gc_major"
+    in
+    let major_heap =
+      Gauge.create reg ~descr:"size of major heap" "ocaml_gc_major_heap_size"
+    in
+    let compactions =
+      Counter.create reg ~descr:"number of GC compactions"
+        "ocaml_gc_compactions"
+    in
+    { major_coll; major_heap; compactions }
+
+  let update (self : t) =
+    let stats = Gc.quick_stat () in
+    Counter.incr_to self.major_coll stats.major_collections;
+    Counter.incr_to self.compactions stats.compactions;
+    Gauge.set self.major_heap (int_of_float (stats.major_words *. 8.))
+end
