@@ -1,0 +1,7 @@
+
+(library
+  (name tiny_httpd_prometheus)
+  (public_name tiny_httpd.prometheus)
+  (synopsis "Metrics using prometheus")
+  (private_modules common_)
+  (libraries tiny_httpd))
