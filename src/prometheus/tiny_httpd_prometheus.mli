@@ -9,6 +9,11 @@ module Registry : sig
 
   val create : unit -> t
 
+  val on_will_emit : t -> (unit -> unit) -> unit
+  (** [on_will_emit registry f] calls [f()] every time
+      [emit buf registry] is called (before the metrics start being emitted). This
+      is useful to update some metrics on demand. *)
+
   val emit : Buffer.t -> t -> unit
   (** Write metrics into the given buffer. The buffer will be
       cleared first thing. *)
@@ -79,4 +84,9 @@ module GC_metrics : sig
 
   val create : Registry.t -> t
   val update : t -> unit
+
+  val create_and_update_before_emit : Registry.t -> unit
+  (** [create_and_update_before_emit reg] creates new GC metrics,
+    adds them to the registry, and uses {!Registry.on_will_emit}
+    to {!update} the metrics every time the registry is polled. *)
 end

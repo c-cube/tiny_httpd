@@ -22,6 +22,7 @@ type registry = {
   mutable counters: counter list;
   mutable gauges: gauge list;
   mutable hists: histogram list;
+  mutable on_will_emit: (unit -> unit) list;
 }
 
 let validate_descr_ what s =
@@ -154,9 +155,13 @@ end
 module Registry = struct
   type t = registry
 
-  let create () : t = { counters = []; gauges = []; hists = [] }
+  let create () : t =
+    { counters = []; gauges = []; hists = []; on_will_emit = [] }
+
+  let on_will_emit self f = self.on_will_emit <- f :: self.on_will_emit
 
   let emit (buf : Buffer.t) (self : t) : unit =
+    List.iter (fun f -> f ()) self.on_will_emit;
     List.iter (Gauge.emit buf) self.gauges;
     List.iter (Counter.emit buf) self.counters;
     List.iter (Histogram.emit buf) self.hists;
@@ -228,4 +233,8 @@ module GC_metrics = struct
     Counter.incr_to self.major_coll stats.major_collections;
     Counter.incr_to self.compactions stats.compactions;
     Gauge.set self.major_heap (stats.heap_words * 8)
+
+  let create_and_update_before_emit reg : unit =
+    let gc = create reg in
+    Registry.on_will_emit reg (fun () -> update gc)
 end
