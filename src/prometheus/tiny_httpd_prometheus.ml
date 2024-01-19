@@ -26,17 +26,21 @@ let emit_tags_ buf tags =
     bpf buf "}"
   )
 
+let opt_iter_ f = function
+  | None -> ()
+  | Some x -> f x
+
 module Counter = struct
   type t = counter
 
   let create (reg : registry) ?(tags = []) ?descr name : t =
     let self : t = { name; descr; tags; c = A.make 0 } in
-    Option.iter (validate_descr_ "counter") descr;
+    opt_iter_ (validate_descr_ "counter") descr;
     reg.counters <- self :: reg.counters;
     self
 
   let emit buf (self : t) =
-    Option.iter (bpf buf "# HELP %s %s\n" self.name) self.descr;
+    opt_iter_ (bpf buf "# HELP %s %s\n" self.name) self.descr;
     bpf buf "# TYPE %s counter\n" self.name;
     bpf buf "%s%a %d\n" self.name emit_tags_ self.tags (A.get self.c);
     ()
@@ -51,13 +55,13 @@ module Gauge = struct
   type t = gauge
 
   let create (reg : registry) ?(tags = []) ?descr name : t =
-    Option.iter (validate_descr_ "gauge") descr;
+    opt_iter_ (validate_descr_ "gauge") descr;
     let self : t = { name; descr; tags; g = A.make 0 } in
     reg.gauges <- self :: reg.gauges;
     self
 
   let emit buf (self : t) =
-    Option.iter (bpf buf "# HELP %s %s\n" self.name) self.descr;
+    opt_iter_ (bpf buf "# HELP %s %s\n" self.name) self.descr;
     bpf buf "# TYPE %s gauge\n" self.name;
     bpf buf "%s%a %d\n" self.name emit_tags_ self.tags (A.get self.g);
     ()
