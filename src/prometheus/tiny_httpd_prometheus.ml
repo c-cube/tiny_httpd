@@ -102,7 +102,7 @@ module Histogram = struct
   let create reg ?(tags = []) ?descr ~buckets name : t =
     opt_iter_ (validate_descr_ "histogram") descr;
     let buckets =
-      List.sort Float.compare buckets
+      List.sort Stdlib.compare buckets
       |> List.map (fun thresh -> thresh, A.make 0)
     in
     let buckets = Array.of_list @@ buckets @ [ infinity, A.make 0 ] in

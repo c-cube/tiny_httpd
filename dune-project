@@ -19,7 +19,7 @@
     seq
     base-threads
     result
-    (ocaml (>= 4.05))
+    (ocaml (>= 4.08))
     (odoc :with-doc)
     (conf-libcurl :with-test)
     (ptime :with-test)
