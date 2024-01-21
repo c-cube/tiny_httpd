@@ -13,11 +13,13 @@
   (name tiny_httpd)
   (synopsis "Minimal HTTP server using threads")
   (tags (http thread server tiny_httpd http_of_dir simplehttpserver))
+  (depopts
+    (mtime (>= 2.0)))
   (depends
     seq
     base-threads
     result
-    (ocaml (>= 4.05))
+    (ocaml (>= 4.08))
     (odoc :with-doc)
     (conf-libcurl :with-test)
     (ptime :with-test)

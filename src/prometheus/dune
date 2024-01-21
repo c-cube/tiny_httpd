@@ -1,0 +1,12 @@
+
+
+(library
+ (name tiny_httpd_prometheus)
+ (public_name tiny_httpd.prometheus)
+ (synopsis "Metrics using prometheus")
+ (private_modules common_ time_)
+ (libraries
+  tiny_httpd unix
+  (select time_.ml from
+   (mtime mtime.clock.os -> time_.mtime.ml)
+   (-> time_.default.ml))))

@@ -15,11 +15,14 @@ depends: [
   "seq"
   "base-threads"
   "result"
-  "ocaml" {>= "4.05"}
+  "ocaml" {>= "4.08"}
   "odoc" {with-doc}
   "conf-libcurl" {with-test}
   "ptime" {with-test}
   "qcheck-core" {>= "0.9" & with-test}
+]
+depopts: [
+  "mtime" {>= "2.0"}
 ]
 build: [
   ["dune" "subst"] {dev}

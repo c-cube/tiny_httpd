@@ -1,0 +1,42 @@
+==== first try ====
+```
+# TYPE yolo_gauge gauge
+yolo_gauge{level="max"} 2525
+# HELP t_c2 more awesome than c1
+# TYPE t_c2 counter
+t_c2 1
+# TYPE t_c1 counter
+t_c1 42
+# HELP latency latency
+# TYPE latency histogram
+latency_bucket{le="0.01"} 2
+latency_bucket{le="0.1"} 4
+latency_bucket{le="0.5"} 7
+latency_bucket{le="1."} 8
+latency_bucket{le="10."} 9
+latency_bucket{le="+Inf"} 10
+latency_count 10
+latency_sum 31.530
+
+```
+==== second try====
+```
+# TYPE yolo_gauge gauge
+yolo_gauge{level="max"} 42000
+# HELP t_c2 more awesome than c1
+# TYPE t_c2 counter
+t_c2 2
+# TYPE t_c1 counter
+t_c1 53
+# HELP latency latency
+# TYPE latency histogram
+latency_bucket{le="0.01"} 2
+latency_bucket{le="0.1"} 4
+latency_bucket{le="0.5"} 8
+latency_bucket{le="1."} 9
+latency_bucket{le="10."} 10
+latency_bucket{le="+Inf"} 12
+latency_count 12
+latency_sum 54.930
+
+```
