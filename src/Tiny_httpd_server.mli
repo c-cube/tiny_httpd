@@ -129,7 +129,7 @@ module Request : sig
 
   val client_addr : _ t -> Unix.sockaddr
   (** Client address of the request.
-      @since NEXT_RELEASE *)
+      @since 0.16 *)
 
   val meth : _ t -> Meth.t
   (** Method for the request. *)

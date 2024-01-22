@@ -1,4 +1,10 @@
 
+## 0.16
+
+- feat: add `Request.client_addr` accessor
+- feat: add `tiny_httpd.prometheus`, a simple sub-library
+    to expose [prometheus](https://prometheus.io) metrics over HTTP.
+
 ## 0.15
 
 - fix: do not block in `accept`, enabling more graceful shutdown
