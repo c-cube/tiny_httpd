@@ -89,6 +89,10 @@ module Byte_stream = Tiny_httpd_stream
 
 module IO = Tiny_httpd_io
 
+(** {2 Logging *)
+
+module Log = Tiny_httpd_log
+
 (** {2 Main Server Type} *)
 
 (** @inline *)

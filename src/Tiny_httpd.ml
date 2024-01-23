@@ -6,3 +6,4 @@ module Dir = Tiny_httpd_dir
 module Html = Tiny_httpd_html
 module IO = Tiny_httpd_io
 module Pool = Tiny_httpd_pool
+module Log = Tiny_httpd_log

@@ -67,8 +67,7 @@ module Request : sig
     meth: Meth.t;  (** HTTP method for this request. *)
     host: string;
         (** Host header, mandatory. It can also be found in {!headers}. *)
-    client_addr: Unix.sockaddr;
-        (** Client address. Available since 0.14. *)
+    client_addr: Unix.sockaddr;  (** Client address. Available since 0.14. *)
     headers: Headers.t;  (** List of headers. *)
     http_version: int * int;
         (** HTTP version. This should be either [1, 0] or [1, 1]. *)
@@ -667,12 +666,3 @@ val run_exn : ?after_init:(unit -> unit) -> t -> unit
 (** [run_exn s] is like [run s] but re-raises an exception if the server exits
     with an error.
     @since 0.14 *)
-
-(**/**)
-
-val _debug :
-  ((('a, out_channel, unit, unit, unit, unit) format6 -> 'a) -> unit) -> unit
-
-val _enable_debug : bool -> unit
-
-(**/**)

@@ -2,6 +2,7 @@ module S = Tiny_httpd
 module U = Tiny_httpd_util
 module D = Tiny_httpd_dir
 module Pf = Printf
+module Log = Tiny_httpd.Log
 
 let serve ~config (dir : string) addr port j : _ result =
   let server = S.create ~max_connections:j ~addr ~port () in
@@ -39,7 +40,7 @@ let main () =
          "--port", Set_int port, " port to listen on";
          "-p", Set_int port, " alias to --port";
          "--dir", Set_string dir_, " directory to serve (default: \".\")";
-         "--debug", Unit (fun () -> S._enable_debug true), " debug mode";
+         "--debug", Unit (Log.setup ~debug:true), " debug mode";
          ( "--upload",
            Unit (fun () -> config.upload <- true),
            " enable file uploading" );

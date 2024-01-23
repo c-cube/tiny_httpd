@@ -1,25 +1,11 @@
 type buf = Tiny_httpd_buf.t
 type byte_stream = Tiny_httpd_stream.t
 
-let _debug_on =
-  ref
-    (match String.trim @@ Sys.getenv "HTTP_DBG" with
-    | "" -> false
-    | _ -> true
-    | exception _ -> false)
-
-let _enable_debug b = _debug_on := b
-
-let _debug k =
-  if !_debug_on then
-    k (fun fmt ->
-        Printf.fprintf stdout "[http.thread %d]: " Thread.(id @@ self ());
-        Printf.kfprintf (fun oc -> Printf.fprintf oc "\n%!") stdout fmt)
-
 module Buf = Tiny_httpd_buf
 module Byte_stream = Tiny_httpd_stream
 module IO = Tiny_httpd_io
 module Pool = Tiny_httpd_pool
+module Log = Tiny_httpd_log
 
 exception Bad_req of int * string
 
@@ -137,7 +123,7 @@ module Headers = struct
   let parse_ ~buf (bs : byte_stream) : t =
     let rec loop acc =
       let line = Byte_stream.read_line ~buf bs in
-      _debug (fun k -> k "parsed header line %S" line);
+      Log.debug (fun k -> k "parsed header line %S" line);
       if line = "\r" then
         acc
       else (
@@ -225,11 +211,11 @@ module Request = struct
 
   (* decode a "chunked" stream into a normal stream *)
   let read_stream_chunked_ ?buf (bs : byte_stream) : byte_stream =
-    _debug (fun k -> k "body: start reading chunked stream...");
+    Log.debug (fun k -> k "body: start reading chunked stream...");
     Byte_stream.read_chunked ?buf ~fail:(fun s -> Bad_req (400, s)) bs
 
   let limit_body_size_ ~max_size (bs : byte_stream) : byte_stream =
-    _debug (fun k -> k "limit size of body to max-size=%d" max_size);
+    Log.debug (fun k -> k "limit size of body to max-size=%d" max_size);
     Byte_stream.limit_size_to ~max_size ~close_rec:false bs
       ~too_big:(fun size ->
         (* read too much *)
@@ -242,7 +228,7 @@ module Request = struct
 
   (* read exactly [size] bytes from the stream *)
   let read_exactly ~size (bs : byte_stream) : byte_stream =
-    _debug (fun k -> k "body: must read exactly %d bytes" size);
+    Log.debug (fun k -> k "body: must read exactly %d bytes" size);
     Byte_stream.read_exactly bs ~close_rec:false ~size ~too_short:(fun size ->
         bad_reqf 400 "body is too short by %d bytes" size)
 
@@ -260,11 +246,11 @@ module Request = struct
           if version != 0 && version != 1 then raise Exit;
           meth, path, version
         with _ ->
-          _debug (fun k -> k "invalid request line: `%s`" line);
+          Log.error (fun k -> k "invalid request line: `%s`" line);
           raise (Bad_req (400, "Invalid request line"))
       in
       let meth = Meth.of_string meth in
-      _debug (fun k -> k "got meth: %s, path %S" (Meth.to_string meth) path);
+      Log.debug (fun k -> k "got meth: %s, path %S" (Meth.to_string meth) path);
       let headers = Headers.parse_ ~buf bs in
       let host =
         match Headers.get "Host" headers with
@@ -463,7 +449,7 @@ module Response = struct
         self.headers
     in
     let self = { self with headers; body } in
-    _debug (fun k ->
+    Log.debug (fun k ->
         k "output response: %s"
           (Format.asprintf "%a" pp { self with body = `String "<...>" }));
 
@@ -872,6 +858,11 @@ module Unix_tcp_server_ = struct
     mutable running: bool; (* TODO: use an atomic? *)
   }
 
+  let str_of_sockaddr = function
+    | Unix.ADDR_UNIX f -> f
+    | Unix.ADDR_INET (inet, port) ->
+      Printf.sprintf "%s:%d" (Unix.string_of_inet_addr inet) port
+
   let to_tcp_server (self : t) : IO.TCP_server.builder =
     {
       IO.TCP_server.serve =
@@ -923,6 +914,8 @@ module Unix_tcp_server_ = struct
           (* how to handle a single client *)
           let handle_client_unix_ (client_sock : Unix.file_descr)
               (client_addr : Unix.sockaddr) : unit =
+            Log.info (fun k ->
+                k "serving new client on %s" (str_of_sockaddr client_addr));
             Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout);
             Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout);
             let oc =
@@ -930,11 +923,15 @@ module Unix_tcp_server_ = struct
             in
             let ic = IO.Input.of_unix_fd client_sock in
             handle.handle ~client_addr ic oc;
-            _debug (fun k -> k "done with client, exiting");
+            Log.info (fun k ->
+                k "done with client on %s, exiting"
+                @@ str_of_sockaddr client_addr);
             (try Unix.close client_sock
              with e ->
-               _debug (fun k ->
-                   k "error when closing sock: %s" (Printexc.to_string e)));
+               Log.error (fun k ->
+                   k "error when closing sock for client %s: %s"
+                     (str_of_sockaddr client_addr)
+                     (Printexc.to_string e)));
             ()
           in
 
@@ -963,7 +960,7 @@ module Unix_tcp_server_ = struct
               ->
               ()
             | exception e ->
-              _debug (fun k ->
+              Log.error (fun k ->
                   k "Unix.accept or Thread.create raised an exception: %s"
                     (Printexc.to_string e))
           done;
@@ -1030,7 +1027,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
   let is = Byte_stream.of_input ~buf_size:self.buf_size ic in
   let continue = ref true in
   while !continue && running self do
-    _debug (fun k -> k "read next request");
+    Log.debug (fun k -> k "read next request");
     let (module B) = self.backend in
     match
       Request.parse_req_start ~client_addr ~get_time_s:B.get_time_s ~buf is
@@ -1042,7 +1039,8 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
       (try Response.output_ ~buf:buf_res oc res with Sys_error _ -> ());
       continue := false
     | Ok (Some req) ->
-      _debug (fun k -> k "req: %s" (Format.asprintf "@[%a@]" Request.pp_ req));
+      Log.debug (fun k ->
+          k "parsed request: %s" (Format.asprintf "@[%a@]" Request.pp_ req));
 
       if Request.close_after_req req then continue := false;
 
@@ -1057,7 +1055,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
          (* handle expect/continue *)
          (match Request.get_header ~f:String.trim req "Expect" with
          | Some "100-continue" ->
-           _debug (fun k -> k "send back: 100 CONTINUE");
+           Log.debug (fun k -> k "send back: 100 CONTINUE");
            Response.output_ ~buf:buf_res oc (Response.make_raw ~code:100 "")
          | Some s -> bad_reqf 417 "unknown expectation %s" s
          | None -> ());
