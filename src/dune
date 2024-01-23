@@ -1,13 +1,10 @@
-
-(env
- (_
-  (flags :standard -warn-error -a+8 -w +a-4-32-40-42-44-48-70 -color always -safe-string
-    -strict-sequence)))
-
 (library
   (name tiny_httpd)
   (public_name tiny_httpd)
-  (libraries threads seq unix)
+  (libraries threads seq unix
+             (select Tiny_httpd_log.ml from
+              (logs -> Tiny_httpd_log.logs.ml)
+              (-> Tiny_httpd_log.default.ml)))
   (wrapped false))
 
 (rule

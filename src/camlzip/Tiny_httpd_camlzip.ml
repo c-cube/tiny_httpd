@@ -2,9 +2,10 @@ module S = Tiny_httpd_server
 module BS = Tiny_httpd_stream
 module W = Tiny_httpd_io.Writer
 module Out = Tiny_httpd_io.Output
+module Log = Tiny_httpd.Log
 
 let decode_deflate_stream_ ~buf_size (is : S.byte_stream) : S.byte_stream =
-  S._debug (fun k -> k "wrap stream with deflate.decode");
+  Log.debug (fun k -> k "wrap stream with deflate.decode");
   let zlib_str = Zlib.inflate_init false in
   let is_done = ref false in
   BS.make ~bs:(Bytes.create buf_size)
@@ -31,19 +32,19 @@ let decode_deflate_stream_ ~buf_size (is : S.byte_stream) : S.byte_stream =
            self.off <- 0;
            self.len <- used_out;
            if finished then is_done := true;
-           S._debug (fun k ->
+           Log.debug (fun k ->
                k "decode %d bytes as %d bytes from inflate (finished: %b)"
                  used_in used_out finished)
          with Zlib.Error (e1, e2) ->
            S.Response.fail_raise ~code:400
              "inflate: error during decompression:\n%s %s" e1 e2);
-        S._debug (fun k ->
+        Log.debug (fun k ->
             k "inflate: refill %d bytes into internal buf" self.len)
       ))
     ()
 
 let encode_deflate_writer_ ~buf_size (w : W.t) : W.t =
-  S._debug (fun k -> k "wrap writer with deflate.encode");
+  Log.debug (fun k -> k "wrap writer with deflate.encode");
   let zlib_str = Zlib.deflate_init 4 false in
 
   let o_buf = Bytes.create buf_size in
@@ -170,7 +171,7 @@ let compress_resp_stream_ ~compress_above ~buf_size (req : _ S.Request.t)
     match resp.body with
     | `String s when String.length s > compress_above ->
       (* big string, we compress *)
-      S._debug (fun k ->
+      Log.debug (fun k ->
           k "encode str response with deflate (size %d, threshold %d)"
             (String.length s) compress_above);
       let body = encode_deflate_writer_ ~buf_size @@ W.of_string s in
@@ -178,13 +179,13 @@ let compress_resp_stream_ ~compress_above ~buf_size (req : _ S.Request.t)
       |> S.Response.update_headers update_headers
       |> S.Response.set_body (`Writer body)
     | `Stream str ->
-      S._debug (fun k -> k "encode stream response with deflate");
+      Log.debug (fun k -> k "encode stream response with deflate");
       let w = BS.to_writer str in
       resp
       |> S.Response.update_headers update_headers
       |> S.Response.set_body (`Writer (encode_deflate_writer_ ~buf_size w))
     | `Writer w ->
-      S._debug (fun k -> k "encode writer response with deflate");
+      Log.debug (fun k -> k "encode writer response with deflate");
       resp
       |> S.Response.update_headers update_headers
       |> S.Response.set_body (`Writer (encode_deflate_writer_ ~buf_size w))
@@ -202,5 +203,5 @@ let middleware ?(compress_above = 16 * 1024) ?(buf_size = 16 * 1_024) () :
 
 let setup ?compress_above ?buf_size server =
   let m = middleware ?compress_above ?buf_size () in
-  S._debug (fun k -> k "setup gzip support");
+  Log.info (fun k -> k "setup gzip middleware");
   S.add_middleware ~stage:`Encoding server m

@@ -22,6 +22,7 @@ depends: [
   "qcheck-core" {>= "0.9" & with-test}
 ]
 depopts: [
+  "logs"
   "mtime" {>= "2.0"}
 ]
 build: [

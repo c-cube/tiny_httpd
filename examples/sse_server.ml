@@ -1,6 +1,7 @@
 (* serves some streams of events *)
 
 module S = Tiny_httpd
+module Log = Tiny_httpd_log
 
 let port = ref 8080
 
@@ -9,7 +10,7 @@ let () =
     (Arg.align
        [
          "-p", Arg.Set_int port, " port to listen on";
-         "--debug", Arg.Bool S._enable_debug, " toggle debug";
+         "--debug", Arg.Unit (Log.setup ~debug:true), " enable debug";
        ])
     (fun _ -> ())
     "sse_clock [opt*]";
@@ -26,12 +27,12 @@ let () =
   S.add_route_server_sent_handler server
     S.Route.(exact "clock" @/ return)
     (fun _req (module EV : S.SERVER_SENT_GENERATOR) ->
-      S._debug (fun k -> k "new connection");
+      Log.debug (fun k -> k "new SSE connection");
       EV.set_headers extra_headers;
       let tick = ref true in
       while true do
         let now = Ptime_clock.now () in
-        S._debug (fun k ->
+        Log.debug (fun k ->
             k "send clock ev %s" (Format.asprintf "%a" Ptime.pp now));
         EV.send_event
           ~event:

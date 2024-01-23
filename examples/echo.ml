@@ -1,4 +1,5 @@
 module S = Tiny_httpd
+module Log = Tiny_httpd.Log
 
 let now_ = Unix.gettimeofday
 
@@ -73,6 +74,10 @@ let base64 x =
   ignore (Unix.close_process (ic, oc));
   r
 
+let setup_logging () =
+  Logs.set_reporter @@ Logs.format_reporter ();
+  Logs.set_level ~all:true (Some Logs.Debug)
+
 let () =
   let port_ = ref 8080 in
   let j = ref 32 in
@@ -81,7 +86,7 @@ let () =
        [
          "--port", Arg.Set_int port_, " set port";
          "-p", Arg.Set_int port_, " set port";
-         "--debug", Arg.Unit (fun () -> S._enable_debug true), " enable debug";
+         "--debug", Arg.Unit setup_logging, " enable debug";
          "-j", Arg.Set_int j, " maximum number of connections";
        ])
     (fun _ -> raise (Arg.Bad ""))
@@ -134,7 +139,7 @@ let () =
   S.add_route_handler_stream ~meth:`PUT server
     S.Route.(exact "upload" @/ string @/ return)
     (fun path req ->
-      S._debug (fun k ->
+      Log.debug (fun k ->
           k "start upload %S, headers:\n%s\n\n%!" path
             (Format.asprintf "%a" S.Headers.pp (S.Request.headers req)));
       try
@@ -153,7 +158,7 @@ let () =
       let ok =
         match S.Request.get_header req "authorization" with
         | Some v ->
-          S._debug (fun k -> k "authenticate with %S" v);
+          Log.debug (fun k -> k "authenticate with %S" v);
           v = "Basic " ^ base64 "user:foobar"
         | None -> false
       in
