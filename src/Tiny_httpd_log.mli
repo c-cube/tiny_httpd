@@ -8,3 +8,5 @@ val setup : debug:bool -> unit -> unit
 (** Setup and enable logging. This should only ever be used in executables,
     not libraries.
     @param debug if true, set logging to debug (otherwise info) *)
+
+val dummy : bool
