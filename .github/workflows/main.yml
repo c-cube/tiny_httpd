@@ -49,3 +49,6 @@ jobs:
       - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd_camlzip
         if: ${{ matrix.os == 'ubuntu-latest' }}
 
+      - run: opam install logs -y
+
+      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
