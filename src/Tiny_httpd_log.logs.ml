@@ -14,3 +14,5 @@ let setup ~debug () =
          Logs.Debug
        else
          Logs.Info))
+
+let dummy = false

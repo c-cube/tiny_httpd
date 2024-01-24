@@ -844,6 +844,11 @@ let create_from ?(buf_size = 16 * 1_024) ?(middlewares = []) ~backend () : t =
 
 let is_ipv6_str addr : bool = String.contains addr ':'
 
+let str_of_sockaddr = function
+  | Unix.ADDR_UNIX f -> f
+  | Unix.ADDR_INET (inet, port) ->
+    Printf.sprintf "%s:%d" (Unix.string_of_inet_addr inet) port
+
 module Unix_tcp_server_ = struct
   type t = {
     addr: string;
@@ -857,11 +862,6 @@ module Unix_tcp_server_ = struct
     masksigpipe: bool;
     mutable running: bool; (* TODO: use an atomic? *)
   }
-
-  let str_of_sockaddr = function
-    | Unix.ADDR_UNIX f -> f
-    | Unix.ADDR_INET (inet, port) ->
-      Printf.sprintf "%s:%d" (Unix.string_of_inet_addr inet) port
 
   let to_tcp_server (self : t) : IO.TCP_server.builder =
     {
@@ -1044,6 +1044,16 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
 
       if Request.close_after_req req then continue := false;
 
+      (* how to log the response to this query *)
+      let log_response (resp : Response.t) =
+        if not Log.dummy then
+          Log.info (fun k ->
+              let elapsed = B.get_time_s () -. req.start_time in
+              k "response to=%s code=%d time=%.3fs"
+                (str_of_sockaddr client_addr)
+                resp.code elapsed)
+      in
+
       (try
          (* is there a handler for this path? *)
          let base_handler =
@@ -1081,6 +1091,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
            try
              if Headers.get "connection" r.Response.headers = Some "close" then
                continue := false;
+             log_response r;
              Response.output_ ~buf:buf_res oc r
            with Sys_error _ -> continue := false
          in
@@ -1088,15 +1099,22 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
          (* call handler *)
          try handler oc req ~resp with Sys_error _ -> continue := false
        with
-      | Sys_error _ -> continue := false
-      (* connection broken somehow *)
+      | Sys_error _ ->
+        (* connection broken somehow *)
+        Log.debug (fun k -> k "connection broken");
+        continue := false
       | Bad_req (code, s) ->
         continue := false;
-        Response.output_ ~buf:buf_res oc @@ Response.make_raw ~code s
+        let resp = Response.make_raw ~code s in
+        log_response resp;
+        Response.output_ ~buf:buf_res oc resp
       | e ->
         continue := false;
-        Response.output_ ~buf:buf_res oc
-        @@ Response.fail ~code:500 "server error: %s" (Printexc.to_string e))
+        let resp =
+          Response.fail ~code:500 "server error: %s" (Printexc.to_string e)
+        in
+        log_response resp;
+        Response.output_ ~buf:buf_res oc resp)
   done
 
 let client_handler (self : t) : IO.TCP_server.conn_handler =
