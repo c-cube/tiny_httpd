@@ -1049,9 +1049,9 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
         if not Log.dummy then
           Log.info (fun k ->
               let elapsed = B.get_time_s () -. req.start_time in
-              k "response to=%s code=%d time=%.3fs"
+              k "response to=%s path=%S code=%d time=%.3fs"
                 (str_of_sockaddr client_addr)
-                resp.code elapsed)
+                req.path resp.code elapsed)
       in
 
       (try
