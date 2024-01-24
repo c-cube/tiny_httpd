@@ -200,7 +200,7 @@ let http_middleware (reg : Registry.t) : H.Middleware.t =
          let elapsed_s = elapsed_us /. 1e6 in
          Histogram.add h_latency elapsed_s;
 
-         if code < 200 || code >= 300 then Counter.incr c_err;
+         if code < 200 || code >= 400 then Counter.incr c_err;
          resp response)
 
 let add_route_to_server (server : H.t) (reg : registry) : unit =
