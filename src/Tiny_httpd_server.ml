@@ -815,8 +815,9 @@ let add_route_server_sent_handler ?accept self route f =
       let send_event = send_event
       let close () = raise Exit_SSE
     end in
-    try f req (module SSG : SERVER_SENT_GENERATOR)
-    with Exit_SSE -> IO.Output.close oc
+    (try f req (module SSG : SERVER_SENT_GENERATOR)
+     with Exit_SSE -> IO.Output.close oc);
+    Log.info (fun k -> k "closed SSE connection")
   in
   add_route_handler_ self ?accept ~meth:`GET route ~tr_req f
 
@@ -1048,12 +1049,19 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
 
       (* how to log the response to this query *)
       let log_response (resp : Response.t) =
-        if not Log.dummy then
-          Log.info (fun k ->
-              let elapsed = B.get_time_s () -. req.start_time in
-              k "response to=%s path=%S code=%d time=%.3fs"
-                (str_of_sockaddr client_addr)
-                req.path resp.code elapsed)
+        if not Log.dummy then (
+          let msgf k =
+            let elapsed = B.get_time_s () -. req.start_time in
+            k
+              ("response to=%s code=%d time=%.3fs path=%S" : _ format4)
+              (str_of_sockaddr client_addr)
+              resp.code elapsed req.path
+          in
+          if Response_code.is_success resp.code then
+            Log.info msgf
+          else
+            Log.error msgf
+        )
       in
 
       (try
