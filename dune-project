@@ -22,6 +22,7 @@
     result
     (ocaml (>= 4.08))
     (odoc :with-doc)
+    (logs :with-test)
     (conf-libcurl :with-test)
     (ptime :with-test)
     (qcheck-core (and (>= 0.9) :with-test))))
