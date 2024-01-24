@@ -42,6 +42,8 @@ module Response_code = struct
     | 501 -> "Not implemented"
     | 503 -> "Service unavailable"
     | n -> "Unknown response code " ^ string_of_int n (* TODO *)
+
+  let[@inline] is_success n = n >= 200 && n < 400
 end
 
 type 'a resp_result = ('a, Response_code.t * string) result

@@ -195,6 +195,10 @@ module Response_code : sig
   val descr : t -> string
   (** A description of some of the error codes.
       NOTE: this is not complete (yet). *)
+
+  val is_success : t -> bool
+  (** [is_success code] is true iff [code] is in the [2xx] or [3xx] range.
+      @since NEXT_RELEASE *)
 end
 
 (** {2 Responses}
