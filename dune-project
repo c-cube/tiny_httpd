@@ -28,6 +28,16 @@
     (qcheck-core (and (>= 0.9) :with-test))))
 
 (package
+  (name tiny_httpd_ws)
+  (synopsis "Websockets for tiny_httpd")
+  (depends
+    (tiny_httpd (= :version))
+    (base64 (>= 3.0))
+    crypokit
+    (logs :with-test)
+    (odoc :with-doc)))
+
+(package
   (name tiny_httpd_camlzip)
   (synopsis "Interface to camlzip for tiny_httpd")
   (depends
