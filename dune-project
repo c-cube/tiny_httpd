@@ -33,7 +33,7 @@
   (depends
     (tiny_httpd (= :version))
     (base64 (>= 3.0))
-    crypokit
+    cryptokit
     (logs :with-test)
     (odoc :with-doc)))
 
