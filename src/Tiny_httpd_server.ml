@@ -946,18 +946,25 @@ module Unix_tcp_server_ = struct
               (* limit concurrency *)
               Sem_.acquire 1 self.sem_max_connections;
 
-              Unix.setsockopt client_sock Unix.TCP_NODELAY true;
               (* Block INT/HUP while cloning to avoid children handling them.
                  When thread gets them, our Unix.accept raises neatly. *)
               ignore Unix.(sigprocmask SIG_BLOCK Sys.[ sigint; sighup ]);
               self.new_thread (fun () ->
                   try
+                    Unix.setsockopt client_sock Unix.TCP_NODELAY true;
                     handle_client_unix_ client_sock client_addr;
                     Sem_.release 1 self.sem_max_connections
                   with e ->
+                    let bt = Printexc.get_raw_backtrace () in
                     (try Unix.close client_sock with _ -> ());
                     Sem_.release 1 self.sem_max_connections;
-                    raise e);
+                    Log.error (fun k ->
+                        k
+                          "@[<v>Handler: uncaught exception for client %s:@ \
+                           %s@ %s@]"
+                          (str_of_sockaddr client_addr)
+                          (Printexc.to_string e)
+                          (Printexc.raw_backtrace_to_string bt)));
               ignore Unix.(sigprocmask SIG_UNBLOCK Sys.[ sigint; sighup ])
             | exception Unix.Unix_error ((Unix.EAGAIN | Unix.EWOULDBLOCK), _, _)
               ->
