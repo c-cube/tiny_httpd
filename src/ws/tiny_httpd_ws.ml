@@ -349,7 +349,7 @@ module Reader = struct
         self.state <- Close;
         let body = read_body_to_string self in
         if String.length body >= 2 then (
-          let errcode = String.get_int16_be body 0 in
+          let errcode = Bytes.get_int16_be (Bytes.unsafe_of_string body) 0 in
           Log.info (fun k ->
               k "client send 'close' with errcode=%d, message=%S" errcode
                 (String.sub body 2 (String.length body - 2)))
