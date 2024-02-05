@@ -645,6 +645,41 @@ val add_route_server_sent_handler :
 
     @since 0.9 *)
 
+(** {2 Upgrade handlers}
+
+    These handlers upgrade the connection to another protocol.
+    @since NEXT_RELEASE *)
+
+(** Handler that upgrades to another protocol.
+  @since NEXT_RELEASE *)
+module type UPGRADE_HANDLER = sig
+  type handshake_state
+  (** Some specific state returned after handshake *)
+
+  val name : string
+  (** Name in the "upgrade" header *)
+
+  val handshake : unit Request.t -> (Headers.t * handshake_state, string) result
+  (** Perform the handshake and upgrade the connection. The returned
+      code is [101] alongside these headers.
+      In case the handshake fails, this only returns [Error log_msg].
+      The connection is closed without further ado. *)
+
+  val handle_connection :
+    handshake_state -> Tiny_httpd_io.Input.t -> Tiny_httpd_io.Output.t -> unit
+  (** Take control of the connection and take it from there *)
+end
+
+type upgrade_handler = (module UPGRADE_HANDLER)
+
+val add_upgrade_handler :
+  ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?middlewares:Middleware.t list ->
+  t ->
+  ('a, upgrade_handler) Route.t ->
+  'a ->
+  unit
+
 (** {2 Run the server} *)
 
 val running : t -> bool
