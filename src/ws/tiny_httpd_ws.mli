@@ -5,6 +5,7 @@ type handler = Unix.sockaddr -> IO.Input.t -> IO.Output.t -> unit
 (** Websocket handler *)
 
 val upgrade : IO.Input.t -> IO.Output.t -> IO.Input.t * IO.Output.t
+(** Upgrade a byte stream to the websocket framing protocol. *)
 
 val add_route_handler :
   ?accept:(unit Request.t -> (unit, int * string) result) ->
