@@ -3,9 +3,6 @@ open Tiny_httpd_server
 module Log = Tiny_httpd_log
 module IO = Tiny_httpd_io
 
-let spf = Printf.sprintf
-let ( let@ ) = ( @@ )
-
 type handler = Unix.sockaddr -> IO.Input.t -> IO.Output.t -> unit
 
 module Frame_type = struct
@@ -34,7 +31,7 @@ module Header = struct
     mutable ty: Frame_type.t;
     mutable payload_len: int;
     mutable mask: bool;
-    mutable mask_key: bytes;  (** len = 4 *)
+    mask_key: bytes;  (** len = 4 *)
   }
 
   let create () : t =

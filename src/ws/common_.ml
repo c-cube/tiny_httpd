@@ -1,1 +1,2 @@
-module IO = Tiny_httpd_io
+let spf = Printf.sprintf
+let ( let@ ) = ( @@ )
