@@ -4,4 +4,4 @@
   (public_name tiny_httpd_ws)
   (synopsis "Websockets for tiny_httpd")
   (private_modules common_)
-  (libraries tiny_httpd base64 cryptokit))
+  (libraries tiny_httpd base64 cryptokit threads))
