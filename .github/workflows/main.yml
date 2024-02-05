@@ -3,9 +3,8 @@ name: build
 on:
   pull_request:
   push:
-  schedule:
-    # Prime the caches every Monday
-    - cron: 0 1 * * MON
+    branches:
+      - main
 
 jobs:
   build:
@@ -32,14 +31,11 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           allow-prerelease-opam: true
-          opam-local-packages: |
-            ./tiny_httpd.opam
-            ./tiny_httpd_camlzip.opam
           opam-depext-flags: --with-test
 
-      - run: opam install ./tiny_httpd.opam ./tiny_httpd_camlzip.opam --deps-only --with-test
+      - run: opam install ./tiny_httpd.opam ./tiny_httpd_camlzip.opam ./tiny_httpd_ws.opam --deps-only --with-test
 
-      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
+      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_ws
 
       - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -49,6 +45,9 @@ jobs:
       - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd_camlzip
         if: ${{ matrix.os == 'ubuntu-latest' }}
 
+      - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd_ws
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+
       - run: opam install logs -y
 
-      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
+      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_ws
