@@ -6,7 +6,7 @@ module IO = Tiny_httpd_io
 let spf = Printf.sprintf
 let ( let@ ) = ( @@ )
 
-type handler = IO.Input.t -> IO.Output.t -> unit
+type handler = Unix.sockaddr -> IO.Input.t -> IO.Output.t -> unit
 
 module Frame_type = struct
   type t = int
@@ -427,7 +427,7 @@ end) : UPGRADE_HANDLER = struct
   let handshake req : _ result =
     try Ok (handshake_ req) with Bad_req s -> Error s
 
-  let handle_connection () ic oc =
+  let handle_connection addr () ic oc =
     let writer = Writer.create ~oc () in
     let reader = Reader.create ~ic ~writer () in
     let ws_ic : IO.Input.t =
@@ -447,7 +447,7 @@ end) : UPGRADE_HANDLER = struct
         close = (fun () -> Writer.close writer);
       }
     in
-    try X.handler ws_ic ws_oc
+    try X.handler addr ws_ic ws_oc
     with Close_connection ->
       Log.debug (fun k -> k "websocket: requested to close the connection");
       ()

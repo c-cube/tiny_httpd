@@ -666,11 +666,16 @@ module type UPGRADE_HANDLER = sig
       The connection is closed without further ado. *)
 
   val handle_connection :
-    handshake_state -> Tiny_httpd_io.Input.t -> Tiny_httpd_io.Output.t -> unit
-  (** Take control of the connection and take it from there *)
+    Unix.sockaddr ->
+    handshake_state ->
+    Tiny_httpd_io.Input.t ->
+    Tiny_httpd_io.Output.t ->
+    unit
+  (** Take control of the connection and take it from ther.e *)
 end
 
 type upgrade_handler = (module UPGRADE_HANDLER)
+(** @since NEXT_RELEASE *)
 
 val add_upgrade_handler :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->

@@ -30,7 +30,7 @@ let () =
   let server = S.create ~port:!port_ ~max_connections:!j () in
   Tiny_httpd_ws.add_route_handler server
     S.Route.(exact "echo" @/ return)
-    (fun ic oc ->
+    (fun addr ic oc ->
       Log.info (fun k -> k "new client connection");
       let buf = Bytes.create 32 in
       let continue = ref true in

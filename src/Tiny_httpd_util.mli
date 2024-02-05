@@ -34,3 +34,7 @@ val parse_query : string -> ((string * string) list, string) result
     The order might not be preserved.
     @since 0.3
 *)
+
+val show_sockaddr : Unix.sockaddr -> string
+(** Simple printer for socket addresses.
+    @since NEXT_RELEASE *)

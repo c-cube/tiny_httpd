@@ -646,7 +646,8 @@ module type UPGRADE_HANDLER = sig
   (** Perform the handshake and upgrade the connection. The returned
       code is [101] alongside these headers. *)
 
-  val handle_connection : handshake_state -> IO.Input.t -> IO.Output.t -> unit
+  val handle_connection :
+    Unix.sockaddr -> handshake_state -> IO.Input.t -> IO.Output.t -> unit
   (** Take control of the connection and take it from there *)
 end
 
@@ -893,11 +894,6 @@ let create_from ?(buf_size = 16 * 1_024) ?(middlewares = []) ~backend () : t =
 
 let is_ipv6_str addr : bool = String.contains addr ':'
 
-let str_of_sockaddr = function
-  | Unix.ADDR_UNIX f -> f
-  | Unix.ADDR_INET (inet, port) ->
-    Printf.sprintf "%s:%d" (Unix.string_of_inet_addr inet) port
-
 module Unix_tcp_server_ = struct
   type t = {
     addr: string;
@@ -964,7 +960,8 @@ module Unix_tcp_server_ = struct
           let handle_client_unix_ (client_sock : Unix.file_descr)
               (client_addr : Unix.sockaddr) : unit =
             Log.info (fun k ->
-                k "serving new client on %s" (str_of_sockaddr client_addr));
+                k "serving new client on %s"
+                  (Tiny_httpd_util.show_sockaddr client_addr));
             Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout);
             Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout);
             let oc =
@@ -974,14 +971,14 @@ module Unix_tcp_server_ = struct
             handle.handle ~client_addr ic oc;
             Log.info (fun k ->
                 k "done with client on %s, exiting"
-                @@ str_of_sockaddr client_addr);
+                @@ Tiny_httpd_util.show_sockaddr client_addr);
             (try
                Unix.shutdown client_sock Unix.SHUTDOWN_ALL;
                Unix.close client_sock
              with e ->
                Log.error (fun k ->
                    k "error when closing sock for client %s: %s"
-                     (str_of_sockaddr client_addr)
+                     (Tiny_httpd_util.show_sockaddr client_addr)
                      (Printexc.to_string e)));
             ()
           in
@@ -1010,7 +1007,7 @@ module Unix_tcp_server_ = struct
                         k
                           "@[<v>Handler: uncaught exception for client %s:@ \
                            %s@ %s@]"
-                          (str_of_sockaddr client_addr)
+                          (Tiny_httpd_util.show_sockaddr client_addr)
                           (Printexc.to_string e)
                           (Printexc.raw_backtrace_to_string bt)));
               ignore Unix.(sigprocmask SIG_UNBLOCK Sys.[ sigint; sighup ])
@@ -1096,7 +1093,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
         let elapsed = B.get_time_s () -. req.start_time in
         k
           ("response to=%s code=%d time=%.3fs path=%S" : _ format4)
-          (str_of_sockaddr client_addr)
+          (Tiny_httpd_util.show_sockaddr client_addr)
           resp.code elapsed req.path
       in
       if Response_code.is_success resp.code then
@@ -1113,7 +1110,9 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
     in
     if not Log.dummy then
       Log.error (fun k ->
-          k "response to %s code=%d" (str_of_sockaddr client_addr) resp.code);
+          k "response to %s code=%d"
+            (Tiny_httpd_util.show_sockaddr client_addr)
+            resp.code);
     Response.output_ ~buf:buf_res oc resp
   in
 
@@ -1166,7 +1165,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
             ic
         in
 
-        UP.handle_connection handshake_st ic oc
+        UP.handle_connection client_addr handshake_st ic oc
     with e -> handle_bad_req req e
   in
 

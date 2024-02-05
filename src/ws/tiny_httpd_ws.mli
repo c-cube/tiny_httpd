@@ -2,9 +2,7 @@ open Common_
 open Tiny_httpd_server
 module IO = Tiny_httpd_io
 
-(* FIXME: also pass client address to the handler *)
-
-type handler = IO.Input.t -> IO.Output.t -> unit
+type handler = Unix.sockaddr -> IO.Input.t -> IO.Output.t -> unit
 (** Websocket handler *)
 
 val add_route_handler :
