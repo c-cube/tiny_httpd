@@ -11,6 +11,35 @@ let setup_logging ~debug () =
        else
          Logs.Info)
 
+let handle_ws _client_addr ic oc =
+  Log.info (fun k ->
+      k "new client connection from %s"
+        (Tiny_httpd_util.show_sockaddr _client_addr));
+
+  let (_ : Thread.t) =
+    Thread.create
+      (fun () ->
+        while true do
+          Thread.delay 3.;
+          IO.Output.output_string oc "(special ping!)";
+          IO.Output.flush oc
+        done)
+      ()
+  in
+
+  let buf = Bytes.create 32 in
+  let continue = ref true in
+  while !continue do
+    let n = IO.Input.input ic buf 0 (Bytes.length buf) in
+    Log.debug (fun k ->
+        k "echo %d bytes from websocket: %S" n (Bytes.sub_string buf 0 n));
+
+    if n = 0 then continue := false;
+    IO.Output.output oc buf 0 n;
+    IO.Output.flush oc
+  done;
+  Log.info (fun k -> k "client exiting")
+
 let () =
   let port_ = ref 8080 in
   let j = ref 32 in
@@ -30,20 +59,7 @@ let () =
   let server = S.create ~port:!port_ ~max_connections:!j () in
   Tiny_httpd_ws.add_route_handler server
     S.Route.(exact "echo" @/ return)
-    (fun addr ic oc ->
-      Log.info (fun k -> k "new client connection");
-      let buf = Bytes.create 32 in
-      let continue = ref true in
-      while !continue do
-        let n = IO.Input.input ic buf 0 (Bytes.length buf) in
-        Log.debug (fun k ->
-            k "echo %d bytes from websocket: %s" n (Bytes.sub_string buf 0 n));
-
-        if n = 0 then continue := false;
-        IO.Output.output oc buf 0 n;
-        IO.Output.flush oc
-      done;
-      Log.info (fun k -> k "client exiting"));
+    handle_ws;
 
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);
   match S.run server with
