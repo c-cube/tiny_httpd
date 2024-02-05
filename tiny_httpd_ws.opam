@@ -10,8 +10,6 @@ bug-reports: "https://github.com/c-cube/tiny_httpd/issues"
 depends: [
   "dune" {>= "2.9"}
   "tiny_httpd" {= version}
-  "base64" {>= "3.0"}
-  "cryptokit"
   "logs" {with-test}
   "odoc" {with-doc}
 ]

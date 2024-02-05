@@ -414,9 +414,8 @@ end) : UPGRADE_HANDLER = struct
     (* produce the accept key *)
     let accept =
       (* yes, SHA1 is broken. It's also part of the spec for websockets. *)
-      let hash = (Cryptokit.Hash.sha1 () [@ocaml.alert "-crypto"]) in
-      Cryptokit.hash_string hash (key ^ "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
-      |> Base64.encode_exn
+      Utils_.sha_1 (key ^ "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
+      |> Utils_.B64.encode ~url:false
     in
 
     let headers = [ "sec-websocket-accept", accept ] in

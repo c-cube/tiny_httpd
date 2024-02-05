@@ -32,8 +32,6 @@
   (synopsis "Websockets for tiny_httpd")
   (depends
     (tiny_httpd (= :version))
-    (base64 (>= 3.0))
-    cryptokit
     (logs :with-test)
     (odoc :with-doc)))
 
