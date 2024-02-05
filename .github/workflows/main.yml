@@ -33,9 +33,9 @@ jobs:
           allow-prerelease-opam: true
           opam-depext-flags: --with-test
 
-      - run: opam install ./tiny_httpd.opam ./tiny_httpd_camlzip.opam ./tiny_httpd_ws.opam --deps-only --with-test
+      - run: opam install ./tiny_httpd.opam ./tiny_httpd_camlzip.opam --deps-only --with-test
 
-      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_ws
+      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
 
       - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -45,9 +45,6 @@ jobs:
       - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd_camlzip
         if: ${{ matrix.os == 'ubuntu-latest' }}
 
-      - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd_ws
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-
       - run: opam install logs -y
 
-      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_ws
+      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
