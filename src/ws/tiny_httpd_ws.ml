@@ -378,6 +378,28 @@ module Reader = struct
     )
 end
 
+let upgrade ic oc : _ * _ =
+  let writer = Writer.create ~oc () in
+  let reader = Reader.create ~ic ~writer () in
+  let ws_ic : IO.Input.t =
+    {
+      input = (fun buf i len -> Reader.read reader buf i len);
+      close = (fun () -> Reader.close reader);
+    }
+  in
+  let ws_oc : IO.Output.t =
+    {
+      flush =
+        (fun () ->
+          Writer.flush writer;
+          IO.Output.flush oc);
+      output_char = Writer.output_char writer;
+      output = Writer.output writer;
+      close = (fun () -> Writer.close writer);
+    }
+  in
+  ws_ic, ws_oc
+
 (** Turn a regular connection handler (provided by the user) into a websocket upgrade handler *)
 module Make_upgrade_handler (X : sig
   val accept_ws_protocol : string -> bool
@@ -424,25 +446,7 @@ end) : UPGRADE_HANDLER = struct
     try Ok (handshake_ req) with Bad_req s -> Error s
 
   let handle_connection addr () ic oc =
-    let writer = Writer.create ~oc () in
-    let reader = Reader.create ~ic ~writer () in
-    let ws_ic : IO.Input.t =
-      {
-        input = (fun buf i len -> Reader.read reader buf i len);
-        close = (fun () -> Reader.close reader);
-      }
-    in
-    let ws_oc : IO.Output.t =
-      {
-        flush =
-          (fun () ->
-            Writer.flush writer;
-            IO.Output.flush oc);
-        output_char = Writer.output_char writer;
-        output = Writer.output writer;
-        close = (fun () -> Writer.close writer);
-      }
-    in
+    let ws_ic, ws_oc = upgrade ic oc in
     try X.handler addr ws_ic ws_oc
     with Close_connection ->
       Log.debug (fun k -> k "websocket: requested to close the connection");
