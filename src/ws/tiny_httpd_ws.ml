@@ -272,14 +272,14 @@ module Reader = struct
           self.header.payload_len self.header.mask);*)
     ()
 
+  external apply_masking_ : bytes -> bytes -> int -> int -> unit
+    = "tiny_httpd_ws_apply_masking"
+    [@@noalloc]
   (** Apply masking to the parsed data *)
-  let apply_masking ~mask_key (buf : bytes) off len : unit =
-    for i = 0 to len - 1 do
-      let c = Bytes.get buf (off + i) in
-      let c_m = Bytes.unsafe_get mask_key (i land 0b11) in
-      let c_xor = Char.chr (Char.code c lxor Char.code c_m) in
-      Bytes.set buf (off + i) c_xor
-    done
+
+  let[@inline] apply_masking ~mask_key (buf : bytes) off len : unit =
+    assert (off >= 0 && off + len <= Bytes.length buf);
+    apply_masking_ mask_key buf off len
 
   let read_body_to_string (self : t) : string =
     let len = self.header.payload_len in
