@@ -45,12 +45,60 @@ module Input = struct
             Unix.close fd);
     }
 
+  let of_slice (i_bs : bytes) (i_off : int) (i_len : int) : t =
+    let i_off = ref i_off in
+    let i_len = ref i_len in
+    {
+      input =
+        (fun buf i len ->
+          let n = min len !i_len in
+          Bytes.blit i_bs !i_off buf i n;
+          i_off := !i_off + n;
+          i_len := !i_len - n;
+          n);
+      close = ignore;
+    }
+
   (** Read into the given slice.
       @return the number of bytes read, [0] means end of input. *)
   let[@inline] input (self : t) buf i len = self.input buf i len
 
+  (** Read exactly [len] bytes.
+      @raise End_of_file if the input did not contain enough data. *)
+  let really_input (self : t) buf i len : unit =
+    let i = ref i in
+    let len = ref len in
+    while !len > 0 do
+      let n = input self buf !i !len in
+      if n = 0 then raise End_of_file;
+      i := !i + n;
+      len := !len - n
+    done
+
   (** Close the channel. *)
   let[@inline] close self : unit = self.close ()
+
+  let append (i1 : t) (i2 : t) : t =
+    let use_i1 = ref true in
+    let rec input buf i len : int =
+      if !use_i1 then (
+        let n = i1.input buf i len in
+        if n = 0 then (
+          use_i1 := false;
+          input buf i len
+        ) else
+          n
+      ) else
+        i2.input buf i len
+    in
+
+    {
+      input;
+      close =
+        (fun () ->
+          close i1;
+          close i2);
+    }
 end
 
 (** Output channel (byte sink) *)

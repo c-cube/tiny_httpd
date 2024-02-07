@@ -1,0 +1,11 @@
+
+(library
+  (name tiny_httpd_ws)
+  (public_name tiny_httpd.ws)
+  (synopsis "Websockets for tiny_httpd")
+  (private_modules common_ utils_)
+  (foreign_stubs
+    (language c)
+    (names tiny_httpd_ws_stubs)
+    (flags :standard -std=c99 -fPIC -O2))
+  (libraries tiny_httpd threads))

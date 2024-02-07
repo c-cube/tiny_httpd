@@ -107,3 +107,8 @@ let parse_query s : (_ list, string) result =
   | Invalid_argument _ | Not_found | Failure _ ->
     Error (Printf.sprintf "error in parse_query for %S: i=%d,j=%d" s !i !j)
   | Invalid_query -> Error ("invalid query string: " ^ s)
+
+let show_sockaddr = function
+  | Unix.ADDR_UNIX f -> f
+  | Unix.ADDR_INET (inet, port) ->
+    Printf.sprintf "%s:%d" (Unix.string_of_inet_addr inet) port

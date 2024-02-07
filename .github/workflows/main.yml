@@ -3,9 +3,8 @@ name: build
 on:
   pull_request:
   push:
-  schedule:
-    # Prime the caches every Monday
-    - cron: 0 1 * * MON
+    branches:
+      - main
 
 jobs:
   build:
@@ -32,9 +31,6 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           allow-prerelease-opam: true
-          opam-local-packages: |
-            ./tiny_httpd.opam
-            ./tiny_httpd_camlzip.opam
           opam-depext-flags: --with-test
 
       - run: opam install ./tiny_httpd.opam ./tiny_httpd_camlzip.opam --deps-only --with-test
