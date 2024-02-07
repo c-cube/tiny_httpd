@@ -15,11 +15,15 @@ jobs:
       - name: Use OCaml
         uses: ocaml/setup-ocaml@v2
         with:
-          ocaml-compiler: 5.0
+          ocaml-compiler: 5.1.x
           dune-cache: true
+          allow-prerelease-opam: true
 
-      - name: Deploy odoc to GitHub Pages
-        uses: ocaml/setup-ocaml/deploy-doc@v2
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          destination-dir: dev
-          enable-jekyll: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_doc/html
+          destination_dir: dev
+          enable_jekyll: true
+
