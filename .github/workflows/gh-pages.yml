@@ -19,6 +19,12 @@ jobs:
           dune-cache: true
           allow-prerelease-opam: true
 
+      - name: Deps
+        run: opam install odig tiny_httpd tiny_httpd_camlzip
+
+      - name: Build
+        run: opam exec -- odig odoc --cache-dir=_doc/ tiny_httpd tiny_httpd_camlzip
+
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
