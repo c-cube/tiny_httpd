@@ -1,3 +1,9 @@
+(** Websockets for Tiny_httpd.
+
+    This sub-library ([tiny_httpd.ws]) exports a small implementation
+    for a websocket server. It has no additional dependencies.
+    *)
+
 open Tiny_httpd_server
 module IO = Tiny_httpd_io
 
