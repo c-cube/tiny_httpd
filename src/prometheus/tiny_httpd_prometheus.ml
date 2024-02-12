@@ -209,7 +209,7 @@ let add_route_to_server (server : H.t) (reg : registry) : unit =
   H.Response.make_string @@ Ok str
 
 let instrument_server (server : H.t) reg : unit =
-  H.add_middleware ~stage:(`Stage 1) server (http_middleware global);
+  H.add_middleware ~stage:(`Stage 1) server (http_middleware reg);
   add_route_to_server server reg
 
 module GC_metrics = struct
