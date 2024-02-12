@@ -679,7 +679,6 @@ type upgrade_handler = (module UPGRADE_HANDLER)
 
 val add_upgrade_handler :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
-  ?middlewares:Middleware.t list ->
   t ->
   ('a, upgrade_handler) Route.t ->
   'a ->

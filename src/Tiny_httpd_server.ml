@@ -852,8 +852,7 @@ let add_route_server_sent_handler ?accept self route f =
   in
   add_route_handler_ self ?accept ~meth:`GET route ~tr_req f
 
-let add_upgrade_handler ?(accept = fun _ -> Ok ()) ?(middlewares = [])
-    (self : t) route f : unit =
+let add_upgrade_handler ?(accept = fun _ -> Ok ()) (self : t) route f : unit =
   let ph req : handler_result option =
     if req.Request.meth <> `GET then
       None
