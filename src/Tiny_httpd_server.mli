@@ -10,6 +10,7 @@
 
 type buf = Tiny_httpd_buf.t
 type byte_stream = Tiny_httpd_stream.t
+type buf_pool = buf Tiny_httpd_pool.t
 
 (** {2 HTTP Methods} *)
 
@@ -469,8 +470,13 @@ module type IO_BACKEND = sig
       on a port and handle clients. *)
 end
 
+val create_buf_pool : ?buf_size:int -> unit -> buf_pool
+(** [create_buf_pool ()] creates a new buffer pool.
+   @since NEXT_RELEASE *)
+
 val create_from :
   ?buf_size:int ->
+  ?buf_pool:buf_pool ->
   ?middlewares:([ `Encoding | `Stage of int ] * Middleware.t) list ->
   backend:(module IO_BACKEND) ->
   unit ->
