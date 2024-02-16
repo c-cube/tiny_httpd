@@ -1,0 +1,7 @@
+
+(library
+  (name tiny_httpd_fuseau)
+  (public_name tiny_httpd.fuseau)
+  (synopsis "Tiny_httpd running on Fuseau")
+  (optional)
+  (libraries tiny_httpd mtime mtime.clock.os fuseau fuseau.unix))
