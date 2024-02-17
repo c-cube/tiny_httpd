@@ -1,5 +1,6 @@
 type buf = Tiny_httpd_buf.t
 type byte_stream = Tiny_httpd_stream.t
+type buf_pool = buf Tiny_httpd_pool.t
 
 module Buf = Tiny_httpd_buf
 module Byte_stream = Tiny_httpd_stream
@@ -871,7 +872,20 @@ let get_max_connection_ ?(max_connections = 64) () : int =
   let max_connections = max 4 max_connections in
   max_connections
 
-let create_from ?(buf_size = 16 * 1_024) ?(middlewares = []) ~backend () : t =
+let _default_buf_size = 16 * 1024
+
+let create_buf_pool ?(buf_size = _default_buf_size) () : buf_pool =
+  Pool.create ~clear:Buf.clear_and_zero
+    ~mk_item:(fun () -> Buf.create ~size:buf_size ())
+    ()
+
+let create_from ?(buf_size = _default_buf_size) ?buf_pool ?(middlewares = [])
+    ~backend () : t =
+  let buf_pool =
+    match buf_pool with
+    | Some p -> p
+    | None -> create_buf_pool ~buf_size ()
+  in
   let handler _req = Response.fail ~code:404 "no top handler" in
   let self =
     {
@@ -882,10 +896,7 @@ let create_from ?(buf_size = 16 * 1_024) ?(middlewares = []) ~backend () : t =
       path_handlers = [];
       middlewares = [];
       middlewares_sorted = lazy [];
-      buf_pool =
-        Pool.create ~clear:Buf.clear_and_zero
-          ~mk_item:(fun () -> Buf.create ~size:buf_size ())
-          ();
+      buf_pool;
     }
   in
   List.iter (fun (stage, m) -> add_middleware self ~stage m) middlewares;
@@ -1223,6 +1234,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
            try
              if Headers.get "connection" r.Response.headers = Some "close" then
                continue := false;
+             Log.debug (fun k -> k "got response: %a" Response.pp r);
              log_response req r;
              Response.output_ ~buf:buf_res oc r
            with Sys_error _ -> continue := false
