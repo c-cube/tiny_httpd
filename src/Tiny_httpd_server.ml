@@ -984,7 +984,6 @@ module Unix_tcp_server_ = struct
 
           Unix.set_nonblock sock;
           while self.running do
-            ignore (Unix.select [ sock ] [] [ sock ] 1.0 : _ * _ * _);
             match Unix.accept sock with
             | client_sock, client_addr ->
               (* limit concurrency *)
@@ -1012,7 +1011,8 @@ module Unix_tcp_server_ = struct
               ignore Unix.(sigprocmask SIG_UNBLOCK Sys.[ sigint; sighup ])
             | exception Unix.Unix_error ((Unix.EAGAIN | Unix.EWOULDBLOCK), _, _)
               ->
-              ()
+              (* wait for the socket to be ready, and re-enter the loop *)
+              ignore (Unix.select [ sock ] [] [ sock ] 1.0 : _ * _ * _)
             | exception e ->
               Log.error (fun k ->
                   k "Unix.accept or Thread.create raised an exception: %s"
