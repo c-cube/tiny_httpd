@@ -87,8 +87,7 @@ module Server = struct
         off := !off + n;
         i := !i + n;
         len := !len - n
-      done;
-      maybe_flush ()
+      done
     in
     { output; output_char; flush; close }
 
