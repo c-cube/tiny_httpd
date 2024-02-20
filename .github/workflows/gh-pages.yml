@@ -31,5 +31,6 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./_doc/html
           destination_dir: .
-          enable_jekyll: true
+          enable_jekyll: false
+            #keep_files: true
 
