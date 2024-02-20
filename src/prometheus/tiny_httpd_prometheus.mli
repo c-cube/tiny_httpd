@@ -1,4 +1,11 @@
-(** Expose metrics over HTTP in the prometheus format *)
+(** Expose metrics over HTTP in the prometheus format.
+
+ This sub-library [tiny_httpd.prometheus] provides definitions
+ for counters, gauges, and histogram, and endpoints to expose
+ them for {{: https://prometheus.io/} Prometheus} to scrape them.
+
+ @since 0.16
+ *)
 
 type tags = (string * string) list
 
