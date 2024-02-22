@@ -4,8 +4,8 @@ module D = Tiny_httpd_dir
 module Pf = Printf
 module Log = Tiny_httpd.Log
 
-let serve ~config (dir : string) addr port j : _ result =
-  let server = S.create ~max_connections:j ~addr ~port () in
+let serve ~config ~timeout (dir : string) addr port j : _ result =
+  let server = S.create ~max_connections:j ~addr ~port ~timeout () in
   let after_init () =
     Printf.printf "serve directory %s on http://%(%s%):%d\n%!" dir
       (if S.is_ipv6 server then
@@ -31,6 +31,7 @@ let main () =
   let dir_ = ref "." in
   let addr = ref "127.0.0.1" in
   let port = ref 8080 in
+  let timeout = ref 30. in
   let j = ref 32 in
   Arg.parse
     (Arg.align
@@ -41,6 +42,7 @@ let main () =
          "-p", Set_int port, " alias to --port";
          "--dir", Set_string dir_, " directory to serve (default: \".\")";
          "--debug", Unit (Log.setup ~debug:true), " debug mode";
+         "--timeout", Arg.Set_float timeout, " TCP timeout on sockets";
          ( "--upload",
            Unit (fun () -> config.upload <- true),
            " enable file uploading" );
@@ -75,7 +77,7 @@ let main () =
        ])
     (fun s -> dir_ := s)
     "http_of_dir [options] [dir]";
-  match serve ~config !dir_ !addr !port !j with
+  match serve ~config ~timeout:!timeout !dir_ !addr !port !j with
   | Ok () -> ()
   | Error e -> raise e
 
