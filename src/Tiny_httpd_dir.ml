@@ -315,7 +315,7 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
                 [ "Content-Type", "text/javascript" ]
               else if on_fs then (
                 (* call "file" util *)
-                let ty = Mime_.mime_of_path (top // path) in
+                let ty = Tiny_httpd_mime_.mime_of_path (top // path) in
                 [ "content-type", ty ]
               ) else
                 []
