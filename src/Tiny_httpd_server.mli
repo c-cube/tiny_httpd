@@ -115,6 +115,10 @@ module Request : sig
   val set_header : string -> string -> 'a t -> 'a t
   (** [set_header k v req] sets [k: v] in the request [req]'s headers. *)
 
+  val remove_header : string -> 'a t -> 'a t
+  (** Remove one instance of this header.
+      @since NEXT_RELEASE *)
+
   val update_headers : (Headers.t -> Headers.t) -> 'a t -> 'a t
   (** Modify headers using the given function.
       @since 0.11 *)
@@ -242,6 +246,10 @@ module Response : sig
   val update_headers : (Headers.t -> Headers.t) -> t -> t
   (** Modify headers.
       @since 0.11 *)
+
+  val remove_header : string -> t -> t
+  (** Remove one instance of this header.
+      @since NEXT_RELEASE *)
 
   val set_headers : Headers.t -> t -> t
   (** Set all headers.

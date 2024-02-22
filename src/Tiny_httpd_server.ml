@@ -173,6 +173,9 @@ module Request = struct
   let query self = self.query
   let get_header ?f self h = Headers.get ?f h self.headers
 
+  let remove_header k self =
+    { self with headers = Headers.remove k self.headers }
+
   let get_header_int self h =
     match get_header self h with
     | Some x -> (try Some (int_of_string x) with _ -> None)
@@ -243,12 +246,22 @@ module Request = struct
       let start_time = get_time_s () in
       let meth, path, version =
         try
-          let meth, path, version =
-            Scanf.sscanf line "%s %s HTTP/1.%d\r" (fun x y z -> x, y, z)
+          let off = ref 0 in
+          let meth = Tiny_httpd_parse_.word line off in
+          let path = Tiny_httpd_parse_.word line off in
+          let http_version = Tiny_httpd_parse_.word line off in
+          let version =
+            match http_version with
+            | "HTTP/1.1" -> 1
+            | "HTTP/1.0" -> 0
+            | v -> invalid_arg (Printf.sprintf "unsupported HTTP version: %s" v)
           in
-          if version != 0 && version != 1 then raise Exit;
           meth, path, version
-        with _ ->
+        with
+        | Invalid_argument msg ->
+          Log.error (fun k -> k "invalid request line: `%s`: %s" line msg);
+          raise (Bad_req (400, "Invalid request line"))
+        | _ ->
           Log.error (fun k -> k "invalid request line: `%s`" line);
           raise (Bad_req (400, "Invalid request line"))
       in
@@ -354,6 +367,10 @@ module Response = struct
   let set_headers headers self = { self with headers }
   let update_headers f self = { self with headers = f self.headers }
   let set_header k v self = { self with headers = Headers.set k v self.headers }
+
+  let remove_header k self =
+    { self with headers = Headers.remove k self.headers }
+
   let set_code code self = { self with code }
 
   let make_raw ?(headers = []) ~code body : t =

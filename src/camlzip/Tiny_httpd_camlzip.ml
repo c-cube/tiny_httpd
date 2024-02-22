@@ -148,6 +148,11 @@ let decompress_req_stream_ ~buf_size (req : BS.t S.Request.t) : _ S.Request.t =
        let req' = S.Request.set_header req "Transfer-Encoding" "chunked" in
        Some (req', decode_gzip_stream_)
   *)
+  | Some "deflate" ->
+    let body' = S.Request.body req |> decode_deflate_stream_ ~buf_size in
+    req
+    |> S.Request.remove_header "Transfer-Encoding"
+    |> S.Request.set_body body'
   | Some s when has_deflate s ->
     (match Scanf.sscanf s "deflate, %s" (fun s -> s) with
     | tr' ->

@@ -11,7 +11,11 @@ let percent_encode ?(skip = fun _ -> false) s =
     s;
   Buffer.contents buf
 
-let hex_int (s : string) : int = Scanf.sscanf s "%x" (fun x -> x)
+let int_of_hex_nibble = function
+  | '0' .. '9' as c -> Char.code c - Char.code '0'
+  | 'a' .. 'f' as c -> 10 + Char.code c - Char.code 'a'
+  | 'A' .. 'F' as c -> 10 + Char.code c - Char.code 'A'
+  | _ -> invalid_arg "string: invalid hex"
 
 let percent_decode (s : string) : _ option =
   let buf = Buffer.create (String.length s) in
@@ -21,7 +25,10 @@ let percent_decode (s : string) : _ option =
       match String.get s !i with
       | '%' ->
         if !i + 2 < String.length s then (
-          (match hex_int @@ String.sub s (!i + 1) 2 with
+          (match
+             (int_of_hex_nibble (String.get s (!i + 1)) lsl 4)
+             + int_of_hex_nibble (String.get s (!i + 2))
+           with
           | n -> Buffer.add_char buf (Char.chr n)
           | exception _ -> raise Exit);
           i := !i + 3

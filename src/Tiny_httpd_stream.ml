@@ -268,7 +268,10 @@ let read_chunked ?(buf = Buf.create ()) ~fail (bs : t) : t =
       if String.trim line = "" then
         0
       else (
-        try Scanf.sscanf line "%x %s@\r" (fun n _ext -> n)
+        try
+          let off = ref 0 in
+          let n = Tiny_httpd_parse_.pos_hex line off in
+          n
         with _ ->
           raise (fail (spf "cannot read chunk size from line %S" line))
       )
