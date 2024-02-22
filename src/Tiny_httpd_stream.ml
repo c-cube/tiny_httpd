@@ -50,10 +50,11 @@ let of_input ?(buf_size = 16 * 1024) (ic : IO.Input.t) : t =
   make ~bs:(Bytes.create buf_size)
     ~close:(fun _ -> IO.Input.close ic)
     ~consume:(fun self n ->
+      assert (self.len >= n);
       self.off <- self.off + n;
       self.len <- self.len - n)
     ~fill:(fun self ->
-      if self.off >= self.len then (
+      if self.len = 0 then (
         self.off <- 0;
         self.len <- IO.Input.input ic self.bs 0 (Bytes.length self.bs)
       ))
@@ -73,15 +74,18 @@ let of_fd_ ?buf_size ~close_noerr ic : t =
 let of_fd ?buf_size fd : t = of_fd_ ?buf_size ~close_noerr:false fd
 let of_fd_close_noerr ?buf_size fd : t = of_fd_ ?buf_size ~close_noerr:true fd
 
-let rec iter f (self : t) : unit =
-  self.fill_buf ();
-  if self.len = 0 then
-    self.close ()
-  else (
-    f self.bs self.off self.len;
-    self.consume self.len;
-    (iter [@tailcall]) f self
-  )
+let iter f (self : t) : unit =
+  let continue = ref true in
+  while !continue do
+    self.fill_buf ();
+    if self.len = 0 then (
+      continue := false;
+      self.close ()
+    ) else (
+      f self.bs self.off self.len;
+      self.consume self.len
+    )
+  done
 
 let to_chan (oc : out_channel) (self : t) = iter (output oc) self
 let to_chan' (oc : IO.Output.t) (self : t) = iter (IO.Output.output oc) self
@@ -127,12 +131,13 @@ let read_all ?(buf = Buf.create ()) (self : t) : string =
   let continue = ref true in
   while !continue do
     self.fill_buf ();
-    if self.len > 0 then (
+    if self.len = 0 then
+      continue := false
+    else (
+      assert (self.len > 0);
       Buf.add_bytes buf self.bs self.off self.len;
       self.consume self.len
-    );
-    assert (self.len >= 0);
-    if self.len = 0 then continue := false
+    )
   done;
   Buf.contents_and_clear buf
 
@@ -165,10 +170,10 @@ let read_line_into (self : t) ~buf : unit =
     done;
     if !j - self.off < self.len then (
       assert (Bytes.get self.bs !j = '\n');
+      (* line without '\n' *)
       Buf.add_bytes buf self.bs self.off (!j - self.off);
-      (* without \n *)
+      (* consume line + '\n' *)
       self.consume (!j - self.off + 1);
-      (* remove \n *)
       continue := false
     ) else (
       Buf.add_bytes buf self.bs self.off self.len;
@@ -273,7 +278,7 @@ let read_chunked ?(buf = Buf.create ()) ~fail (bs : t) : t =
     ~bs:(Bytes.create (16 * 4096))
     ~fill:(fun self ->
       (* do we need to refill? *)
-      if self.off >= self.len then (
+      if self.len = 0 then (
         if !chunk_size = 0 && !refill then chunk_size := read_next_chunk_len ();
         self.off <- 0;
         self.len <- 0;
