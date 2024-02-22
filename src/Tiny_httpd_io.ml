@@ -35,10 +35,31 @@ module Input = struct
     }
 
   let of_unix_fd ?(close_noerr = false) (fd : Unix.file_descr) : t =
+    let eof = ref false in
     {
-      input = (fun buf i len -> Unix.read fd buf i len);
+      input =
+        (fun buf i len ->
+          let n = ref 0 in
+          if (not !eof) && len > 0 then (
+            let continue = ref true in
+            while !continue do
+              (* Printf.eprintf "read %d B (from fd %d)\n%!" len (Obj.magic fd); *)
+              match Unix.read fd buf i len with
+              | n_ ->
+                n := n_;
+                continue := false
+              | exception
+                  Unix.Unix_error
+                    ((Unix.EWOULDBLOCK | Unix.EAGAIN | Unix.EINTR), _, _) ->
+                ignore (Unix.select [ fd ] [] [] 1.)
+            done;
+            (* Printf.eprintf "read returned %d B\n%!" !n; *)
+            if !n = 0 then eof := true
+          );
+          !n);
       close =
         (fun () ->
+          eof := true;
           if close_noerr then (
             try Unix.close fd with _ -> ()
           ) else
@@ -170,7 +191,7 @@ module Output = struct
        If [force=true] then write content of [buf] if it's simply non empty. *)
     let write_buf ~force () =
       let n = Buf.size buf in
-      if (force && n > 0) || n > 4_096 then (
+      if (force && n > 0) || n >= 4_096 then (
         output_string self (Printf.sprintf "%x\r\n" n);
         self.output (Buf.bytes_slice buf) 0 n;
         output_string self "\r\n";
