@@ -491,8 +491,12 @@ module Response = struct
         Byte_stream.close str
       | exception e ->
         let bt = Printexc.get_raw_backtrace () in
-        IO.Output.flush oc;
+        Log.error (fun k ->
+            k "t[%d]: outputing stream failed with %s"
+              (Thread.id @@ Thread.self ())
+              (Printexc.to_string e));
         Byte_stream.close str;
+        IO.Output.flush oc;
         Printexc.raise_with_backtrace e bt));
     IO.Output.flush oc
 end
@@ -904,6 +908,7 @@ module Unix_tcp_server_ = struct
   type t = {
     addr: string;
     port: int;
+    buf_pool: Buf.t Pool.t;
     max_connections: int;
     sem_max_connections: Sem_.t;
         (** semaphore to restrict the number of active concurrent connections *)
@@ -971,20 +976,24 @@ module Unix_tcp_server_ = struct
           let handle_client_unix_ (client_sock : Unix.file_descr)
               (client_addr : Unix.sockaddr) : unit =
             Log.info (fun k ->
-                k "serving new client on %s"
+                k "t[%d]: serving new client on %s"
+                  (Thread.id @@ Thread.self ())
                   (Tiny_httpd_util.show_sockaddr client_addr));
-            (*
+
             if self.masksigpipe then
               ignore (Unix.sigprocmask Unix.SIG_BLOCK [ Sys.sigpipe ] : _ list);
-              *)
+            Unix.set_nonblock client_sock;
             Unix.setsockopt client_sock Unix.TCP_NODELAY true;
             Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout);
             Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout);
+            Pool.with_resource self.buf_pool @@ fun buf ->
+            let closed = ref false in
             let oc =
-              IO.Output.of_out_channel ~close_noerr:true
-              @@ Unix.out_channel_of_descr client_sock
+              IO.Output.of_unix_fd ~close_noerr:true ~closed ~buf client_sock
             in
-            let ic = IO.Input.of_unix_fd ~close_noerr:true client_sock in
+            let ic =
+              IO.Input.of_unix_fd ~close_noerr:true ~closed client_sock
+            in
             handle.handle ~client_addr ic oc
           in
 
@@ -1046,6 +1055,10 @@ let create ?(masksigpipe = true) ?max_connections ?(timeout = 0.0) ?buf_size
     {
       Unix_tcp_server_.addr;
       new_thread;
+      buf_pool =
+        Pool.create ~clear:Buf.clear_and_zero
+          ~mk_item:(fun () -> Buf.create ?size:buf_size ())
+          ();
       running = true;
       port;
       sock;
