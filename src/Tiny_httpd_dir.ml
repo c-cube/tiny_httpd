@@ -94,8 +94,12 @@ let vfs_of_dir (top : string) : vfs =
     let list_dir f = Sys.readdir (top // f)
 
     let read_file_content f =
-      let ic = Unix.(openfile (top // f) [ O_RDONLY ] 0) in
-      Tiny_httpd_stream.of_fd_close_noerr ic
+      let fpath = top // f in
+      match Unix.stat fpath with
+      | { st_kind = Unix.S_REG; _ } ->
+        let ic = Unix.(openfile fpath [ O_RDONLY ] 0) in
+        Tiny_httpd_stream.of_fd_close_noerr ic
+      | _ -> failwith (Printf.sprintf "not a regular file: %S" f)
 
     let create f =
       let oc = open_out_bin (top // f) in
