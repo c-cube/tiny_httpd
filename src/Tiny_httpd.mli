@@ -1,7 +1,7 @@
 (** Tiny Http Server
 
     This library implements a very simple, basic HTTP/1.1 server using blocking
-    IOs and threads. Basic routing based on {!Scanf} is provided for convenience,
+    IOs and threads. Basic routing based is provided for convenience,
     so that several handlers can be registered.
 
     It is possible to use a thread pool, see {!create}'s argument [new_thread].

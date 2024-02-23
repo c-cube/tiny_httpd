@@ -173,6 +173,9 @@ module Request = struct
   let query self = self.query
   let get_header ?f self h = Headers.get ?f h self.headers
 
+  let remove_header k self =
+    { self with headers = Headers.remove k self.headers }
+
   let get_header_int self h =
     match get_header self h with
     | Some x -> (try Some (int_of_string x) with _ -> None)
@@ -243,12 +246,22 @@ module Request = struct
       let start_time = get_time_s () in
       let meth, path, version =
         try
-          let meth, path, version =
-            Scanf.sscanf line "%s %s HTTP/1.%d\r" (fun x y z -> x, y, z)
+          let off = ref 0 in
+          let meth = Tiny_httpd_parse_.word line off in
+          let path = Tiny_httpd_parse_.word line off in
+          let http_version = Tiny_httpd_parse_.word line off in
+          let version =
+            match http_version with
+            | "HTTP/1.1" -> 1
+            | "HTTP/1.0" -> 0
+            | v -> invalid_arg (Printf.sprintf "unsupported HTTP version: %s" v)
           in
-          if version != 0 && version != 1 then raise Exit;
           meth, path, version
-        with _ ->
+        with
+        | Invalid_argument msg ->
+          Log.error (fun k -> k "invalid request line: `%s`: %s" line msg);
+          raise (Bad_req (400, "Invalid request line"))
+        | _ ->
           Log.error (fun k -> k "invalid request line: `%s`" line);
           raise (Bad_req (400, "Invalid request line"))
       in
@@ -354,6 +367,10 @@ module Response = struct
   let set_headers headers self = { self with headers }
   let update_headers f self = { self with headers = f self.headers }
   let set_header k v self = { self with headers = Headers.set k v self.headers }
+
+  let remove_header k self =
+    { self with headers = Headers.remove k self.headers }
+
   let set_code code self = { self with code }
 
   let make_raw ?(headers = []) ~code body : t =
@@ -453,7 +470,8 @@ module Response = struct
     in
     let self = { self with headers; body } in
     Log.debug (fun k ->
-        k "output response: %s"
+        k "t[%d]: output response: %s"
+          (Thread.id @@ Thread.self ())
           (Format.asprintf "%a" pp { self with body = `String "<...>" }));
 
     (* write headers, using [buf] to batch writes *)
@@ -478,15 +496,25 @@ module Response = struct
          IO.Writer.write oc' w;
          IO.Output.close oc'
        with e ->
+         let bt = Printexc.get_raw_backtrace () in
          IO.Output.close oc';
-         raise e)
+         IO.Output.flush oc;
+         Printexc.raise_with_backtrace e bt)
     | `Stream str ->
-      (try
-         Byte_stream.output_chunked' ~buf oc str;
-         Byte_stream.close str
-       with e ->
-         Byte_stream.close str;
-         raise e));
+      (match Byte_stream.output_chunked' ~buf oc str with
+      | () ->
+        Log.debug (fun k ->
+            k "t[%d]: done outputing stream" (Thread.id @@ Thread.self ()));
+        Byte_stream.close str
+      | exception e ->
+        let bt = Printexc.get_raw_backtrace () in
+        Log.error (fun k ->
+            k "t[%d]: outputing stream failed with %s"
+              (Thread.id @@ Thread.self ())
+              (Printexc.to_string e));
+        Byte_stream.close str;
+        IO.Output.flush oc;
+        Printexc.raise_with_backtrace e bt));
     IO.Output.flush oc
 end
 
@@ -897,6 +925,7 @@ module Unix_tcp_server_ = struct
   type t = {
     addr: string;
     port: int;
+    buf_pool: Buf.t Pool.t;
     max_connections: int;
     sem_max_connections: Sem_.t;
         (** semaphore to restrict the number of active concurrent connections *)
@@ -906,6 +935,11 @@ module Unix_tcp_server_ = struct
     masksigpipe: bool;
     mutable running: bool; (* TODO: use an atomic? *)
   }
+
+  let shutdown_silent_ fd =
+    try Unix.shutdown fd Unix.SHUTDOWN_ALL with _ -> ()
+
+  let close_silent_ fd = try Unix.close fd with _ -> ()
 
   let to_tcp_server (self : t) : IO.TCP_server.builder =
     {
@@ -959,27 +993,25 @@ module Unix_tcp_server_ = struct
           let handle_client_unix_ (client_sock : Unix.file_descr)
               (client_addr : Unix.sockaddr) : unit =
             Log.info (fun k ->
-                k "serving new client on %s"
+                k "t[%d]: serving new client on %s"
+                  (Thread.id @@ Thread.self ())
                   (Tiny_httpd_util.show_sockaddr client_addr));
+
+            if self.masksigpipe then
+              ignore (Unix.sigprocmask Unix.SIG_BLOCK [ Sys.sigpipe ] : _ list);
+            Unix.set_nonblock client_sock;
+            Unix.setsockopt client_sock Unix.TCP_NODELAY true;
             Unix.(setsockopt_float client_sock SO_RCVTIMEO self.timeout);
             Unix.(setsockopt_float client_sock SO_SNDTIMEO self.timeout);
+            Pool.with_resource self.buf_pool @@ fun buf ->
+            let closed = ref false in
             let oc =
-              IO.Output.of_out_channel @@ Unix.out_channel_of_descr client_sock
+              IO.Output.of_unix_fd ~close_noerr:true ~closed ~buf client_sock
             in
-            let ic = IO.Input.of_unix_fd client_sock in
-            handle.handle ~client_addr ic oc;
-            Log.info (fun k ->
-                k "done with client on %s, exiting"
-                @@ Tiny_httpd_util.show_sockaddr client_addr);
-            (try
-               Unix.shutdown client_sock Unix.SHUTDOWN_ALL;
-               Unix.close client_sock
-             with e ->
-               Log.error (fun k ->
-                   k "error when closing sock for client %s: %s"
-                     (Tiny_httpd_util.show_sockaddr client_addr)
-                     (Printexc.to_string e)));
-            ()
+            let ic =
+              IO.Input.of_unix_fd ~close_noerr:true ~closed client_sock
+            in
+            handle.handle ~client_addr ic oc
           in
 
           Unix.set_nonblock sock;
@@ -988,18 +1020,23 @@ module Unix_tcp_server_ = struct
             | client_sock, client_addr ->
               (* limit concurrency *)
               Sem_.acquire 1 self.sem_max_connections;
-
               (* Block INT/HUP while cloning to avoid children handling them.
                  When thread gets them, our Unix.accept raises neatly. *)
               ignore Unix.(sigprocmask SIG_BLOCK Sys.[ sigint; sighup ]);
               self.new_thread (fun () ->
                   try
-                    Unix.setsockopt client_sock Unix.TCP_NODELAY true;
                     handle_client_unix_ client_sock client_addr;
+                    Log.info (fun k ->
+                        k "t[%d]: done with client on %s, exiting"
+                          (Thread.id @@ Thread.self ())
+                        @@ Tiny_httpd_util.show_sockaddr client_addr);
+                    shutdown_silent_ client_sock;
+                    close_silent_ client_sock;
                     Sem_.release 1 self.sem_max_connections
                   with e ->
                     let bt = Printexc.get_raw_backtrace () in
-                    (try Unix.close client_sock with _ -> ());
+                    shutdown_silent_ client_sock;
+                    close_silent_ client_sock;
                     Sem_.release 1 self.sem_max_connections;
                     Log.error (fun k ->
                         k
@@ -1015,8 +1052,8 @@ module Unix_tcp_server_ = struct
               ignore (Unix.select [ sock ] [] [ sock ] 1.0 : _ * _ * _)
             | exception e ->
               Log.error (fun k ->
-                  k "Unix.accept or Thread.create raised an exception: %s"
-                    (Printexc.to_string e))
+                  k "Unix.accept raised an exception: %s" (Printexc.to_string e));
+              Thread.delay 0.01
           done;
 
           (* Wait for all threads to be done: this only works if all threads are done. *)
@@ -1035,6 +1072,10 @@ let create ?(masksigpipe = true) ?max_connections ?(timeout = 0.0) ?buf_size
     {
       Unix_tcp_server_.addr;
       new_thread;
+      buf_pool =
+        Pool.create ~clear:Buf.clear_and_zero
+          ~mk_item:(fun () -> Buf.create ?size:buf_size ())
+          ();
       running = true;
       port;
       sock;
@@ -1102,24 +1143,29 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
     )
   in
 
+  let log_exn msg bt =
+    Log.error (fun k ->
+        k "error while processing response for %s msg=%s@.%s"
+          (Tiny_httpd_util.show_sockaddr client_addr)
+          msg
+          (Printexc.raw_backtrace_to_string bt))
+  in
+
   (* handle generic exception *)
-  let handle_exn e =
-    let resp =
-      Response.fail ~code:500 "server error: %s" (Printexc.to_string e)
-    in
-    if not Log.dummy then
-      Log.error (fun k ->
-          k "response to %s code=%d"
-            (Tiny_httpd_util.show_sockaddr client_addr)
-            resp.code);
+  let handle_exn e bt : unit =
+    let msg = Printexc.to_string e in
+    let resp = Response.fail ~code:500 "server error: %s" msg in
+    if not Log.dummy then log_exn msg bt;
     Response.output_ ~buf:buf_res oc resp
   in
 
-  let handle_bad_req req e =
-    let resp =
-      Response.fail ~code:500 "server error: %s" (Printexc.to_string e)
-    in
-    log_response req resp;
+  let handle_bad_req req e bt =
+    let msg = Printexc.to_string e in
+    let resp = Response.fail ~code:500 "server error: %s" msg in
+    if not Log.dummy then (
+      log_exn msg bt;
+      log_response req resp
+    );
     Response.output_ ~buf:buf_res oc resp
   in
 
@@ -1165,7 +1211,9 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
         in
 
         UP.handle_connection client_addr handshake_st ic oc
-    with e -> handle_bad_req req e
+    with e ->
+      let bt = Printexc.get_raw_backtrace () in
+      handle_bad_req req e bt
   in
 
   let continue = ref true in
@@ -1182,7 +1230,9 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
       continue := false
     | Ok (Some req) ->
       Log.debug (fun k ->
-          k "parsed request: %s" (Format.asprintf "@[%a@]" Request.pp_ req));
+          k "t[%d]: parsed request: %s"
+            (Thread.id @@ Thread.self ())
+            (Format.asprintf "@[%a@]" Request.pp_ req));
 
       if Request.close_after_req req then continue := false;
 
@@ -1225,15 +1275,22 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
                continue := false;
              log_response req r;
              Response.output_ ~buf:buf_res oc r
-           with Sys_error _ -> continue := false
+           with Sys_error e ->
+             Log.debug (fun k ->
+                 k "error when writing response: %s@.connection broken" e);
+             continue := false
          in
 
          (* call handler *)
-         try handler oc req ~resp with Sys_error _ -> continue := false
+         try handler oc req ~resp
+         with Sys_error e ->
+           Log.debug (fun k ->
+               k "error while handling request: %s@.connection broken" e);
+           continue := false
        with
-      | Sys_error _ ->
+      | Sys_error e ->
         (* connection broken somehow *)
-        Log.debug (fun k -> k "connection broken");
+        Log.debug (fun k -> k "error: %s@. connection broken" e);
         continue := false
       | Bad_req (code, s) ->
         continue := false;
@@ -1241,12 +1298,15 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
         log_response req resp;
         Response.output_ ~buf:buf_res oc resp
       | Upgrade _ as e -> raise e
-      | e -> handle_bad_req req e)
+      | e ->
+        let bt = Printexc.get_raw_backtrace () in
+        handle_bad_req req e bt)
   in
 
   try
     while !continue && running self do
-      Log.debug (fun k -> k "read next request");
+      Log.debug (fun k ->
+          k "t[%d]: read next request" (Thread.id @@ Thread.self ()));
       handle_one_req ()
     done
   with
@@ -1254,7 +1314,9 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
     (* upgrades take over the whole connection, we won't process
        any further request *)
     handle_upgrade req up
-  | e -> handle_exn e
+  | e ->
+    let bt = Printexc.get_raw_backtrace () in
+    handle_exn e bt
 
 let client_handler (self : t) : IO.TCP_server.conn_handler =
   { IO.TCP_server.handle = client_handle_for self }

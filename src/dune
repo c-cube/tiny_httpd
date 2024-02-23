@@ -1,9 +1,13 @@
 (library
   (name tiny_httpd)
   (public_name tiny_httpd)
+  (private_modules Tiny_httpd_mime_ Tiny_httpd_parse_)
   (libraries threads seq unix
+             (select Tiny_httpd_mime_.ml from
+              (magic-mime -> Tiny_httpd_mime_.magic.ml)
+              ( -> Tiny_httpd_mime_.dummy.ml))
              (select Tiny_httpd_log.ml from
-              (logs -> Tiny_httpd_log.logs.ml)
+              (logs logs.fmt fmt.tty -> Tiny_httpd_log.logs.ml)
               (-> Tiny_httpd_log.default.ml)))
   (wrapped false))
 

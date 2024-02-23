@@ -94,8 +94,13 @@ let vfs_of_dir (top : string) : vfs =
     let list_dir f = Sys.readdir (top // f)
 
     let read_file_content f =
-      let ic = Unix.(openfile (top // f) [ O_RDONLY ] 0) in
-      Tiny_httpd_stream.of_fd ic
+      let fpath = top // f in
+      match Unix.stat fpath with
+      | { st_kind = Unix.S_REG; _ } ->
+        let ic = Unix.(openfile fpath [ O_RDONLY ] 0) in
+        let closed = ref false in
+        Tiny_httpd_stream.of_fd_close_noerr ~closed ic
+      | _ -> failwith (Printf.sprintf "not a regular file: %S" f)
 
     let create f =
       let oc = open_out_bin (top // f) in
@@ -310,18 +315,8 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
                 [ "Content-Type", "text/javascript" ]
               else if on_fs then (
                 (* call "file" util *)
-                try
-                  let p =
-                    Unix.open_process_in
-                      (Printf.sprintf "file -i -b %S" (top // path))
-                  in
-                  finally_
-                    ~h:(fun p -> ignore @@ Unix.close_process_in p)
-                    p
-                    (fun p ->
-                      try [ "Content-Type", String.trim (input_line p) ]
-                      with _ -> [])
-                with _ -> []
+                let ty = Tiny_httpd_mime_.mime_of_path (top // path) in
+                [ "content-type", ty ]
               ) else
                 []
             in
@@ -330,8 +325,12 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
               ~headers:(mime_type @ [ "Etag", Lazy.force mtime ])
               ~code:200 stream
           with e ->
-            S.Response.fail ~code:500 "error while reading file: %s"
-              (Printexc.to_string e)
+            let bt = Printexc.get_raw_backtrace () in
+            let msg = Printexc.to_string e in
+            Log.error (fun k ->
+                k "dir.get failed: %s@.%s" msg
+                  (Printexc.raw_backtrace_to_string bt));
+            S.Response.fail ~code:500 "error while reading file: %s" msg
         ))
   else
     S.add_route_handler server ~meth:`GET (route ()) (fun _ _ ->

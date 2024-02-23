@@ -15,6 +15,7 @@
   (tags (http thread server tiny_httpd http_of_dir simplehttpserver))
   (depopts
     logs
+    magic-mime
     (mtime (>= 2.0)))
   (depends
     seq

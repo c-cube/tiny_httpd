@@ -34,15 +34,47 @@ module Input = struct
             close_in ic);
     }
 
-  let of_unix_fd ?(close_noerr = false) (fd : Unix.file_descr) : t =
+  let of_unix_fd ?(close_noerr = false) ~closed (fd : Unix.file_descr) : t =
+    let eof = ref false in
     {
-      input = (fun buf i len -> Unix.read fd buf i len);
+      input =
+        (fun buf i len ->
+          let n = ref 0 in
+          if (not !eof) && len > 0 then (
+            let continue = ref true in
+            while !continue do
+              (* Printf.eprintf "read %d B (from fd %d)\n%!" len (Obj.magic fd); *)
+              match Unix.read fd buf i len with
+              | n_ ->
+                n := n_;
+                continue := false
+              | exception
+                  Unix.Unix_error
+                    ( ( Unix.EBADF | Unix.ENOTCONN | Unix.ESHUTDOWN
+                      | Unix.ECONNRESET | Unix.EPIPE ),
+                      _,
+                      _ ) ->
+                eof := true;
+                continue := false
+              | exception
+                  Unix.Unix_error
+                    ((Unix.EWOULDBLOCK | Unix.EAGAIN | Unix.EINTR), _, _) ->
+                ignore (Unix.select [ fd ] [] [] 1.)
+            done;
+            (* Printf.eprintf "read returned %d B\n%!" !n; *)
+            if !n = 0 then eof := true
+          );
+          !n);
       close =
         (fun () ->
-          if close_noerr then (
-            try Unix.close fd with _ -> ()
-          ) else
-            Unix.close fd);
+          if not !closed then (
+            closed := true;
+            eof := true;
+            if close_noerr then (
+              try Unix.close fd with _ -> ()
+            ) else
+              Unix.close fd
+          ));
     }
 
   let of_slice (i_bs : bytes) (i_off : int) (i_len : int) : t =
@@ -113,6 +145,70 @@ module Output = struct
 
       This can be a [Buffer.t], an [out_channel], a [Unix.file_descr], etc. *)
 
+  let of_unix_fd ?(close_noerr = false) ~closed ~(buf : Buf.t)
+      (fd : Unix.file_descr) : t =
+    Buf.clear buf;
+    let buf = Buf.bytes_slice buf in
+    let off = ref 0 in
+
+    let flush () =
+      if !off > 0 then (
+        let i = ref 0 in
+        while !i < !off do
+          (* Printf.eprintf "write %d bytes\n%!" (!off - !i); *)
+          match Unix.write fd buf !i (!off - !i) with
+          | 0 -> failwith "write failed"
+          | n -> i := !i + n
+          | exception
+              Unix.Unix_error
+                ( ( Unix.EBADF | Unix.ENOTCONN | Unix.ESHUTDOWN
+                  | Unix.ECONNRESET | Unix.EPIPE ),
+                  _,
+                  _ ) ->
+            failwith "write failed"
+          | exception
+              Unix.Unix_error
+                ((Unix.EWOULDBLOCK | Unix.EAGAIN | Unix.EINTR), _, _) ->
+            ignore (Unix.select [] [ fd ] [] 1.)
+        done;
+        off := 0
+      )
+    in
+
+    let[@inline] flush_if_full_ () = if !off = Bytes.length buf then flush () in
+
+    let output_char c =
+      flush_if_full_ ();
+      Bytes.set buf !off c;
+      incr off;
+      flush_if_full_ ()
+    in
+    let output bs i len =
+      (* Printf.eprintf "output %d bytes (buffered)\n%!" len; *)
+      let i = ref i in
+      let len = ref len in
+      while !len > 0 do
+        flush_if_full_ ();
+        let n = min !len (Bytes.length buf - !off) in
+        Bytes.blit bs !i buf !off n;
+        i := !i + n;
+        len := !len - n;
+        off := !off + n
+      done;
+      flush_if_full_ ()
+    in
+    let close () =
+      if not !closed then (
+        closed := true;
+        flush ();
+        if close_noerr then (
+          try Unix.close fd with _ -> ()
+        ) else
+          Unix.close fd
+      )
+    in
+    { output; output_char; flush; close }
+
   (** [of_out_channel oc] wraps the channel into a {!Output.t}.
       @param close_noerr if true, then closing the result uses [close_out_noerr]
       instead of [close_out] to close [oc] *)
@@ -170,7 +266,7 @@ module Output = struct
        If [force=true] then write content of [buf] if it's simply non empty. *)
     let write_buf ~force () =
       let n = Buf.size buf in
-      if (force && n > 0) || n > 4_096 then (
+      if (force && n > 0) || n >= 4_096 then (
         output_string self (Printf.sprintf "%x\r\n" n);
         self.output (Buf.bytes_slice buf) 0 n;
         output_string self "\r\n";

@@ -74,10 +74,10 @@ val of_chan : ?buf_size:int -> in_channel -> t
 val of_chan_close_noerr : ?buf_size:int -> in_channel -> t
 (** Same as {!of_chan} but the [close] method will never fail. *)
 
-val of_fd : ?buf_size:int -> Unix.file_descr -> t
+val of_fd : ?buf_size:int -> closed:bool ref -> Unix.file_descr -> t
 (** Make a buffered stream from the given file descriptor. *)
 
-val of_fd_close_noerr : ?buf_size:int -> Unix.file_descr -> t
+val of_fd_close_noerr : ?buf_size:int -> closed:bool ref -> Unix.file_descr -> t
 (** Same as {!of_fd} but the [close] method will never fail. *)
 
 val of_bytes : ?i:int -> ?len:int -> bytes -> t
