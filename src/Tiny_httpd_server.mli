@@ -361,6 +361,10 @@ module Route : sig
       [exact "foo" @/ exact "bar" @/ ... @/ r]
       @since 0.11 **)
 
+  (** A type-erased route.
+      @since NEXT_RELEASE *)
+  type any = Any : (_, _) t -> any
+
   val pp : Format.formatter -> _ t -> unit
   (** Print the route.
       @since 0.7 *)
@@ -683,6 +687,23 @@ val add_upgrade_handler :
   ('a, upgrade_handler) Route.t ->
   'a ->
   unit
+
+(** {2 Inspect the server} *)
+
+(** Inspect the server.
+      @since NEXT_RELEASE *)
+module Inspect : sig
+  type endpoint =
+    | Regular of { meth: Meth.t }
+    | SSE
+    | Upgrade of { name: string }
+
+  val pp_endpoint : Format.formatter -> endpoint -> unit
+  val string_of_endpoint : endpoint -> string
+
+  val endpoints : t -> (Route.any * endpoint -> unit) -> unit
+  (** Iterate on all endpoints of the server *)
+end
 
 (** {2 Run the server} *)
 

@@ -56,6 +56,7 @@ let unwrap_resp_result = function
 module Meth = struct
   type t = [ `GET | `PUT | `POST | `HEAD | `DELETE | `OPTIONS ]
 
+
   let to_string = function
     | `GET -> "GET"
     | `PUT -> "PUT"
@@ -74,6 +75,11 @@ module Meth = struct
     | "DELETE" -> `DELETE
     | "OPTIONS" -> `OPTIONS
     | s -> bad_reqf 400 "unknown method %S" s
+
+    module Map = Map.Make(struct
+      type nonrec t = t
+  let compare : t -> t -> int = Stdlib.compare
+    end)
 end
 
 module Headers = struct
@@ -585,6 +591,8 @@ module Route = struct
     | [], Compose (String_urlencoded, Fire) -> Some (f "") (* trailing *)
     | [], Compose _ -> None
 
+  type any = Any : (_, _) t -> any
+
   let bpf = Printf.bprintf
 
   let rec pp_ : type a b. Buffer.t -> (a, b) t -> unit =
@@ -654,6 +662,20 @@ end
 type upgrade_handler = (module UPGRADE_HANDLER)
 
 exception Upgrade of unit Request.t * upgrade_handler
+
+module Route_tree = struct
+  type leaf = {
+    regular: (unit Req.t Meth.Map.t;
+  }
+  type endpoint =
+    | Regular of Meth
+
+  type (_, _) t =
+    | Fire : ('b, 'b) t * 
+    | Rest : { url_encoded: bool } -> (string -> 'b, 'b) t
+    | Node
+
+end
 
 module type IO_BACKEND = sig
   val init_addr : unit -> string
@@ -1024,6 +1046,23 @@ module Unix_tcp_server_ = struct
           Sem_.acquire self.sem_max_connections.max self.sem_max_connections;
           ());
     }
+end
+
+module Inspect = struct
+  type endpoint =
+    | Regular of { meth: Meth.t }
+    | SSE
+    | Upgrade of { name: string }
+
+  let string_of_endpoint = function
+    | Regular { meth } -> Meth.to_string meth
+    | SSE -> "SSE"
+    | Upgrade { name } -> Printf.sprintf "upgrade-to-%s" name
+
+  let pp_endpoint out e = Format.pp_print_string out (string_of_endpoint e)
+
+  let endpoints (self:t) yield : unit =
+    self.path_handlers
 end
 
 let create ?(masksigpipe = true) ?max_connections ?(timeout = 0.0) ?buf_size
