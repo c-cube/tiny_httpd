@@ -683,6 +683,35 @@ type upgrade_handler = (module UPGRADE_HANDLER)
 
 exception Upgrade of unit Request.t * upgrade_handler
 
+module Routes = struct
+  module Component = struct
+    type t = Exact of string | String | Int | Rest
+
+    let compare : t -> t -> int = Stdlib.compare
+  end
+
+  module C_map = Map.Make (Component)
+
+  type handler =
+    | Handler : {
+        meth: Meth.t option;
+        route: ('a, string Request.t -> Response.t) Route.t;
+        f: 'a;
+      }
+        -> handler
+    | Upgrade : { route: ('a, upgrade_handler) Route.t; f: 'a } -> handler
+    | SSE : {
+        route:
+          ( 'a,
+            string Request.t -> (module SERVER_SENT_GENERATOR) -> unit )
+          Route.t;
+        f: 'a;
+      }
+        -> handler
+
+  type t = { leaf: handler list; sub: t C_map.t }
+end
+
 module type IO_BACKEND = sig
   val init_addr : unit -> string
   val init_port : unit -> int
