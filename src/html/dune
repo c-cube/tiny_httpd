@@ -1,0 +1,15 @@
+
+
+(library
+  (name tiny_httpd_html)
+  (public_name tiny_httpd.html)
+  (libraries seq tiny_httpd.html))
+
+(rule
+ (targets html_.ml)
+ (deps
+  (:bin ./gen/gentags.exe))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run %{bin}))))
