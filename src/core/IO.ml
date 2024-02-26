@@ -77,18 +77,18 @@ module Output = struct
       )
     in
 
-    object (self)
+    object
       method flush () =
         write_buf ~force:true ();
-        flush self
+        flush oc
 
       method close () =
         write_buf ~force:true ();
         (* write an empty chunk to close the stream *)
-        output_string self "0\r\n";
+        output_string oc "0\r\n";
         (* write another crlf after the stream (see #56) *)
-        output_string self "\r\n";
-        self#flush ();
+        output_string oc "\r\n";
+        flush oc;
         if close_rec then close oc
 
       method output b i n =

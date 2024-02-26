@@ -18,7 +18,8 @@ let to_output ?(top = false) (self : elt) (out : #IO.Output.t) : unit =
   let out = Out.create_of_out out in
   if top then Out.add_string out "<!DOCTYPE html>\n";
   self out;
-  Out.add_format_nl out
+  Out.add_format_nl out;
+  Out.flush out
 
 (** Convert a HTML element to a string.
     @param top if true, add DOCTYPE at the beginning. The top element should then
