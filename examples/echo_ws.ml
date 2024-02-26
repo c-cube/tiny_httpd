@@ -1,6 +1,5 @@
 module S = Tiny_httpd
-module Log = Tiny_httpd.Log
-module IO = Tiny_httpd_io
+open Tiny_httpd_core
 
 let setup_logging ~debug () =
   Logs.set_reporter @@ Logs.format_reporter ();
@@ -13,8 +12,7 @@ let setup_logging ~debug () =
 
 let handle_ws _client_addr ic oc =
   Log.info (fun k ->
-      k "new client connection from %s"
-        (Tiny_httpd_util.show_sockaddr _client_addr));
+      k "new client connection from %s" (Util.show_sockaddr _client_addr));
 
   let (_ : Thread.t) =
     Thread.create
@@ -58,7 +56,7 @@ let () =
 
   let server = S.create ~port:!port_ ~max_connections:!j () in
   Tiny_httpd_ws.add_route_handler server
-    S.Route.(exact "echo" @/ return)
+    Route.(exact "echo" @/ return)
     handle_ws;
 
   Printf.printf "listening on http://%s:%d\n%!" (S.addr server) (S.port server);

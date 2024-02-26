@@ -1,5 +1,5 @@
 open Test_util
-open Tiny_httpd_server
+open Tiny_httpd_core
 
 let () =
   let q =
@@ -9,9 +9,13 @@ let () =
      \r\n\
      salutationsSOMEJUNK"
   in
-  let str = Tiny_httpd.Byte_stream.of_string q in
+  let str = IO.Input.of_string q in
   let client_addr = Unix.(ADDR_INET (inet_addr_loopback, 1024)) in
-  let r = Request.Internal_.parse_req_start ~client_addr ~get_time_s:(fun _ -> 0.) str in
+  let r =
+    Request.Private_.parse_req_start_exn ~client_addr ~buf:(Buf.create ())
+      ~get_time_s:(fun _ -> 0.)
+      str
+  in
   match r with
   | None -> failwith "should parse"
   | Some req ->
@@ -19,6 +23,6 @@ let () =
     assert_eq (Some "coucou") (Headers.get "host" req.Request.headers);
     assert_eq (Some "11") (Headers.get "content-length" req.Request.headers);
     assert_eq "hello" req.Request.path;
-    let req = Request.Internal_.parse_body req str |> Request.read_body_full in
+    let req = Request.Private_.parse_body req str |> Request.read_body_full in
     assert_eq ~to_string:(fun s -> s) "salutations" req.Request.body;
     ()

@@ -295,56 +295,51 @@ module Input = struct
     | () -> Some (Buf.contents_and_clear buf)
     | exception End_of_file -> None
 
-  (** new stream with maximum size [max_size].
-   @param close_rec if true, closing this will also close the input stream *)
-  let limit_size_to ~close_rec ~max_size ~(bytes : bytes) (arg : t) : t =
-    let remaining_size = ref max_size in
+  let reading_exactly_ ~skip_on_close ~close_rec ~size (arg : t) : t =
+    let remaining_size = ref size in
 
     object
-      inherit Iostream.In_buf.t_from_refill ~bytes ()
-      method close () = if close_rec then close arg
+      method close () =
+        if !remaining_size > 0 && skip_on_close then skip arg !remaining_size;
+        if close_rec then close arg
 
-      method private refill slice =
-        if slice.len = 0 then
-          if !remaining_size > 0 then (
-            let sub = fill_buf arg in
-            let len = min sub.len !remaining_size in
+      method fill_buf () =
+        if !remaining_size > 0 then
+          fill_buf arg
+        else
+          Slice.empty
 
-            Bytes.blit sub.bytes sub.off slice.bytes 0 len;
-            slice.off <- 0;
-            slice.len <- len;
-            Slice.consume sub len
-          )
+      method input bs i len =
+        if !remaining_size > 0 then (
+          let slice = fill_buf arg in
+          let n = min len (min slice.len !remaining_size) in
+          Bytes.blit slice.bytes slice.off bs i n;
+          remaining_size := !remaining_size - n;
+          Slice.consume slice n;
+          n
+        ) else
+          0
+
+      method consume n =
+        if n > !remaining_size then
+          invalid_arg "reading_exactly: consuming too much";
+        remaining_size := !remaining_size - n;
+        consume arg n
     end
+
+  (** new stream with maximum size [max_size].
+   @param close_rec if true, closing this will also close the input stream *)
+  let limit_size_to ~close_rec ~max_size (arg : t) : t =
+    reading_exactly_ ~size:max_size ~skip_on_close:false ~close_rec arg
 
   (** New stream that consumes exactly [size] bytes from the input.
         If fewer bytes are read before [close] is called, we read and discard
         the remaining quota of bytes before [close] returns.
    @param close_rec if true, closing this will also close the input stream *)
-  let reading_exactly ~close_rec ~size ~(bytes : bytes) (arg : t) : t =
-    let remaining_size = ref size in
+  let reading_exactly ~close_rec ~size (arg : t) : t =
+    reading_exactly_ ~size ~close_rec ~skip_on_close:true arg
 
-    object
-      inherit Iostream.In_buf.t_from_refill ~bytes ()
-
-      method close () =
-        if !remaining_size > 0 then skip arg !remaining_size;
-        if close_rec then close arg
-
-      method private refill slice =
-        if slice.len = 0 then
-          if !remaining_size > 0 then (
-            let sub = fill_buf arg in
-            let len = min sub.len !remaining_size in
-
-            Bytes.blit sub.bytes sub.off slice.bytes 0 len;
-            slice.off <- 0;
-            slice.len <- len;
-            Slice.consume sub len
-          )
-    end
-
-  let read_chunked ~(bytes : bytes) ~fail (bs : #t) : t =
+  let read_chunked ~(bytes : bytes) ~fail (ic : #t) : t =
     let first = ref true in
 
     (* small buffer to read the chunk sizes *)
@@ -353,11 +348,11 @@ module Input = struct
       if !first then
         first := false
       else (
-        let line = read_line_using ~buf:line_buf bs in
+        let line = read_line_using ~buf:line_buf ic in
         if String.trim line <> "" then
           raise (fail "expected crlf between chunks")
       );
-      let line = read_line_using ~buf:line_buf bs in
+      let line = read_line_using ~buf:line_buf ic in
       (* parse chunk length, ignore extensions *)
       let chunk_size =
         if String.trim line = "" then
@@ -380,7 +375,10 @@ module Input = struct
       inherit t_from_refill ~bytes ()
 
       method private refill (slice : Slice.t) : unit =
-        if !chunk_size = 0 && not !eof then chunk_size := read_next_chunk_len ();
+        if !chunk_size = 0 && not !eof then (
+          chunk_size := read_next_chunk_len ();
+          if !chunk_size = 0 then eof := true (* stream is finished *)
+        );
         slice.off <- 0;
         slice.len <- 0;
         if !chunk_size > 0 then (
@@ -388,12 +386,10 @@ module Input = struct
           let to_read = min !chunk_size (Bytes.length slice.bytes) in
           read_exactly_
             ~too_short:(fun () -> raise (fail "chunk is too short"))
-            bs slice.bytes to_read;
+            ic slice.bytes to_read;
           slice.len <- to_read;
           chunk_size := !chunk_size - to_read
-        ) else
-          (* stream is finished *)
-          eof := true
+        )
 
       method close () = eof := true (* do not close underlying stream *)
     end

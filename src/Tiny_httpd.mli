@@ -108,6 +108,8 @@ module Pool = Tiny_httpd_core.Pool
 
 module Dir = Tiny_httpd_unix.Dir
 
+module type VFS = Tiny_httpd_unix.Dir.VFS
+
 (** {2 HTML combinators} *)
 
 module Html = Tiny_httpd_html

@@ -33,12 +33,12 @@ let is_url s =
   is_prefix "http://" s || is_prefix "https://" s
 
 let emit oc (l : entry list) : unit =
-  fpf oc "let embedded_fs = Tiny_httpd_dir.Embedded_fs.create ~mtime:%f ()\n"
+  fpf oc "let embedded_fs = Tiny_httpd.Dir.Embedded_fs.create ~mtime:%f ()\n"
     now_;
 
   let add_vfs ~mtime vfs_path content =
     fpf oc
-      "let () = Tiny_httpd_dir.Embedded_fs.add_file embedded_fs \n\
+      "let () = Tiny_httpd.Dir.Embedded_fs.add_file embedded_fs \n\
       \  ~mtime:%h ~path:%S\n\
       \  %S\n"
       mtime vfs_path content
@@ -99,7 +99,7 @@ let emit oc (l : entry list) : unit =
   in
   List.iter add_entry l;
 
-  fpf oc "let vfs = Tiny_httpd_dir.Embedded_fs.to_vfs embedded_fs\n";
+  fpf oc "let vfs = Tiny_httpd.Dir.Embedded_fs.to_vfs embedded_fs\n";
   ()
 
 let help =

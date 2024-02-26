@@ -2,6 +2,9 @@ module Buf = Buf
 include Server
 module Util = Util
 module Dir = Tiny_httpd_unix.Dir
+
+module type VFS = Tiny_httpd_unix.Dir.VFS
+
 module Html = Tiny_httpd_html
 module IO = Tiny_httpd_core.IO
 module Pool = Tiny_httpd_core.Pool

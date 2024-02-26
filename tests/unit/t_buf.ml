@@ -1,5 +1,5 @@
 open Test_util
-open Tiny_httpd_buf
+open Tiny_httpd_core.Buf
 
 let spf = Printf.sprintf
 
