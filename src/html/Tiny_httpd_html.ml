@@ -6,8 +6,6 @@
     @since 0.12
 *)
 
-module IO = Tiny_httpd_io
-
 include Html_
 (** @inline *)
 
@@ -61,5 +59,5 @@ let to_writer ?top (self : elt) : IO.Writer.t =
 
 (** Convert a HTML element to a stream. This might just convert
     it to a string first, do not assume it to be more efficient. *)
-let to_stream (self : elt) : Tiny_httpd_stream.t =
-  Tiny_httpd_stream.of_string @@ to_string self
+let[@inline] to_stream (self : elt) : IO.Input.t =
+  IO.Input.of_string @@ to_string self

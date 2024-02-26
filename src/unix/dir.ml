@@ -1,7 +1,7 @@
-module S = Tiny_httpd_server
-module U = Tiny_httpd_util
+module S = Server
+module U = Util
 module Html = Tiny_httpd_html
-module Log = Tiny_httpd_log
+module Log = Log
 
 type dir_behavior = Index | Lists | Index_or_lists | Forbidden
 type hidden = unit
@@ -78,7 +78,7 @@ module type VFS = sig
   val list_dir : string -> string array
   val delete : string -> unit
   val create : string -> (bytes -> int -> int -> unit) * (unit -> unit)
-  val read_file_content : string -> Tiny_httpd_stream.t
+  val read_file_content : string -> IO.Input.t
   val file_size : string -> int option
   val file_mtime : string -> float option
 end
@@ -99,7 +99,8 @@ let vfs_of_dir (top : string) : vfs =
       | { st_kind = Unix.S_REG; _ } ->
         let ic = Unix.(openfile fpath [ O_RDONLY ] 0) in
         let closed = ref false in
-        Tiny_httpd_stream.of_fd_close_noerr ~closed ic
+        let buf = IO.Slice.create 4096 in
+        IO.Input.of_unix_fd ~buf ~close_noerr:true ~closed ic
       | _ -> failwith (Printf.sprintf "not a regular file: %S" f)
 
     let create f =
@@ -216,51 +217,51 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
     : unit =
   let route () =
     if prefix = "" then
-      S.Route.rest_of_path_urlencoded
+      Route.rest_of_path_urlencoded
     else
-      S.Route.exact_path prefix S.Route.rest_of_path_urlencoded
+      Route.exact_path prefix Route.rest_of_path_urlencoded
   in
   if config.delete then
     S.add_route_handler server ~meth:`DELETE (route ()) (fun path _req ->
         if contains_dot_dot path then
-          S.Response.fail_raise ~code:403 "invalid path in delete"
+          Response.fail_raise ~code:403 "invalid path in delete"
         else
-          S.Response.make_string
+          Response.make_string
             (try
                VFS.delete path;
                Ok "file deleted successfully"
              with e -> Error (500, Printexc.to_string e)))
   else
     S.add_route_handler server ~meth:`DELETE (route ()) (fun _ _ ->
-        S.Response.make_raw ~code:405 "delete not allowed");
+        Response.make_raw ~code:405 "delete not allowed");
 
   if config.upload then
     S.add_route_handler_stream server ~meth:`PUT (route ())
       ~accept:(fun req ->
-        match S.Request.get_header_int req "Content-Length" with
+        match Request.get_header_int req "Content-Length" with
         | Some n when n > config.max_upload_size ->
           Error
             (403, "max upload size is " ^ string_of_int config.max_upload_size)
-        | Some _ when contains_dot_dot req.S.Request.path ->
+        | Some _ when contains_dot_dot req.Request.path ->
           Error (403, "invalid path (contains '..')")
         | _ -> Ok ())
       (fun path req ->
         let write, close =
           try VFS.create path
           with e ->
-            S.Response.fail_raise ~code:403 "cannot upload to %S: %s" path
+            Response.fail_raise ~code:403 "cannot upload to %S: %s" path
               (Printexc.to_string e)
         in
         let req =
-          S.Request.limit_body_size ~max_size:config.max_upload_size req
+          Request.limit_body_size ~max_size:config.max_upload_size req
         in
-        Tiny_httpd_stream.iter write req.S.Request.body;
+        IO.Input.iter write req.Request.body;
         close ();
         Log.debug (fun k -> k "dir: done uploading file to %S" path);
-        S.Response.make_raw ~code:201 "upload successful")
+        Response.make_raw ~code:201 "upload successful")
   else
     S.add_route_handler server ~meth:`PUT (route ()) (fun _ _ ->
-        S.Response.make_raw ~code:405 "upload not allowed");
+        Response.make_raw ~code:405 "upload not allowed");
 
   if config.download then
     S.add_route_handler server ~meth:`GET (route ()) (fun path req ->
@@ -268,19 +269,18 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
         let mtime =
           lazy
             (match VFS.file_mtime path with
-            | None -> S.Response.fail_raise ~code:403 "Cannot access file"
+            | None -> Response.fail_raise ~code:403 "Cannot access file"
             | Some t -> Printf.sprintf "mtime: %.4f" t)
         in
         if contains_dot_dot path then
-          S.Response.fail ~code:403 "Path is forbidden"
+          Response.fail ~code:403 "Path is forbidden"
         else if not (VFS.contains path) then
-          S.Response.fail ~code:404 "File not found"
-        else if
-          S.Request.get_header req "If-None-Match" = Some (Lazy.force mtime)
+          Response.fail ~code:404 "File not found"
+        else if Request.get_header req "If-None-Match" = Some (Lazy.force mtime)
         then (
           Log.debug (fun k ->
               k "dir: cached object %S (etag: %S)" path (Lazy.force mtime));
-          S.Response.make_raw ~code:304 ""
+          Response.make_raw ~code:304 ""
         ) else if VFS.is_directory path then (
           Log.debug (fun k -> k "dir: list dir %S (topdir %S)" path VFS.descr);
           let parent = Filename.(dirname path) in
@@ -295,17 +295,17 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
             (* redirect using path, not full path *)
             let new_path = "/" // prefix // path // "index.html" in
             Log.debug (fun k -> k "dir: redirect to `%s`" new_path);
-            S.Response.make_void ~code:301 ()
-              ~headers:S.Headers.(empty |> set "location" new_path)
+            Response.make_void ~code:301 ()
+              ~headers:Headers.(empty |> set "location" new_path)
           | Lists | Index_or_lists ->
             let body =
               html_list_dir ~prefix vfs path ~parent |> Html.to_string_top
             in
-            S.Response.make_string
+            Response.make_string
               ~headers:[ header_html; "ETag", Lazy.force mtime ]
               (Ok body)
           | Forbidden | Index ->
-            S.Response.make_raw ~code:405 "listing dir not allowed"
+            Response.make_raw ~code:405 "listing dir not allowed"
         ) else (
           try
             let mime_type =
@@ -315,13 +315,13 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
                 [ "Content-Type", "text/javascript" ]
               else if on_fs then (
                 (* call "file" util *)
-                let ty = Tiny_httpd_mime_.mime_of_path (top // path) in
+                let ty = Mime_.mime_of_path (top // path) in
                 [ "content-type", ty ]
               ) else
                 []
             in
             let stream = VFS.read_file_content path in
-            S.Response.make_raw_stream
+            Response.make_raw_stream
               ~headers:(mime_type @ [ "Etag", Lazy.force mtime ])
               ~code:200 stream
           with e ->
@@ -330,11 +330,11 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
             Log.error (fun k ->
                 k "dir.get failed: %s@.%s" msg
                   (Printexc.raw_backtrace_to_string bt));
-            S.Response.fail ~code:500 "error while reading file: %s" msg
+            Response.fail ~code:500 "error while reading file: %s" msg
         ))
   else
     S.add_route_handler server ~meth:`GET (route ()) (fun _ _ ->
-        S.Response.make_raw ~code:405 "download not allowed");
+        Response.make_raw ~code:405 "download not allowed");
   ()
 
 let add_vfs ~config ~vfs ~prefix server : unit =
@@ -437,7 +437,7 @@ module Embedded_fs = struct
 
       let read_file_content p =
         match find_ self p with
-        | Some (File { content; _ }) -> Tiny_httpd_stream.of_string content
+        | Some (File { content; _ }) -> IO.Input.of_string content
         | _ -> failwith (Printf.sprintf "no such file: %S" p)
 
       let list_dir p =

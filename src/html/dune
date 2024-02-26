@@ -3,7 +3,8 @@
 (library
   (name tiny_httpd_html)
   (public_name tiny_httpd.html)
-  (libraries seq tiny_httpd.html))
+  (flags :standard -open Tiny_httpd_core)
+  (libraries seq tiny_httpd.core))
 
 (rule
  (targets html_.ml)

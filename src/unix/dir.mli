@@ -60,7 +60,7 @@ val config :
     @since 0.12 *)
 
 val add_dir_path :
-  config:config -> dir:string -> prefix:string -> Tiny_httpd_server.t -> unit
+  config:config -> dir:string -> prefix:string -> Server.t -> unit
 (** [add_dirpath ~config ~dir ~prefix server] adds route handle to the
     [server] to serve static files in [dir] when url starts with [prefix],
     using the given configuration [config]. *)
@@ -91,7 +91,7 @@ module type VFS = sig
   val create : string -> (bytes -> int -> int -> unit) * (unit -> unit)
   (** Create a file and obtain a pair [write, close] *)
 
-  val read_file_content : string -> Tiny_httpd_stream.t
+  val read_file_content : string -> IO.Input.t
   (** Read content of a file *)
 
   val file_size : string -> int option
@@ -108,11 +108,7 @@ val vfs_of_dir : string -> (module VFS)
 *)
 
 val add_vfs :
-  config:config ->
-  vfs:(module VFS) ->
-  prefix:string ->
-  Tiny_httpd_server.t ->
-  unit
+  config:config -> vfs:(module VFS) -> prefix:string -> Server.t -> unit
 (** Similar to {!add_dir_path} but using a virtual file system instead.
     @since 0.12
 *)

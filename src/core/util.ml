@@ -119,3 +119,5 @@ let show_sockaddr = function
   | Unix.ADDR_UNIX f -> f
   | Unix.ADDR_INET (inet, port) ->
     Printf.sprintf "%s:%d" (Unix.string_of_inet_addr inet) port
+
+let is_ipv6_str addr : bool = String.contains addr ':'

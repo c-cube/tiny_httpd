@@ -16,7 +16,7 @@ module Slice = Iostream.Slice
 module Output = struct
   include Iostream.Out_buf
 
-  class of_fd ?(close_noerr = false) ~closed ~(buf : Slice.t)
+  class of_unix_fd ?(close_noerr = false) ~closed ~(buf : Slice.t)
     (fd : Unix.file_descr) : t =
     object
       inherit t_from_output ~bytes:buf.bytes ()
@@ -203,7 +203,7 @@ module Input = struct
         close i2
     end
 
-  let iter (f : Slice.t -> unit) (self : #t) : unit =
+  let iter_slice (f : Slice.t -> unit) (self : #t) : unit =
     let continue = ref true in
     while !continue do
       let slice = self#fill_buf () in
@@ -216,14 +216,17 @@ module Input = struct
       )
     done
 
+  let iter f self =
+    iter_slice (fun (slice : Slice.t) -> f slice.bytes slice.off slice.len) self
+
   let to_chan oc (self : #t) =
-    iter
+    iter_slice
       (fun (slice : Slice.t) ->
         Stdlib.output oc slice.bytes slice.off slice.len)
       self
 
   let to_chan' (oc : #Iostream.Out_buf.t) (self : #t) : unit =
-    iter
+    iter_slice
       (fun (slice : Slice.t) ->
         Iostream.Out_buf.output oc slice.bytes slice.off slice.len)
       self

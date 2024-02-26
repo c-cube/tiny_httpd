@@ -79,38 +79,34 @@ echo:
     processing streams and parsing requests.
 *)
 
-module Buf = Tiny_httpd_buf
-
-(** {2 Generic byte streams} *)
-
-module Byte_stream = Tiny_httpd_stream
+module Buf = Buf
 
 (** {2 IO Abstraction} *)
 
-module IO = Tiny_httpd_io
+module IO = Tiny_httpd_core.IO
 
 (** {2 Logging *)
 
-module Log = Tiny_httpd_log
+module Log = Tiny_httpd_core.Log
 
 (** {2 Main Server Type} *)
 
 (** @inline *)
 include module type of struct
-  include Tiny_httpd_server
+  include Tiny_httpd_core.Server
 end
 
 (** {2 Utils} *)
 
-module Util = Tiny_httpd_util
+module Util = Tiny_httpd_core.Util
 
 (** {2 Resource pool} *)
 
-module Pool = Tiny_httpd_pool
+module Pool = Tiny_httpd_core.Pool
 
 (** {2 Static directory serving} *)
 
-module Dir = Tiny_httpd_dir
+module Dir = Tiny_httpd_unix.Dir
 
 module Html = Tiny_httpd_html
 (** Alias to {!Tiny_httpd_html}

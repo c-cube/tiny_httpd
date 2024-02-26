@@ -83,11 +83,6 @@ type t = {
   buf_pool: Buf.t Pool.t;
 }
 
-let get_addr_ sock =
-  match Unix.getsockname sock with
-  | Unix.ADDR_INET (addr, port) -> addr, port
-  | _ -> invalid_arg "httpd: address is not INET"
-
 let addr (self : t) =
   match self.tcp_server with
   | None ->
@@ -280,8 +275,6 @@ let create_from ?(buf_size = 16 * 1_024) ?(middlewares = []) ~backend () : t =
   in
   List.iter (fun (stage, m) -> add_middleware self ~stage m) middlewares;
   self
-
-let is_ipv6_str addr : bool = String.contains addr ':'
 
 let stop (self : t) =
   match self.tcp_server with
@@ -500,7 +493,7 @@ let client_handler (self : t) : IO.TCP_server.conn_handler =
 
 let is_ipv6 (self : t) =
   let (module B) = self.backend in
-  is_ipv6_str (B.init_addr ())
+  Util.is_ipv6_str (B.init_addr ())
 
 let run_exn ?(after_init = ignore) (self : t) : unit =
   let (module B) = self.backend in

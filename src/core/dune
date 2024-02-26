@@ -2,11 +2,8 @@
 (library
   (name tiny_httpd_core)
   (public_name tiny_httpd.core)
-  (private_modules mime_ parse_)
+  (private_modules parse_)
   (libraries threads seq hmap iostream
-             (select mime_.ml from
-              (magic-mime -> mime_.magic.ml)
-              ( -> mime_.dummy.ml))
              (select log.ml from
               (logs -> log.logs.ml)
               (-> log.default.ml))))

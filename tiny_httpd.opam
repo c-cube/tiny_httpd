@@ -15,6 +15,7 @@ depends: [
   "seq"
   "base-threads"
   "result"
+  "hmap"
   "ocaml" {>= "4.08"}
   "odoc" {with-doc}
   "logs" {with-test}

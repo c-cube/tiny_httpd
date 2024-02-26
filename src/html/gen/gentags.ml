@@ -294,14 +294,13 @@ let prelude =
 module Out : sig
   type t
   val create_of_buffer : Buffer.t -> t
-  val create_of_out: Tiny_httpd_io.Output.t -> t
+  val create_of_out: IO.Output.t -> t
   val flush : t -> unit
   val add_char : t -> char -> unit
   val add_string : t -> string -> unit
   val add_format_nl : t -> unit
   val with_no_format_nl : t -> (unit -> 'a) -> 'a
 end = struct
-  module IO = Tiny_httpd_io
   type t = {
     out: IO.Output.t;
     mutable fmt_nl: bool; (* if true, we print [\n] around tags to format the html *)
