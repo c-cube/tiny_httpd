@@ -76,12 +76,12 @@ let pp out self : unit =
   Format.fprintf out "{@[code=%d;@ headers=[@[%a@]];@ body=%a@]}" self.code
     Headers.pp self.headers pp_body self.body
 
-let output_ ~buf (oc : IO.Output.t) (self : t) : unit =
+let output_ ~bytes (oc : IO.Output.t) (self : t) : unit =
   (* double indirection:
      - print into [buffer] using [bprintf]
      - transfer to [buf_] so we can output from there *)
   let tmp_buffer = Buffer.create 32 in
-  Buf.clear buf;
+  let buf = Buf.of_bytes bytes in
 
   (* write start of reply *)
   Printf.bprintf tmp_buffer "HTTP/1.1 %d %s\r\n" self.code

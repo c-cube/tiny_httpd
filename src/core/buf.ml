@@ -4,6 +4,7 @@ let create ?(size = 4_096) () : t =
   let bytes = Bytes.make size ' ' in
   { bytes; i = 0; original = bytes }
 
+let of_bytes bytes : t = { bytes; i = 0; original = bytes }
 let[@inline] size self = self.i
 let[@inline] bytes_slice self = self.bytes
 

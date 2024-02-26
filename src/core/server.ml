@@ -72,7 +72,6 @@ let unwrap_handler_result req = function
 type t = {
   backend: (module IO_BACKEND);
   mutable tcp_server: IO.TCP_server.t option;
-  buf_size: int;
   mutable handler: IO.Input.t Request.t -> Response.t;
       (** toplevel handler, if any *)
   mutable middlewares: (int * Middleware.t) list;  (** Global middlewares *)
@@ -80,7 +79,7 @@ type t = {
       (** sorted version of {!middlewares} *)
   mutable path_handlers: (unit Request.t -> handler_result option) list;
       (** path handlers *)
-  buf_pool: Buf.t Pool.t;
+  bytes_pool: bytes Pool.t;
 }
 
 let addr (self : t) =
@@ -169,8 +168,8 @@ let add_route_handler (type a) ?accept ?middlewares ?meth self
     (route : (a, _) Route.t) (f : _) : unit =
   let tr_req _oc req ~resp f =
     let req =
-      Pool.with_resource self.buf_pool @@ fun buf ->
-      Request.read_body_full ~buf req
+      Pool.with_resource self.bytes_pool @@ fun bytes ->
+      Request.read_body_full ~bytes req
     in
     resp (f req)
   in
@@ -190,8 +189,8 @@ exception Exit_SSE
 let add_route_server_sent_handler ?accept self route f =
   let tr_req (oc : IO.Output.t) req ~resp f =
     let req =
-      Pool.with_resource self.buf_pool @@ fun buf ->
-      Request.read_body_full ~buf req
+      Pool.with_resource self.bytes_pool @@ fun bytes ->
+      Request.read_body_full ~bytes req
     in
     let headers =
       ref Headers.(empty |> set "content-type" "text/event-stream")
@@ -256,6 +255,8 @@ let add_upgrade_handler ?(accept = fun _ -> Ok ()) (self : t) route f : unit =
   in
   self.path_handlers <- ph :: self.path_handlers
 
+let clear_bytes_ bs = Bytes.fill bs 0 (Bytes.length bs) '\x00'
+
 let create_from ?(buf_size = 16 * 1_024) ?(middlewares = []) ~backend () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let self =
@@ -263,13 +264,12 @@ let create_from ?(buf_size = 16 * 1_024) ?(middlewares = []) ~backend () : t =
       backend;
       tcp_server = None;
       handler;
-      buf_size;
       path_handlers = [];
       middlewares = [];
       middlewares_sorted = lazy [];
-      buf_pool =
-        Pool.create ~clear:Buf.clear_and_zero
-          ~mk_item:(fun () -> Buf.create ~size:buf_size ())
+      bytes_pool =
+        Pool.create ~clear:clear_bytes_
+          ~mk_item:(fun () -> Bytes.create buf_size)
           ();
     }
   in
@@ -302,8 +302,8 @@ let string_as_list_contains_ (s : string) (sub : string) : bool =
 
 (* handle client on [ic] and [oc] *)
 let client_handle_for (self : t) ~client_addr ic oc : unit =
-  Pool.with_resource self.buf_pool @@ fun buf ->
-  Pool.with_resource self.buf_pool @@ fun buf_res ->
+  Pool.with_resource self.bytes_pool @@ fun bytes_req ->
+  Pool.with_resource self.bytes_pool @@ fun bytes_res ->
   let (module B) = self.backend in
 
   (* how to log the response to this query *)
@@ -336,7 +336,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
     let msg = Printexc.to_string e in
     let resp = Response.fail ~code:500 "server error: %s" msg in
     if not Log.dummy then log_exn msg bt;
-    Response.Private_.output_ ~buf:buf_res oc resp
+    Response.Private_.output_ ~bytes:bytes_res oc resp
   in
 
   let handle_bad_req req e bt =
@@ -346,7 +346,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
       log_exn msg bt;
       log_response req resp
     );
-    Response.Private_.output_ ~buf:buf_res oc resp
+    Response.Private_.output_ ~bytes:bytes_res oc resp
   in
 
   let handle_upgrade req (module UP : UPGRADE_HANDLER) : unit =
@@ -368,7 +368,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
         Log.error (fun k -> k "upgrade failed: %s" msg);
         let resp = Response.make_raw ~code:429 "upgrade required" in
         log_response req resp;
-        Response.Private_.output_ ~buf:buf_res oc resp
+        Response.Private_.output_ ~bytes:bytes_res oc resp
       | Ok (headers, handshake_st) ->
         (* send the upgrade reply *)
         let headers =
@@ -376,7 +376,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
         in
         let resp = Response.make_string ~code:101 ~headers (Ok "") in
         log_response req resp;
-        Response.Private_.output_ ~buf:buf_res oc resp;
+        Response.Private_.output_ ~bytes:bytes_res oc resp;
 
         UP.handle_connection client_addr handshake_st ic oc
     with e ->
@@ -388,6 +388,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
 
   let handle_one_req () =
     match
+      let buf = Buf.of_bytes bytes_req in
       Request.Private_.parse_req_start ~client_addr ~get_time_s:B.get_time_s
         ~buf ic
     with
@@ -395,7 +396,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
     | Error (c, s) ->
       (* connection error, close *)
       let res = Response.make_raw ~code:c s in
-      (try Response.Private_.output_ ~buf:buf_res oc res
+      (try Response.Private_.output_ ~bytes:bytes_res oc res
        with Sys_error _ -> ());
       continue := false
     | Ok (Some req) ->
@@ -418,7 +419,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
          (match Request.get_header ~f:String.trim req "Expect" with
          | Some "100-continue" ->
            Log.debug (fun k -> k "send back: 100 CONTINUE");
-           Response.Private_.output_ ~buf:buf_res oc
+           Response.Private_.output_ ~bytes:bytes_res oc
              (Response.make_raw ~code:100 "")
          | Some s -> bad_reqf 417 "unknown expectation %s" s
          | None -> ());
@@ -432,11 +433,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
          in
 
          (* now actually read request's body into a stream *)
-         let req =
-           Request.Private_.parse_body
-             ~buf:(IO.Slice.of_bytes (Buf.bytes_slice buf))
-             req ic
-         in
+         let req = Request.Private_.parse_body ~bytes:bytes_req req ic in
 
          (* how to reply *)
          let resp r =
@@ -444,7 +441,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
              if Headers.get "connection" r.Response.headers = Some "close" then
                continue := false;
              log_response req r;
-             Response.Private_.output_ ~buf:buf_res oc r
+             Response.Private_.output_ ~bytes:bytes_res oc r
            with Sys_error e ->
              Log.debug (fun k ->
                  k "error when writing response: %s@.connection broken" e);
@@ -466,7 +463,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
         continue := false;
         let resp = Response.make_raw ~code s in
         log_response req resp;
-        Response.Private_.output_ ~buf:buf_res oc resp
+        Response.Private_.output_ ~bytes:bytes_res oc resp
       | Upgrade _ as e -> raise e
       | e ->
         let bt = Printexc.get_raw_backtrace () in

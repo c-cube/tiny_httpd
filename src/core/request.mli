@@ -36,6 +36,19 @@ type 'body t = private {
       @since 0.11 the field [start_time] was added
   *)
 
+val add_meta : _ t -> 'a Hmap.key -> 'a -> unit
+(** Add metadata
+ @since NEXT_RELEASE *)
+
+val get_meta : _ t -> 'a Hmap.key -> 'a option
+(** Get metadata
+ @since NEXT_RELEASE *)
+
+val get_meta_exn : _ t -> 'a Hmap.key -> 'a
+(** Like {!get_meta} but can fail
+    @raise Invalid_argument if not present
+ @since NEXT_RELEASE *)
+
 val pp : Format.formatter -> string t -> unit
 (** Pretty print the request and its body. The exact format of this printing
       is not specified. *)
@@ -102,11 +115,11 @@ val limit_body_size :
       @since 0.3
   *)
 
-val read_body_full : ?buf:Buf.t -> ?buf_size:int -> IO.Input.t t -> string t
+val read_body_full : ?bytes:bytes -> ?buf_size:int -> IO.Input.t t -> string t
 (** Read the whole body into a string. Potentially blocking.
 
     @param buf_size initial size of underlying buffer (since 0.11)
-    @param buf the initial buffer (since 0.14)
+    @param bytes the initial buffer (since 0.14)
     *)
 
 (**/**)
@@ -128,7 +141,7 @@ module Private_ : sig
     unit t option
 
   val close_after_req : _ t -> bool
-  val parse_body : ?buf:IO.Slice.t -> unit t -> IO.Input.t -> IO.Input.t t
+  val parse_body : ?bytes:bytes -> unit t -> IO.Input.t -> IO.Input.t t
   val set_body : 'a -> _ t -> 'a t
 end
 

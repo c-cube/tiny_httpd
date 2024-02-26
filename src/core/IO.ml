@@ -109,7 +109,7 @@ module Input = struct
       (fd : Unix.file_descr) : t =
     let eof = ref false in
     object
-      inherit Iostream.In_buf.t_from_refill ~buf ()
+      inherit Iostream.In_buf.t_from_refill ~bytes:buf.bytes ()
 
       method private refill (slice : Slice.t) =
         if not !eof then (
@@ -137,7 +137,7 @@ module Input = struct
           if slice.len = 0 then eof := true
         )
 
-      method! close () =
+      method close () =
         if not !closed then (
           closed := true;
           eof := true;
@@ -150,13 +150,13 @@ module Input = struct
 
   let of_slice (slice : Slice.t) : t =
     object
-      inherit Iostream.In_buf.t_from_refill ~buf:slice ()
+      inherit Iostream.In_buf.t_from_refill ~bytes:slice.bytes ()
 
       method private refill (slice : Slice.t) =
         slice.off <- 0;
         slice.len <- 0
 
-      method! close () = ()
+      method close () = ()
     end
 
   (** Read into the given slice.
@@ -198,7 +198,7 @@ module Input = struct
         slice.off <- 0;
         input_rec slice
 
-      method! close () =
+      method close () =
         close i1;
         close i2
     end
@@ -225,10 +225,10 @@ module Input = struct
         Stdlib.output oc slice.bytes slice.off slice.len)
       self
 
-  let to_chan' (oc : #Iostream.Out_buf.t) (self : #t) : unit =
+  let to_chan' (oc : #Iostream.Out.t) (self : #t) : unit =
     iter_slice
       (fun (slice : Slice.t) ->
-        Iostream.Out_buf.output oc slice.bytes slice.off slice.len)
+        Iostream.Out.output oc slice.bytes slice.off slice.len)
       self
 
   let read_all_using ~buf (self : #t) : string =
@@ -299,11 +299,10 @@ module Input = struct
    @param close_rec if true, closing this will also close the input stream *)
   let limit_size_to ~close_rec ~max_size ~(bytes : bytes) (arg : t) : t =
     let remaining_size = ref max_size in
-    let slice = Slice.of_bytes bytes in
 
     object
-      inherit Iostream.In_buf.t_from_refill ~buf:slice ()
-      method! close () = if close_rec then close arg
+      inherit Iostream.In_buf.t_from_refill ~bytes ()
+      method close () = if close_rec then close arg
 
       method private refill slice =
         if slice.len = 0 then
@@ -324,12 +323,11 @@ module Input = struct
    @param close_rec if true, closing this will also close the input stream *)
   let reading_exactly ~close_rec ~size ~(bytes : bytes) (arg : t) : t =
     let remaining_size = ref size in
-    let slice = Slice.of_bytes bytes in
 
     object
-      inherit Iostream.In_buf.t_from_refill ~buf:slice ()
+      inherit Iostream.In_buf.t_from_refill ~bytes ()
 
-      method! close () =
+      method close () =
         if !remaining_size > 0 then skip arg !remaining_size;
         if close_rec then close arg
 
@@ -346,9 +344,11 @@ module Input = struct
           )
     end
 
-  let read_chunked ~(buf : Slice.t) ~fail (bs : #t) : t =
+  let read_chunked ~(bytes : bytes) ~fail (bs : #t) : t =
     let first = ref true in
-    let line_buf = Buf.create ~size:128 () in
+
+    (* small buffer to read the chunk sizes *)
+    let line_buf = Buf.create ~size:32 () in
     let read_next_chunk_len () : int =
       if !first then
         first := false
@@ -377,7 +377,7 @@ module Input = struct
     let chunk_size = ref 0 in
 
     object
-      inherit t_from_refill ~buf ()
+      inherit t_from_refill ~bytes ()
 
       method private refill (slice : Slice.t) : unit =
         if !chunk_size = 0 && not !eof then chunk_size := read_next_chunk_len ();
@@ -395,10 +395,7 @@ module Input = struct
           (* stream is finished *)
           eof := true
 
-      method! close () =
-        (* do not close underlying stream *)
-        eof := true;
-        ()
+      method close () = eof := true (* do not close underlying stream *)
     end
 
   (** Output a stream using chunked encoding *)
@@ -435,14 +432,15 @@ module Writer = struct
   let[@inline] make ~write () : t = { write }
 
   (** Write into the channel. *)
-  let[@inline] write (oc : Output.t) (self : t) : unit = self.write oc
+  let[@inline] write (oc : #Output.t) (self : t) : unit =
+    self.write (oc :> Output.t)
 
   (** Empty writer, will output 0 bytes. *)
   let empty : t = { write = ignore }
 
   (** A writer that just emits the bytes from the given string. *)
   let[@inline] of_string (str : string) : t =
-    let write oc = Output.output_string oc str in
+    let write oc = Iostream.Out.output_string oc str in
     { write }
 
   let[@inline] of_input (ic : #Input.t) : t =

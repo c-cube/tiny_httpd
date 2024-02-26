@@ -24,6 +24,9 @@ let start_time self = self.start_time
 let query self = self.query
 let get_header ?f self h = Headers.get ?f h self.headers
 let remove_header k self = { self with headers = Headers.remove k self.headers }
+let add_meta self k v = self.meta <- Hmap.add k v self.meta
+let get_meta self k = Hmap.find k self.meta
+let get_meta_exn self k = Hmap.get k self.meta
 
 let get_header_int self h =
   match get_header self h with
@@ -64,9 +67,9 @@ let pp out self : unit =
     self.body pp_comp_ self.path_components pp_query self.query
 
 (* decode a "chunked" stream into a normal stream *)
-let read_stream_chunked_ ~buf (bs : #IO.Input.t) : IO.Input.t =
+let read_stream_chunked_ ~bytes (bs : #IO.Input.t) : IO.Input.t =
   Log.debug (fun k -> k "body: start reading chunked stream...");
-  IO.Input.read_chunked ~buf ~fail:(fun s -> Bad_req (400, s)) bs
+  IO.Input.read_chunked ~bytes ~fail:(fun s -> Bad_req (400, s)) bs
 
 let limit_body_size_ ~max_size ~bytes (bs : #IO.Input.t) : IO.Input.t =
   Log.debug (fun k -> k "limit size of body to max-size=%d" max_size);
@@ -146,8 +149,8 @@ let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
 
 (* parse body, given the headers.
    @param tr_stream a transformation of the input stream. *)
-let parse_body_ ~tr_stream ~buf (req : IO.Input.t t) : IO.Input.t t resp_result
-    =
+let parse_body_ ~tr_stream ~bytes (req : IO.Input.t t) :
+    IO.Input.t t resp_result =
   try
     let size =
       match Headers.get_exn "Content-Length" req.headers |> int_of_string with
@@ -162,7 +165,9 @@ let parse_body_ ~tr_stream ~buf (req : IO.Input.t t) : IO.Input.t t resp_result
         read_exactly ~size ~bytes @@ tr_stream req.body
       | Some "chunked" ->
         (* body sent by chunks *)
-        let bs : IO.Input.t = read_stream_chunked_ ~buf @@ tr_stream req.body in
+        let bs : IO.Input.t =
+          read_stream_chunked_ ~bytes @@ tr_stream req.body
+        in
         if size > 0 then (
           let bytes = Bytes.create 4096 in
           limit_body_size_ ~max_size:size ~bytes bs
@@ -176,11 +181,11 @@ let parse_body_ ~tr_stream ~buf (req : IO.Input.t t) : IO.Input.t t resp_result
   | Bad_req (c, s) -> Error (c, s)
   | e -> Error (400, Printexc.to_string e)
 
-let read_body_full ?buf ?buf_size (self : IO.Input.t t) : string t =
+let read_body_full ?bytes ?buf_size (self : IO.Input.t t) : string t =
   try
     let buf =
-      match buf with
-      | Some b -> b
+      match bytes with
+      | Some b -> Buf.of_bytes b
       | None -> Buf.create ?size:buf_size ()
     in
     let body = IO.Input.read_all_using ~buf self.body in
@@ -196,8 +201,8 @@ module Private_ = struct
   let parse_req_start_exn ?(buf = Buf.create ()) ~client_addr ~get_time_s bs =
     parse_req_start ~client_addr ~get_time_s ~buf bs |> unwrap_resp_result
 
-  let parse_body ?(buf = IO.Slice.create 4096) req bs : _ t =
-    parse_body_ ~tr_stream:(fun s -> s) ~buf { req with body = bs }
+  let parse_body ?(bytes = Bytes.create 4096) req bs : _ t =
+    parse_body_ ~tr_stream:(fun s -> s) ~bytes { req with body = bs }
     |> unwrap_resp_result
 
   let[@inline] set_body body self = { self with body }

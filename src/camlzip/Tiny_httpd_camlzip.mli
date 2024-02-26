@@ -7,7 +7,7 @@
   *)
 
 val middleware :
-  ?compress_above:int -> ?buf_size:int -> unit -> Tiny_httpd_server.Middleware.t
+  ?compress_above:int -> ?buf_size:int -> unit -> Server.Middleware.t
 (** Middleware responsible for deflate compression/decompression.
     @param compress_above threshold, in bytes, above which a response body
       that has a known content-length is compressed. Stream bodies
@@ -15,7 +15,7 @@ val middleware :
     @param buf_size size of the underlying buffer for compression/decompression
     @since 0.11 *)
 
-val setup : ?compress_above:int -> ?buf_size:int -> Tiny_httpd_server.t -> unit
+val setup : ?compress_above:int -> ?buf_size:int -> Server.t -> unit
 (** Install middleware for tiny_httpd to be able to encode/decode
     compressed streams
     @param compress_above threshold above with string responses are compressed

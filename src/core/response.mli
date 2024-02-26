@@ -112,7 +112,7 @@ val pp : Format.formatter -> t -> unit
 
 module Private_ : sig
   val make_void_force_ : ?headers:Headers.t -> code:int -> unit -> t
-  val output_ : buf:Buf.t -> IO.Output.t -> t -> unit
+  val output_ : bytes:Bytes.t -> IO.Output.t -> t -> unit
 end
 
 (**/**)

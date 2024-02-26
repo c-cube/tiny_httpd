@@ -14,12 +14,11 @@ include Html_
     be a "html" tag.
     @since 0.14
     *)
-let to_output ?(top = false) (self : elt) (out : IO.Output.t) : unit =
+let to_output ?(top = false) (self : elt) (out : #IO.Output.t) : unit =
   let out = Out.create_of_out out in
   if top then Out.add_string out "<!DOCTYPE html>\n";
   self out;
-  Out.add_format_nl out;
-  Out.flush out
+  Out.add_format_nl out
 
 (** Convert a HTML element to a string.
     @param top if true, add DOCTYPE at the beginning. The top element should then
@@ -54,7 +53,7 @@ let to_out_channel_top = to_output ~top:true
     @param top if true, add a DOCTYPE. See {!to_out_channel}.
     @since 0.14 *)
 let to_writer ?top (self : elt) : IO.Writer.t =
-  let write oc = to_output ?top self oc in
+  let write (oc : #IO.Output.t) = to_output ?top self oc in
   IO.Writer.make ~write ()
 
 (** Convert a HTML element to a stream. This might just convert

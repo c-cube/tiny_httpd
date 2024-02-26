@@ -380,13 +380,13 @@ let upgrade ic oc : _ * _ =
   let reader = Reader.create ~ic ~writer () in
   let ws_ic : IO.Input.t =
     object
-      inherit IO.Input.t_from_refill ()
+      inherit IO.Input.t_from_refill ~bytes:(Bytes.create 4_096) ()
 
       method private refill (slice : IO.Slice.t) =
         slice.off <- 0;
         slice.len <- Reader.read reader slice.bytes 0 (Bytes.length slice.bytes)
 
-      method! close () = Reader.close reader
+      method close () = Reader.close reader
     end
   in
   let ws_oc : IO.Output.t =
