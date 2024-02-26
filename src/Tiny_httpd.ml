@@ -6,6 +6,8 @@ module Html = Tiny_httpd_html
 module IO = Tiny_httpd_core.IO
 module Pool = Tiny_httpd_core.Pool
 module Log = Tiny_httpd_core.Log
+module Server = Tiny_httpd_core.Server
+include Server
 
 open struct
   let get_max_connection_ ?(max_connections = 64) () : int =

@@ -4,9 +4,10 @@
  (name tiny_httpd_prometheus)
  (public_name tiny_httpd.prometheus)
  (synopsis "Metrics using prometheus")
- (private_modules common_ time_)
+ (private_modules common_p_ time_)
+ (flags :standard -open Tiny_httpd_core)
  (libraries
-  tiny_httpd unix
+  tiny_httpd.core unix
   (select time_.ml from
    (mtime mtime.clock.os -> time_.mtime.ml)
    (-> time_.default.ml))))
