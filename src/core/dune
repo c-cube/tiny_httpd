@@ -1,0 +1,21 @@
+
+(library
+  (name tiny_httpd_core)
+  (public_name tiny_httpd.core)
+  (private_modules mime_ parse_)
+  (libraries threads seq hmap iostream
+             (select mime_.ml from
+              (magic-mime -> mime_.magic.ml)
+              ( -> mime_.dummy.ml))
+             (select log.ml from
+              (logs -> log.logs.ml)
+              (-> log.default.ml))))
+
+(rule
+ (targets Tiny_httpd_atomic_.ml)
+ (deps
+  (:bin ./gen/mkshims.exe))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run %{bin}))))
