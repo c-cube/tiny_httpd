@@ -3,9 +3,10 @@
   (name tiny_httpd_ws)
   (public_name tiny_httpd.ws)
   (synopsis "Websockets for tiny_httpd")
-  (private_modules common_ utils_)
+  (private_modules common_ws_ utils_)
+  (flags :standard -open Tiny_httpd_core)
   (foreign_stubs
     (language c)
     (names tiny_httpd_ws_stubs)
     (flags :standard -std=c99 -fPIC -O2))
-  (libraries tiny_httpd threads))
+  (libraries tiny_httpd.core threads))
