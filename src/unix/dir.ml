@@ -310,7 +310,10 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
         ) else (
           try
             let mime_type =
-              if Filename.extension path = ".css" then
+              (* FIXME: handle .html specially *)
+              if Filename.extension path = ".html" then
+                [ "Content-Type", "text/html" ]
+              else if Filename.extension path = ".css" then
                 [ "Content-Type", "text/css" ]
               else if Filename.extension path = ".js" then
                 [ "Content-Type", "text/javascript" ]
