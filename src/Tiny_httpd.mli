@@ -89,13 +89,6 @@ module IO = Tiny_httpd_core.IO
 
 module Log = Tiny_httpd_core.Log
 
-(** {2 Main Server Type} *)
-
-(** @inline *)
-include module type of struct
-  include Tiny_httpd_core.Server
-end
-
 (** {2 Utils} *)
 
 module Util = Tiny_httpd_core.Util
@@ -118,8 +111,15 @@ module Html = Tiny_httpd_html
 
 (** {2 Main server types} *)
 
+module Request = Tiny_httpd_core.Request
+module Response = Tiny_httpd_core.Response
+module Response_code = Tiny_httpd_core.Response_code
+module Route = Tiny_httpd_core.Route
+module Headers = Tiny_httpd_core.Headers
+module Meth = Tiny_httpd_core.Meth
 module Server = Tiny_httpd_core.Server
 
+(** @inline *)
 include module type of struct
   include Server
 end

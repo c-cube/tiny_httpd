@@ -1,16 +1,20 @@
 module Buf = Buf
-include Server
-module Util = Util
-module Dir = Tiny_httpd_unix.Dir
-
-module type VFS = Tiny_httpd_unix.Dir.VFS
-
 module Html = Tiny_httpd_html
 module IO = Tiny_httpd_core.IO
+module Request = Tiny_httpd_core.Request
+module Response = Tiny_httpd_core.Response
+module Response_code = Tiny_httpd_core.Response_code
+module Route = Tiny_httpd_core.Route
+module Headers = Tiny_httpd_core.Headers
+module Meth = Tiny_httpd_core.Meth
 module Pool = Tiny_httpd_core.Pool
 module Log = Tiny_httpd_core.Log
 module Server = Tiny_httpd_core.Server
+module Util = Tiny_httpd_core.Util
 include Server
+module Dir = Tiny_httpd_unix.Dir
+
+module type VFS = Tiny_httpd_unix.Dir.VFS
 
 open struct
   let get_max_connection_ ?(max_connections = 64) () : int =
