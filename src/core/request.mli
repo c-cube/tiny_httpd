@@ -107,7 +107,8 @@ val start_time : _ t -> float
 (** time stamp (from {!Unix.gettimeofday}) after parsing the first line of the request
       @since 0.11 *)
 
-val limit_body_size : max_size:int -> IO.Input.t t -> IO.Input.t t
+val limit_body_size :
+  max_size:int -> bytes:bytes -> IO.Input.t t -> IO.Input.t t
 (** Limit the body size to [max_size] bytes, or return
       a [413] error.
       @since 0.3

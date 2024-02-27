@@ -71,17 +71,17 @@ let read_stream_chunked_ ~bytes (bs : #IO.Input.t) : IO.Input.t =
   Log.debug (fun k -> k "body: start reading chunked stream...");
   IO.Input.read_chunked ~bytes ~fail:(fun s -> Bad_req (400, s)) bs
 
-let limit_body_size_ ~max_size (bs : #IO.Input.t) : IO.Input.t =
+let limit_body_size_ ~max_size ~bytes (bs : #IO.Input.t) : IO.Input.t =
   Log.debug (fun k -> k "limit size of body to max-size=%d" max_size);
-  IO.Input.limit_size_to ~max_size ~close_rec:false bs
+  IO.Input.limit_size_to ~max_size ~close_rec:false ~bytes bs
 
-let limit_body_size ~max_size (req : IO.Input.t t) : IO.Input.t t =
-  { req with body = limit_body_size_ ~max_size req.body }
+let limit_body_size ~max_size ~bytes (req : IO.Input.t t) : IO.Input.t t =
+  { req with body = limit_body_size_ ~max_size ~bytes req.body }
 
 (** read exactly [size] bytes from the stream *)
-let read_exactly ~size (bs : #IO.Input.t) : IO.Input.t =
+let read_exactly ~size ~bytes (bs : #IO.Input.t) : IO.Input.t =
   Log.debug (fun k -> k "body: must read exactly %d bytes" size);
-  IO.Input.reading_exactly bs ~close_rec:false ~size
+  IO.Input.reading_exactly bs ~close_rec:false ~bytes ~size
 
 (* parse request, but not body (yet) *)
 let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
@@ -151,23 +151,27 @@ let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
 let parse_body_ ~tr_stream ~bytes (req : IO.Input.t t) :
     IO.Input.t t resp_result =
   try
-    let size =
+    let size, has_size =
       match Headers.get_exn "Content-Length" req.headers |> int_of_string with
-      | n -> n (* body of fixed size *)
-      | exception Not_found -> 0
+      | n -> n, true (* body of fixed size *)
+      | exception Not_found -> 0, false
       | exception _ -> bad_reqf 400 "invalid content-length"
     in
     let body =
       match get_header ~f:String.trim req "Transfer-Encoding" with
-      | None -> read_exactly ~size @@ tr_stream req.body
+      | None -> read_exactly ~size ~bytes @@ tr_stream req.body
+      | Some "chunked" when has_size ->
+        bad_reqf 400 "specifying both transfer-encoding and content-length"
       | Some "chunked" ->
         (* body sent by chunks *)
         let bs : IO.Input.t =
           read_stream_chunked_ ~bytes @@ tr_stream req.body
         in
-        if size > 0 then
-          limit_body_size_ ~max_size:size bs
-        else
+        if size > 0 then (
+          (* TODO: ensure we recycle [bytes] when the new input is closed *)
+          let bytes = Bytes.create 4096 in
+          limit_body_size_ ~max_size:size ~bytes bs
+        ) else
           bs
       | Some s -> bad_reqf 500 "cannot handle transfer encoding: %s" s
     in

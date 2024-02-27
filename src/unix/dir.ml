@@ -253,9 +253,10 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
               (Printexc.to_string e)
         in
         let req =
-          Request.limit_body_size ~max_size:config.max_upload_size req
+          Request.limit_body_size ~bytes:(Bytes.create 4096)
+            ~max_size:config.max_upload_size req
         in
-        IO.Input.iter write req.Request.body;
+        IO.Input.iter write req.body;
         close ();
         Log.debug (fun k -> k "dir: done uploading file to %S" path);
         Response.make_raw ~code:201 "upload successful")

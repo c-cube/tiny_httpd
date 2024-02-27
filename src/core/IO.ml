@@ -235,7 +235,7 @@ module Input = struct
     Buf.clear buf;
     let continue = ref true in
     while !continue do
-      let slice = self#fill_buf () in
+      let slice = fill_buf self in
       if slice.len = 0 then
         continue := false
       else (
@@ -246,7 +246,7 @@ module Input = struct
     done;
     Buf.contents_and_clear buf
 
-  (** put [n] bytes from the input into bytes *)
+  (** Read [n] bytes from the input into [bytes]. *)
   let read_exactly_ ~too_short (self : #t) (bytes : bytes) (n : int) : unit =
     assert (Bytes.length bytes >= n);
     let offset = ref 0 in
@@ -295,49 +295,44 @@ module Input = struct
     | () -> Some (Buf.contents_and_clear buf)
     | exception End_of_file -> None
 
-  let reading_exactly_ ~skip_on_close ~close_rec ~size (arg : t) : t =
+  (* helper for making a new input stream that either contains at most [size]
+     bytes, or contains exactly [size] bytes. *)
+  let reading_exactly_ ~skip_on_close ~close_rec ~size ~bytes (arg : t) : t =
     let remaining_size = ref size in
 
     object
+      inherit t_from_refill ~bytes ()
+
       method close () =
         if !remaining_size > 0 && skip_on_close then skip arg !remaining_size;
         if close_rec then close arg
 
-      method fill_buf () =
-        if !remaining_size > 0 then
-          fill_buf arg
-        else
-          Slice.empty
-
-      method input bs i len =
+      method private refill (slice : Slice.t) =
+        slice.off <- 0;
+        slice.len <- 0;
         if !remaining_size > 0 then (
-          let slice = fill_buf arg in
-          let n = min len (min slice.len !remaining_size) in
-          Bytes.blit slice.bytes slice.off bs i n;
+          let sub = fill_buf arg in
+          let n =
+            min !remaining_size (min sub.len (Bytes.length slice.bytes))
+          in
+          Bytes.blit sub.bytes sub.off slice.bytes 0 n;
+          Slice.consume sub n;
           remaining_size := !remaining_size - n;
-          Slice.consume slice n;
-          n
-        ) else
-          0
-
-      method consume n =
-        if n > !remaining_size then
-          invalid_arg "reading_exactly: consuming too much";
-        remaining_size := !remaining_size - n;
-        consume arg n
+          slice.len <- n
+        )
     end
 
   (** new stream with maximum size [max_size].
    @param close_rec if true, closing this will also close the input stream *)
-  let limit_size_to ~close_rec ~max_size (arg : t) : t =
-    reading_exactly_ ~size:max_size ~skip_on_close:false ~close_rec arg
+  let limit_size_to ~close_rec ~max_size ~bytes (arg : t) : t =
+    reading_exactly_ ~size:max_size ~skip_on_close:false ~bytes ~close_rec arg
 
   (** New stream that consumes exactly [size] bytes from the input.
         If fewer bytes are read before [close] is called, we read and discard
         the remaining quota of bytes before [close] returns.
    @param close_rec if true, closing this will also close the input stream *)
-  let reading_exactly ~close_rec ~size (arg : t) : t =
-    reading_exactly_ ~size ~close_rec ~skip_on_close:true arg
+  let reading_exactly ~close_rec ~size ~bytes (arg : t) : t =
+    reading_exactly_ ~size ~close_rec ~skip_on_close:true ~bytes arg
 
   let read_chunked ~(bytes : bytes) ~fail (ic : #t) : t =
     let first = ref true in
