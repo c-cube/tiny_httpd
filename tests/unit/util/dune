@@ -2,4 +2,4 @@
 (library
   (name test_util)
   (modules test_util)
-  (libraries qcheck-core qcheck-core.runner))
+  (libraries logs qcheck-core qcheck-core.runner))

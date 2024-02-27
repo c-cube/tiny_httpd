@@ -19,10 +19,10 @@ let () =
   match r with
   | None -> failwith "should parse"
   | Some req ->
-    assert_eq (Some "coucou") (Headers.get "Host" req.Request.headers);
-    assert_eq (Some "coucou") (Headers.get "host" req.Request.headers);
-    assert_eq (Some "11") (Headers.get "content-length" req.Request.headers);
-    assert_eq "hello" req.Request.path;
+    assert_eq (Some "coucou") (Headers.get "Host" req.headers);
+    assert_eq (Some "coucou") (Headers.get "host" req.headers);
+    assert_eq (Some "11") (Headers.get "content-length" req.headers);
+    assert_eq "hello" req.path;
     let req = Request.Private_.parse_body req str |> Request.read_body_full in
-    assert_eq ~to_string:(fun s -> s) "salutations" req.Request.body;
+    assert_eq ~to_string:(fun s -> s) "salutations" req.body;
     ()
