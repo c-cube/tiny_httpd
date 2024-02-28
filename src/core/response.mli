@@ -99,10 +99,14 @@ val fail : ?headers:Headers.t -> code:int -> ('a, unit, string, t) format4 -> 'a
       Example: [fail ~code:404 "oh noes, %s not found" "waldo"].
   *)
 
+exception Bad_req of int * string
+(** Exception raised by {!fail_raise} with the HTTP code and body *)
+
 val fail_raise : code:int -> ('a, unit, string, 'b) format4 -> 'a
 (** Similar to {!fail} but raises an exception that exits the current handler.
-      This should not be used outside of a (path) handler.
-      Example: [fail_raise ~code:404 "oh noes, %s not found" "waldo"; never_executed()]
+    This should not be used outside of a (path) handler.
+    Example: [fail_raise ~code:404 "oh noes, %s not found" "waldo"; never_executed()]
+    @raise Bad_req always
   *)
 
 val pp : Format.formatter -> t -> unit

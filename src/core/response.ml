@@ -63,6 +63,8 @@ let make ?headers ?(code = 200) r : t =
 let fail ?headers ~code fmt =
   Printf.ksprintf (fun msg -> make_raw ?headers ~code msg) fmt
 
+exception Bad_req = Bad_req
+
 let fail_raise ~code fmt =
   Printf.ksprintf (fun msg -> raise (Bad_req (code, msg))) fmt
 
