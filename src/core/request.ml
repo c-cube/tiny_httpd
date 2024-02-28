@@ -88,6 +88,7 @@ let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
     unit t option resp_result =
   try
     let line = IO.Input.read_line_using ~buf bs in
+    Log.debug (fun k -> k "parse request line: %s" line);
     let start_time = get_time_s () in
     let meth, path, version =
       try
