@@ -78,7 +78,7 @@ module Unix_tcp_server_ = struct
           (* how to handle a single client *)
           let handle_client_unix_ (client_sock : Unix.file_descr)
               (client_addr : Unix.sockaddr) : unit =
-            Log.info (fun k ->
+            Log.debug (fun k ->
                 k "t[%d]: serving new client on %s"
                   (Thread.id @@ Thread.self ())
                   (Util.show_sockaddr client_addr));
@@ -117,7 +117,7 @@ module Unix_tcp_server_ = struct
               self.new_thread (fun () ->
                   try
                     handle_client_unix_ client_sock client_addr;
-                    Log.info (fun k ->
+                    Log.debug (fun k ->
                         k "t[%d]: done with client on %s, exiting"
                           (Thread.id @@ Thread.self ())
                         @@ Util.show_sockaddr client_addr);
