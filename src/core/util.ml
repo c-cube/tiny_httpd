@@ -76,6 +76,11 @@ let split_on_slash s : _ list =
   List.rev !l
 
 let parse_query s : (_ list, string) result =
+  let s =
+    match String.index_opt s '#' with
+    | Some i -> String.sub s (i + 1) (String.length s - i - 1)
+    | None -> s
+  in
   let pairs = ref [] in
   let is_sep_ = function
     | '&' | ';' -> true

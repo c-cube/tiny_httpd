@@ -30,6 +30,8 @@ let () = assert_eq [] (U.split_on_slash "//")
 let () =
   assert_eq ~cmp:eq_sorted (Ok [ "a", "b"; "c", "d" ]) (U.parse_query "a=b&c=d")
 
+let () = assert_eq (Ok [ "foo", "bar" ]) (U.parse_query "yolo#foo=bar")
+
 let () =
   add_qcheck
   @@ QCheck.Test.make ~long_factor:20 ~count:1_000
