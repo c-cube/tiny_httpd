@@ -312,9 +312,9 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
       let msgf k =
         let elapsed = B.get_time_s () -. req.start_time in
         k
-          ("response to=%s code=%d time=%.3fs path=%S" : _ format4)
+          ("response to=%s code=%d time=%.3fs meth=%s path=%S" : _ format4)
           (Util.show_sockaddr client_addr)
-          resp.code elapsed req.path
+          resp.code elapsed (Meth.to_string req.meth) req.path
       in
       if Response_code.is_success resp.code then
         Log.info msgf
