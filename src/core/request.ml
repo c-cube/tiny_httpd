@@ -52,19 +52,40 @@ let pp_query out q =
   Format.fprintf out "[%s]"
     (String.concat ";" @@ List.map (fun (a, b) -> Printf.sprintf "%S,%S" a b) q)
 
-let pp_ out self : unit =
+let pp_with ?(mask_header = fun _ -> false)
+    ?(headers_to_mask = [ "authorization"; "cookie" ]) ?(show_query = true)
+    ?(pp_body = fun out _ -> Format.pp_print_string out "?") () out self : unit
+    =
+  let pp_query out q =
+    if show_query then
+      pp_query out q
+    else
+      Format.fprintf out "<hidden>"
+  in
+
+  let headers_to_mask = List.rev_map String.lowercase_ascii headers_to_mask in
+  (* hide some headers *)
+  let headers =
+    List.map
+      (fun (k, v) ->
+        let hidden = List.mem k headers_to_mask || mask_header k in
+        if hidden then
+          k, "<hidden>"
+        else
+          k, v)
+      self.headers
+  in
   Format.fprintf out
-    "{@[meth=%s;@ host=%s;@ headers=[@[%a@]];@ path=%S;@ body=?;@ \
+    "{@[meth=%s;@ host=%s;@ headers=[@[%a@]];@ path=%S;@ body=%a;@ \
      path_components=%a;@ query=%a@]}"
-    (Meth.to_string self.meth) self.host Headers.pp self.headers self.path
-    pp_comp_ self.path_components pp_query self.query
+    (Meth.to_string self.meth) self.host Headers.pp headers self.path pp_body
+    self.body pp_comp_ self.path_components pp_query self.query
+
+let pp_ out self : unit = pp_with () out self
 
 let pp out self : unit =
-  Format.fprintf out
-    "{@[meth=%s;@ host=%s;@ headers=[@[%a@]];@ path=%S;@ body=%S;@ \
-     path_components=%a;@ query=%a@]}"
-    (Meth.to_string self.meth) self.host Headers.pp self.headers self.path
-    self.body pp_comp_ self.path_components pp_query self.query
+  let pp_body out b = Format.fprintf out "%S" b in
+  pp_with ~pp_body () out self
 
 (* decode a "chunked" stream into a normal stream *)
 let read_stream_chunked_ ~bytes (bs : #IO.Input.t) : IO.Input.t =

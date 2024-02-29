@@ -49,6 +49,27 @@ val get_meta_exn : _ t -> 'a Hmap.key -> 'a
     @raise Invalid_argument if not present
  @since NEXT_RELEASE *)
 
+val pp_with :
+  ?mask_header:(string -> bool) ->
+  ?headers_to_mask:string list ->
+  ?show_query:bool ->
+  ?pp_body:(Format.formatter -> 'body -> unit) ->
+  unit ->
+  Format.formatter ->
+  'body t ->
+  unit
+(** Pretty print the request. The exact format of this printing
+    is not specified.
+    @param mask_header function which is given each header name. If it
+      returns [true], the header's value is masked. The presence of
+      the header is still printed. Default [fun _ -> false].
+    @param headers_to_mask a list of headers masked by default.
+      Default is ["authorization"; "cookie"].
+    @show_query if [true] (default [true]), the query part of the
+      request is shown.
+    @param pp_body body printer (default prints "?" instead of the body,
+      which works even for stream bodies) *)
+
 val pp : Format.formatter -> string t -> unit
 (** Pretty print the request and its body. The exact format of this printing
       is not specified. *)
