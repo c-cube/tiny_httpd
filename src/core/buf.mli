@@ -11,6 +11,7 @@ type t
 val size : t -> int
 val clear : t -> unit
 val create : ?size:int -> unit -> t
+val of_bytes : bytes -> t
 val contents : t -> string
 
 val clear_and_zero : t -> unit

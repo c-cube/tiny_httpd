@@ -29,3 +29,7 @@ let add_qcheck f = qchecks := f :: !qchecks
 
 let run_qcheck_and_exit () : 'a =
   exit @@ QCheck_base_runner.run_tests ~colors:false !qchecks
+
+let setup_logs_debug () =
+  Logs.set_reporter @@ Logs.format_reporter ();
+  Logs.set_level ~all:true @@ Some Logs.Debug

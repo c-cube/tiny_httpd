@@ -2,7 +2,7 @@
   https://prometheus.io/docs/instrumenting/exposition_formats/#text-based-format
   *)
 
-open Common_
+open Common_p_
 
 let bpf = Printf.bprintf
 
@@ -175,9 +175,7 @@ end
 
 let global = Registry.create ()
 
-module H = Tiny_httpd
-
-let http_middleware (reg : Registry.t) : H.Middleware.t =
+let http_middleware (reg : Registry.t) : Server.Middleware.t =
   let c_req =
     Counter.create reg "tiny_httpd_requests" ~descr:"number of HTTP requests"
   in
@@ -189,11 +187,11 @@ let http_middleware (reg : Registry.t) : H.Middleware.t =
       ~buckets:[ 0.001; 0.01; 0.1; 0.5; 1.; 5.; 10. ]
   in
 
-  fun h : H.Middleware.handler ->
+  fun h : Server.Middleware.handler ->
     fun req ~resp : unit ->
      let start = Time_.now_us () in
      Counter.incr c_req;
-     h req ~resp:(fun (response : H.Response.t) ->
+     h req ~resp:(fun (response : Response.t) ->
          let code = response.code in
 
          let elapsed_us = Time_.now_us () -. start in
@@ -203,13 +201,14 @@ let http_middleware (reg : Registry.t) : H.Middleware.t =
          if code < 200 || code >= 400 then Counter.incr c_err;
          resp response)
 
-let add_route_to_server (server : H.t) (reg : registry) : unit =
-  H.add_route_handler server H.Route.(exact "metrics" @/ return) @@ fun _req ->
+let add_route_to_server (server : Server.t) (reg : registry) : unit =
+  Server.add_route_handler server Route.(exact "metrics" @/ return)
+  @@ fun _req ->
   let str = Registry.emit_str reg in
-  H.Response.make_string @@ Ok str
+  Response.make_string @@ Ok str
 
-let instrument_server (server : H.t) reg : unit =
-  H.add_middleware ~stage:(`Stage 1) server (http_middleware reg);
+let instrument_server (server : Server.t) reg : unit =
+  Server.add_middleware ~stage:(`Stage 1) server (http_middleware reg);
   add_route_to_server server reg
 
 module GC_metrics = struct

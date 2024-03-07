@@ -1,3 +1,4 @@
+(*
 module Buf = Tiny_httpd_buf
 module IO = Tiny_httpd_io
 
@@ -184,36 +185,6 @@ let read_line_into (self : t) ~buf : unit =
     )
   done
 
-(* new stream with maximum size [max_size].
-   @param close_rec if true, closing this will also close the input stream
-   @param too_big called with read size if the max size is reached *)
-let limit_size_to ~close_rec ~max_size ~too_big (arg : t) : t =
-  let size = ref 0 in
-  let continue = ref true in
-  make ~bs:Bytes.empty
-    ~close:(fun _ -> if close_rec then arg.close ())
-    ~fill:(fun res ->
-      if res.len = 0 && !continue then (
-        arg.fill_buf ();
-        res.bs <- arg.bs;
-        res.off <- arg.off;
-        res.len <- arg.len
-      ) else (
-        arg.bs <- Bytes.empty;
-        arg.off <- 0;
-        arg.len <- 0
-      ))
-    ~consume:(fun res n ->
-      size := !size + n;
-      if !size > max_size then (
-        continue := false;
-        too_big !size
-      ) else (
-        arg.consume n;
-        res.off <- res.off + n;
-        res.len <- res.len - n
-      ))
-    ()
 
 (* read exactly [size] bytes from the stream *)
 let read_exactly ~close_rec ~size ~too_short (arg : t) : t =
@@ -320,3 +291,4 @@ let output_chunked' ?buf (oc : IO.Output.t) (self : t) : unit =
 (* print a stream as a series of chunks *)
 let output_chunked ?buf (oc : out_channel) (self : t) : unit =
   output_chunked' ?buf (IO.Output.of_out_channel oc) self
+  *)

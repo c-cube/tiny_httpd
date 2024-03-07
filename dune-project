@@ -21,6 +21,8 @@
     seq
     base-threads
     result
+    hmap
+    (iostream (>= 0.2))
     (ocaml (>= 4.08))
     (odoc :with-doc)
     (logs :with-test)
@@ -34,5 +36,6 @@
   (depends
     (tiny_httpd (= :version))
     (camlzip (>= 1.06))
+    iostream-camlzip
     (logs :with-test)
     (odoc :with-doc)))

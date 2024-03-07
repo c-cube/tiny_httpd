@@ -6,9 +6,7 @@
     @since 0.12
 *)
 
-module IO = Tiny_httpd_io
-
-include Tiny_httpd_html_
+include Html_
 (** @inline *)
 
 (** Write an HTML element to this output.
@@ -16,7 +14,7 @@ include Tiny_httpd_html_
     be a "html" tag.
     @since 0.14
     *)
-let to_output ?(top = false) (self : elt) (out : IO.Output.t) : unit =
+let to_output ?(top = false) (self : elt) (out : #IO.Output.t) : unit =
   let out = Out.create_of_out out in
   if top then Out.add_string out "<!DOCTYPE html>\n";
   self out;
@@ -56,10 +54,10 @@ let to_out_channel_top = to_output ~top:true
     @param top if true, add a DOCTYPE. See {!to_out_channel}.
     @since 0.14 *)
 let to_writer ?top (self : elt) : IO.Writer.t =
-  let write oc = to_output ?top self oc in
+  let write (oc : #IO.Output.t) = to_output ?top self oc in
   IO.Writer.make ~write ()
 
 (** Convert a HTML element to a stream. This might just convert
     it to a string first, do not assume it to be more efficient. *)
-let to_stream (self : elt) : Tiny_httpd_stream.t =
-  Tiny_httpd_stream.of_string @@ to_string self
+let[@inline] to_stream (self : elt) : IO.Input.t =
+  IO.Input.of_string @@ to_string self

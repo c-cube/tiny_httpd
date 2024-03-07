@@ -76,6 +76,12 @@ let split_on_slash s : _ list =
   List.rev !l
 
 let parse_query s : (_ list, string) result =
+  let s =
+    (* skip hash if present *)
+    match String.index_opt s '#' with
+    | Some i -> String.sub s (i + 1) (String.length s - i - 1)
+    | None -> s
+  in
   let pairs = ref [] in
   let is_sep_ = function
     | '&' | ';' -> true
@@ -119,3 +125,5 @@ let show_sockaddr = function
   | Unix.ADDR_UNIX f -> f
   | Unix.ADDR_INET (inet, port) ->
     Printf.sprintf "%s:%d" (Unix.string_of_inet_addr inet) port
+
+let is_ipv6_str addr : bool = String.contains addr ':'

@@ -38,3 +38,7 @@ val parse_query : string -> ((string * string) list, string) result
 val show_sockaddr : Unix.sockaddr -> string
 (** Simple printer for socket addresses.
     @since NEXT_RELEASE *)
+
+val is_ipv6_str : string -> bool
+(** Is this string potentially an IPV6 address?
+    @since NEXT_RELEASE *)

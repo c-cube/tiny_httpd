@@ -1,4 +1,4 @@
-module A = Tiny_httpd_atomic_
+module A = Atomic_
 
 type 'a list_ = Nil | Cons of int * 'a * 'a list_
 

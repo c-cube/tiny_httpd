@@ -64,7 +64,7 @@ val close : t -> unit
 val empty : t
 (** Stream with 0 bytes inside *)
 
-val of_input : ?buf_size:int -> Tiny_httpd_io.Input.t -> t
+val of_input : ?buf_size:int -> Io.Input.t -> t
 (** Make a buffered stream from the given channel.
     @since 0.14 *)
 

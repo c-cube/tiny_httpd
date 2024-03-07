@@ -1,6 +1,6 @@
 module S = Tiny_httpd
-module U = Tiny_httpd_util
-module D = Tiny_httpd_dir
+module U = Tiny_httpd.Util
+module D = Tiny_httpd.Dir
 module Pf = Printf
 module Log = Tiny_httpd.Log
 

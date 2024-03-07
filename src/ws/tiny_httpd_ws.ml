@@ -1,7 +1,4 @@
-open Common_
-open Tiny_httpd_server
-module Log = Tiny_httpd_log
-module IO = Tiny_httpd_io
+open Common_ws_
 
 type handler = Unix.sockaddr -> IO.Input.t -> IO.Output.t -> unit
 
@@ -382,21 +379,23 @@ let upgrade ic oc : _ * _ =
   let writer = Writer.create ~oc () in
   let reader = Reader.create ~ic ~writer () in
   let ws_ic : IO.Input.t =
-    {
-      input = (fun buf i len -> Reader.read reader buf i len);
-      close = (fun () -> Reader.close reader);
-    }
+    object
+      inherit IO.Input.t_from_refill ~bytes:(Bytes.create 4_096) ()
+
+      method private refill (slice : IO.Slice.t) =
+        slice.off <- 0;
+        slice.len <- Reader.read reader slice.bytes 0 (Bytes.length slice.bytes)
+
+      method close () = Reader.close reader
+    end
   in
   let ws_oc : IO.Output.t =
-    {
-      flush =
-        (fun () ->
-          Writer.flush writer;
-          IO.Output.flush oc);
-      output_char = Writer.output_char writer;
-      output = Writer.output writer;
-      close = (fun () -> Writer.close writer);
-    }
+    object
+      method close () = Writer.close writer
+      method flush () = Writer.flush writer
+      method output bs i len = Writer.output writer bs i len
+      method output_char c = Writer.output_char writer c
+    end
   in
   ws_ic, ws_oc
 
@@ -404,7 +403,7 @@ let upgrade ic oc : _ * _ =
 module Make_upgrade_handler (X : sig
   val accept_ws_protocol : string -> bool
   val handler : handler
-end) : UPGRADE_HANDLER = struct
+end) : Server.UPGRADE_HANDLER = struct
   type handshake_state = unit
 
   let name = "websocket"
@@ -454,10 +453,10 @@ end) : UPGRADE_HANDLER = struct
 end
 
 let add_route_handler ?accept ?(accept_ws_protocol = fun _ -> true)
-    (server : Tiny_httpd_server.t) route (f : handler) : unit =
+    (server : Server.t) route (f : handler) : unit =
   let module M = Make_upgrade_handler (struct
     let handler = f
     let accept_ws_protocol = accept_ws_protocol
   end) in
-  let up : upgrade_handler = (module M) in
-  Tiny_httpd_server.add_upgrade_handler ?accept server route up
+  let up : Server.upgrade_handler = (module M) in
+  Server.add_upgrade_handler ?accept server route up

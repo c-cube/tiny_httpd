@@ -1,7 +1,8 @@
 module H = Tiny_httpd
+open Tiny_httpd_core
 
 let serve_zeroes server : unit =
-  H.add_route_handler server H.(Route.(exact "zeroes" @/ int @/ return))
+  Server.add_route_handler server Route.(exact "zeroes" @/ int @/ return)
   @@ fun n _req ->
   (* stream [n] zeroes *)
   let write (oc : H.IO.Output.t) : unit =
@@ -11,7 +12,7 @@ let serve_zeroes server : unit =
     done
   in
   let writer = H.IO.Writer.make ~write () in
-  H.Response.make_writer @@ Ok writer
+  Response.make_writer @@ Ok writer
 
 let serve_file server : unit =
   H.add_route_handler server H.(Route.(exact "file" @/ string @/ return))
@@ -32,9 +33,9 @@ let serve_file server : unit =
     in
 
     let writer = H.IO.Writer.make ~write () in
-    H.Response.make_writer @@ Ok writer
+    Response.make_writer @@ Ok writer
   ) else
-    H.Response.fail ~code:404 "file not found"
+    Response.fail ~code:404 "file not found"
 
 let () =
   let port = ref 8085 in
@@ -43,7 +44,7 @@ let () =
   Printf.printf "listen on http://localhost:%d/\n%!" !port;
   serve_file server;
   serve_zeroes server;
-  H.add_route_handler server H.Route.return (fun _req ->
+  H.add_route_handler server Route.return (fun _req ->
       let body =
         H.Html.(
           div []
@@ -58,5 +59,5 @@ let () =
             ])
         |> H.Html.to_string_top
       in
-      H.Response.make_string @@ Ok body);
+      Response.make_string @@ Ok body);
   H.run_exn server
