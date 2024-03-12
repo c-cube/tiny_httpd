@@ -136,6 +136,7 @@ module Writer = struct
     write_header_ self;
 
     IO.Output.output self.oc self.buf 0 self.offset;
+    IO.Output.flush self.oc;
     self.offset <- 0
 
   let flush_ (self : t) =
