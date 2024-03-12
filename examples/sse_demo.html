@@ -1,0 +1,21 @@
+
+<!-- to be used with sse_server -p 8087 -->
+
+<html>
+<head>
+  <script src="https://unpkg.com/htmx.org@1.7.0"></script>
+
+  <script>
+    htmx.createEventSource = (url) => {
+		return new EventSource(url, {withCredentials:false});
+	}
+
+  </script>
+
+</head>
+<body hx-trigger="onload" hx-sse="connect:http://localhost:8087/clock">
+  <p>time:</p>
+  <div hx-sse="swap:tick" hx-swap="innerHtml"> </div>
+  <!-- <div hx-trigger="sse:tick" hx-get="/news"></div> -->
+</body>
+</html>

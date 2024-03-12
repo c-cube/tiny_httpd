@@ -1,0 +1,25 @@
+<!-- to be used with echo_ws -p 8085 -->
+<html>
+
+<head>
+  <script>
+
+    console.log('hello')
+
+    const ws = new WebSocket('ws://localhost:8085/echo');
+    ws.onmessage = (msg) => console.log(`received: ${msg}`);
+
+    let count = 0;
+    setInterval(() => {
+      const msg = `hello ${count++}`;
+      console.log(`send ${msg}`);
+      ws.send(msg);
+    }, 2000);
+  </script>
+</head>
+
+<body>
+  open console!
+</body>
+
+</html>
