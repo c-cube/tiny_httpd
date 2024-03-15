@@ -1,7 +1,5 @@
 module W = IO.Writer
 
-(* TODO: just use iostream-camlzip? *)
-
 let decode_deflate_stream_ ~buf_size (ic : IO.Input.t) : IO.Input.t =
   Log.debug (fun k -> k "wrap stream with deflate.decode");
   Iostream_camlzip.decompress_in_buf ~buf_size ic
@@ -12,7 +10,9 @@ let encode_deflate_writer_ ~buf_size (w : W.t) : W.t =
   let { IO.Writer.write } = w in
   let write' (oc : IO.Output.t) =
     let oc' = Iostream_camlzip.compressed_out ~buf_size ~level:4 oc in
-    write (oc' :> IO.Output.t)
+    write (oc' :> IO.Output.t);
+    IO.Output.flush oc';
+    IO.Output.close oc'
   in
   IO.Writer.make ~write:write' ()
 
