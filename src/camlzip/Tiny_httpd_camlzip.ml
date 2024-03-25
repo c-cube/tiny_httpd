@@ -12,7 +12,8 @@ let encode_deflate_writer_ ~buf_size (w : W.t) : W.t =
     let oc' = Iostream_camlzip.compressed_out ~buf_size ~level:4 oc in
     write (oc' :> IO.Output.t);
     IO.Output.flush oc';
-    IO.Output.close oc'
+    IO.Output.close oc';
+    IO.Output.flush oc
   in
   IO.Writer.make ~write:write' ()
 
