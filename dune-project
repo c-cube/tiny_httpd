@@ -36,6 +36,6 @@
   (depends
     (tiny_httpd (= :version))
     (camlzip (>= 1.06))
-    iostream-camlzip
+    (iostream-camlzip (>= 0.2.1))
     (logs :with-test)
     (odoc :with-doc)))
