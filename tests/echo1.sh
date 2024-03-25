@@ -15,6 +15,9 @@ sleep 0.1
 curl -N "http://localhost:${PORT}/vfs/a.txt" --max-time 5
 
 sleep 0.1
+curl -N "http://localhost:${PORT}/vfs/a.txt" -H 'accept-encoding: deflate' --max-time 5 | base64
+
+sleep 0.1
 curl -N "http://localhost:${PORT}/vfs/sub/yolo.html" --max-time 5
 
 kill $PID
