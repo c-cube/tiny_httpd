@@ -29,4 +29,4 @@ let descr = function
   | 503 -> "Service unavailable"
   | n -> "Unknown response code " ^ string_of_int n (* TODO *)
 
-let[@inline] is_success n = n >= 200 && n < 400
+let[@inline] is_success n = n < 400
