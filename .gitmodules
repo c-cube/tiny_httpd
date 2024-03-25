@@ -1,3 +1,0 @@
-[submodule "vendor/iostream"]
-	path = vendor/iostream
-	url = https://github.com/c-cube/ocaml-iostream
