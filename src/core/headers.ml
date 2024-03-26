@@ -52,7 +52,6 @@ let parse_ ~(buf : Buf.t) (bs : IO.Input.t) : t =
     | None -> raise End_of_file
     | Some "\r" -> acc
     | Some line ->
-      Log.debug (fun k -> k "parsed header line %S" line);
       let k, v =
         try
           let i = String.index line ':' in
