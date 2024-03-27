@@ -4,6 +4,9 @@
   (public_name tiny_httpd.core)
   (private_modules parse_ common_)
   (libraries threads seq hmap iostream
+             (select time.ml from
+              (mtime mtime.clock.os -> time.mtime.ml)
+              (unix -> time.default.ml))
              (select log.ml from
               (logs -> log.logs.ml)
               (-> log.default.ml))))
