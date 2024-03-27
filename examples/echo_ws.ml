@@ -28,7 +28,7 @@ let handle_ws _client_addr ic oc =
   let buf = Bytes.create 32 in
   let continue = ref true in
   while !continue do
-    let n = IO.Input.input ic buf 0 (Bytes.length buf) in
+    let n = IO.Input_with_timeout.input ic buf 0 (Bytes.length buf) in
     Log.debug (fun k ->
         k "echo %d bytes from websocket: %S" n (Bytes.sub_string buf 0 n));
 

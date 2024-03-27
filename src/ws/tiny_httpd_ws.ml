@@ -1,6 +1,6 @@
 open Common_ws_
 
-type handler = Unix.sockaddr -> IO.Input.t -> IO.Output.t -> unit
+type handler = Unix.sockaddr -> IO.Input_with_timeout.t -> IO.Output.t -> unit
 
 module Frame_type = struct
   type t = int
@@ -196,7 +196,7 @@ module Reader = struct
     | Close
 
   type t = {
-    ic: IO.Input.t;
+    ic: IO.Input_with_timeout.t;
     writer: Writer.t;  (** Writer, to send "pong" *)
     header_buf: bytes;  (** small buffer to read frame headers *)
     small_buf: bytes;  (** Used for control frames *)
@@ -220,52 +220,65 @@ module Reader = struct
   let max_fragment_size = 1 lsl 30
 
   (** Read next frame header into [self.header] *)
-  let read_frame_header (self : t) : unit =
-    (* read header *)
-    IO.Input.really_input self.ic self.header_buf 0 2;
+  let read_frame_header (self : t) ~deadline : unit =
+    try
+      (* read header *)
+      IO.Input_with_timeout.really_input self.ic ~deadline self.header_buf 0 2;
 
-    let b0 = Bytes.unsafe_get self.header_buf 0 |> Char.code in
-    let b1 = Bytes.unsafe_get self.header_buf 1 |> Char.code in
+      let b0 = Bytes.unsafe_get self.header_buf 0 |> Char.code in
+      let b1 = Bytes.unsafe_get self.header_buf 1 |> Char.code in
 
-    self.header.fin <- b0 land 1 == 1;
-    let ext = (b0 lsr 4) land 0b0111 in
-    if ext <> 0 then (
-      Log.error (fun k -> k "websocket: unknown extension %d, closing" ext);
+      self.header.fin <- b0 land 1 == 1;
+      let ext = (b0 lsr 4) land 0b0111 in
+      if ext <> 0 then (
+        Log.error (fun k -> k "websocket: unknown extension %d, closing" ext);
+        raise Close_connection
+      );
+
+      self.header.ty <- b0 land 0b0000_1111;
+      self.header.mask <- b1 land 0b1000_0000 != 0;
+
+      let payload_len : int =
+        let len = b1 land 0b0111_1111 in
+        if len = 126 then (
+          IO.Input_with_timeout.really_input self.ic ~deadline self.header_buf 0
+            2;
+          Bytes.get_int16_be self.header_buf 0
+        ) else if len = 127 then (
+          IO.Input_with_timeout.really_input self.ic ~deadline self.header_buf 0
+            8;
+          let len64 = Bytes.get_int64_be self.header_buf 0 in
+          if compare len64 (Int64.of_int max_fragment_size) > 0 then (
+            Log.error (fun k ->
+                k "websocket: maximum frame fragment exceeded (%Ld > %d)" len64
+                  max_fragment_size);
+            raise Close_connection
+          );
+
+          Int64.to_int len64
+        ) else
+          len
+      in
+      self.header.payload_len <- payload_len;
+
+      if self.header.mask then
+        IO.Input_with_timeout.really_input self.ic ~deadline
+          self.header.mask_key 0 4;
+
+      (*Log.debug (fun k ->
+          k "websocket: read frame header type=%s payload_len=%d mask=%b"
+            (Frame_type.show self.header.ty)
+            self.header.payload_len self.header.mask);*)
+      ()
+    with
+    | IO.Input_with_timeout.Timeout_partial_read _
+    | IO.Input_with_timeout.Timeout
+    ->
+      (* NOTE: this is not optimal but it's the easiest solution, for now,
+         to the problem of a partially read frame header with
+         a timeout in the middle (we would have to save *)
+      Log.error (fun k -> k "websocket: timeout while reading frame header");
       raise Close_connection
-    );
-
-    self.header.ty <- b0 land 0b0000_1111;
-    self.header.mask <- b1 land 0b1000_0000 != 0;
-
-    let payload_len : int =
-      let len = b1 land 0b0111_1111 in
-      if len = 126 then (
-        IO.Input.really_input self.ic self.header_buf 0 2;
-        Bytes.get_int16_be self.header_buf 0
-      ) else if len = 127 then (
-        IO.Input.really_input self.ic self.header_buf 0 8;
-        let len64 = Bytes.get_int64_be self.header_buf 0 in
-        if compare len64 (Int64.of_int max_fragment_size) > 0 then (
-          Log.error (fun k ->
-              k "websocket: maximum frame fragment exceeded (%Ld > %d)" len64
-                max_fragment_size);
-          raise Close_connection
-        );
-
-        Int64.to_int len64
-      ) else
-        len
-    in
-    self.header.payload_len <- payload_len;
-
-    if self.header.mask then
-      IO.Input.really_input self.ic self.header.mask_key 0 4;
-
-    (*Log.debug (fun k ->
-        k "websocket: read frame header type=%s payload_len=%d mask=%b"
-          (Frame_type.show self.header.ty)
-          self.header.payload_len self.header.mask);*)
-    ()
 
   external apply_masking_ : bytes -> bytes -> int -> int -> unit
     = "tiny_httpd_ws_apply_masking"
@@ -276,30 +289,45 @@ module Reader = struct
     assert (off >= 0 && off + len <= Bytes.length buf);
     apply_masking_ mask_key buf off len
 
-  let read_body_to_string (self : t) : string =
+  let read_body_to_string (self : t) ~deadline : string =
     let len = self.header.payload_len in
     let buf = Bytes.create len in
-    IO.Input.really_input self.ic buf 0 len;
+    (try IO.Input_with_timeout.really_input self.ic ~deadline buf 0 len
+     with
+     | IO.Input_with_timeout.Timeout_partial_read _
+     | IO.Input_with_timeout.Timeout
+     ->
+       raise Close_connection);
     if self.header.mask then
       apply_masking ~mask_key:self.header.mask_key buf 0 len;
     Bytes.unsafe_to_string buf
 
   (** Skip bytes of the body *)
-  let skip_body (self : t) : unit =
+  let skip_body (self : t) ~deadline : unit =
     let len = ref self.header.payload_len in
     while !len > 0 do
       let n = min !len (Bytes.length self.small_buf) in
-      IO.Input.really_input self.ic self.small_buf 0 n;
+      (try
+         IO.Input_with_timeout.really_input self.ic ~deadline self.small_buf 0 n
+       with
+       | IO.Input_with_timeout.Timeout_partial_read _
+       | IO.Input_with_timeout.Timeout
+       ->
+         raise Close_connection);
       len := !len - n
     done
 
   (** State machine that reads [len] bytes into [buf] *)
-  let rec read_rec (self : t) buf i len : int =
+  let rec read_rec (self : t) ~deadline buf i len : int =
     match self.state with
     | Close -> 0
     | Reading_frame r ->
       let len = min len r.remaining_bytes in
-      let n = IO.Input.input self.ic buf i len in
+      let timeout = Time.now_s () -. deadline in
+      if timeout <= 0. then raise IO.Input_with_timeout.Timeout;
+      let n =
+        IO.Input_with_timeout.input_with_timeout self.ic timeout buf i len
+      in
 
       (* update state *)
       r.remaining_bytes <- r.remaining_bytes - n;
@@ -313,7 +341,7 @@ module Reader = struct
       );
       n
     | Begin ->
-      read_frame_header self;
+      read_frame_header self ~deadline;
       (*Log.debug (fun k ->
           k "websocket: read frame of type=%s payload_len=%d"
             (Frame_type.show self.header.ty)
@@ -330,19 +358,19 @@ module Reader = struct
                 (Frame_type.show self.last_ty));
           raise Close_connection
         );
-        read_rec self buf i len
+        read_rec self ~deadline buf i len
       | 1 ->
         self.state <-
           Reading_frame { remaining_bytes = self.header.payload_len };
-        read_rec self buf i len
+        read_rec self ~deadline buf i len
       | 2 ->
         self.state <-
           Reading_frame { remaining_bytes = self.header.payload_len };
-        read_rec self buf i len
+        read_rec self ~deadline buf i len
       | 8 ->
         (* close frame *)
         self.state <- Close;
-        let body = read_body_to_string self in
+        let body = read_body_to_string self ~deadline in
         if String.length body >= 2 then (
           let errcode = Bytes.get_int16_be (Bytes.unsafe_of_string body) 0 in
           Log.info (fun k ->
@@ -352,19 +380,19 @@ module Reader = struct
         0
       | 9 ->
         (* pong, just ignore *)
-        skip_body self;
+        skip_body self ~deadline;
         Writer.send_pong self.writer;
-        read_rec self buf i len
+        read_rec self ~deadline buf i len
       | 10 ->
         (* pong, just ignore *)
-        skip_body self;
-        read_rec self buf i len
+        skip_body self ~deadline;
+        read_rec self ~deadline buf i len
       | ty ->
         Log.error (fun k -> k "unknown frame type: %xd" ty);
         raise Close_connection)
 
-  let read self buf i len =
-    try read_rec self buf i len
+  let read self ~deadline buf i len =
+    try read_rec self ~deadline buf i len
     with Close_connection ->
       self.state <- Close;
       0
@@ -376,16 +404,26 @@ module Reader = struct
     )
 end
 
-let upgrade ic oc : _ * _ =
+(* 30 min *)
+let default_timeout_s = 60. *. 30.
+
+let upgrade ?(timeout_s = default_timeout_s) ic oc : _ * _ =
   let writer = Writer.create ~oc () in
   let reader = Reader.create ~ic ~writer () in
-  let ws_ic : IO.Input.t =
-    object
-      inherit IO.Input.t_from_refill ~bytes:(Bytes.create 4_096) ()
+  let ws_ic : IO.Input_with_timeout.t =
+    object (self)
+      inherit
+        IO.Input_with_timeout.t_with_timeout_from_refill
+          ~bytes:(Bytes.create 4_096) () as super
 
-      method private refill (slice : IO.Slice.t) =
+      method private refill_with_timeout t (slice : IO.Slice.t) =
+        let deadline = Time.now_s () +. t in
         slice.off <- 0;
-        slice.len <- Reader.read reader slice.bytes 0 (Bytes.length slice.bytes)
+        slice.len <-
+          Reader.read reader ~deadline slice.bytes 0 (Bytes.length slice.bytes)
+
+      method! fill_buf () =
+        IO.Input_with_timeout.fill_buf_with_timeout self timeout_s
 
       method close () = Reader.close reader
     end
@@ -404,6 +442,7 @@ let upgrade ic oc : _ * _ =
 module Make_upgrade_handler (X : sig
   val accept_ws_protocol : string -> bool
   val handler : handler
+  val timeout_s : float
 end) : Server.UPGRADE_HANDLER = struct
   type handshake_state = unit
 
@@ -446,7 +485,7 @@ end) : Server.UPGRADE_HANDLER = struct
     try Ok (handshake_ req) with Bad_req s -> Error s
 
   let handle_connection addr () ic oc =
-    let ws_ic, ws_oc = upgrade ic oc in
+    let ws_ic, ws_oc = upgrade ~timeout_s:X.timeout_s ic oc in
     try X.handler addr ws_ic ws_oc
     with Close_connection ->
       Log.debug (fun k -> k "websocket: requested to close the connection");
@@ -454,10 +493,12 @@ end) : Server.UPGRADE_HANDLER = struct
 end
 
 let add_route_handler ?accept ?(accept_ws_protocol = fun _ -> true)
-    (server : Server.t) route (f : handler) : unit =
+    ?(timeout_s = default_timeout_s) (server : Server.t) route (f : handler) :
+    unit =
   let module M = Make_upgrade_handler (struct
     let handler = f
     let accept_ws_protocol = accept_ws_protocol
+    let timeout_s = timeout_s
   end) in
   let up : Server.upgrade_handler = (module M) in
   Server.add_upgrade_handler ?accept server route up

@@ -17,7 +17,8 @@
 *)
 
 module Middleware : sig
-  type handler = IO.Input.t Request.t -> resp:(Response.t -> unit) -> unit
+  type handler =
+    IO.Input_with_timeout.t Request.t -> resp:(Response.t -> unit) -> unit
   (** Handlers are functions returning a response to a request.
       The response can be delayed, hence the use of a continuation
       as the [resp] parameter. *)
@@ -52,9 +53,6 @@ module type IO_BACKEND = sig
   val init_port : unit -> int
   (** Initial port *)
 
-  val get_time_s : unit -> float
-  (** Obtain the current timestamp in seconds. *)
-
   val tcp_server : unit -> IO.TCP_server.builder
   (** TCP server builder, to create servers that can listen
       on a port and handle clients. *)
@@ -63,6 +61,7 @@ end
 val create_from :
   ?buf_size:int ->
   ?middlewares:([ `Encoding | `Stage of int ] * Middleware.t) list ->
+  ?request_timeout_s:float ->
   backend:(module IO_BACKEND) ->
   unit ->
   t
@@ -74,6 +73,7 @@ val create_from :
 
     @param buf_size size for buffers (since 0.11)
     @param middlewares see {!add_middleware} for more details.
+    @param request_timeout_s default timeout for requests (headers+body) (since NEXT_RELEASE)
 
     @since 0.14
 *)
@@ -95,7 +95,8 @@ val active_connections : t -> int
 
 val add_decode_request_cb :
   t ->
-  (unit Request.t -> (unit Request.t * (IO.Input.t -> IO.Input.t)) option) ->
+  (unit Request.t ->
+  (unit Request.t * (IO.Input_with_timeout.t -> IO.Input_with_timeout.t)) option) ->
   unit
   [@@deprecated "use add_middleware"]
 (** Add a callback for every request.
@@ -130,7 +131,8 @@ val add_middleware :
 
 (** {2 Request handlers} *)
 
-val set_top_handler : t -> (IO.Input.t Request.t -> Response.t) -> unit
+val set_top_handler :
+  t -> (IO.Input_with_timeout.t Request.t -> Response.t) -> unit
 (** Setup a handler called by default.
 
     This handler is called with any request not accepted by any handler
@@ -174,7 +176,7 @@ val add_route_handler_stream :
   ?middlewares:Middleware.t list ->
   ?meth:Meth.t ->
   t ->
-  ('a, IO.Input.t Request.t -> Response.t) Route.t ->
+  ('a, IO.Input_with_timeout.t Request.t -> Response.t) Route.t ->
   'a ->
   unit
 (** Similar to {!add_route_handler}, but where the body of the request
@@ -257,7 +259,11 @@ module type UPGRADE_HANDLER = sig
       The connection is closed without further ado. *)
 
   val handle_connection :
-    Unix.sockaddr -> handshake_state -> IO.Input.t -> IO.Output.t -> unit
+    Unix.sockaddr ->
+    handshake_state ->
+    IO.Input_with_timeout.t ->
+    IO.Output.t ->
+    unit
   (** Take control of the connection and take it from ther.e *)
 end
 

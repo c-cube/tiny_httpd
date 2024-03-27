@@ -129,17 +129,26 @@ val start_time : _ t -> float
       @since 0.11 *)
 
 val limit_body_size :
-  max_size:int -> bytes:bytes -> IO.Input.t t -> IO.Input.t t
+  max_size:int ->
+  bytes:bytes ->
+  #IO.Input_with_timeout.t t ->
+  IO.Input_with_timeout.t t
 (** Limit the body size to [max_size] bytes, or return
       a [413] error.
       @since 0.3
   *)
 
-val read_body_full : ?bytes:bytes -> ?buf_size:int -> IO.Input.t t -> string t
+val read_body_full :
+  ?bytes:bytes ->
+  ?buf_size:int ->
+  deadline:float ->
+  #IO.Input_with_timeout.t t ->
+  string t
 (** Read the whole body into a string. Potentially blocking.
 
     @param buf_size initial size of underlying buffer (since 0.11)
     @param bytes the initial buffer (since 0.14)
+    @param deadline time after which this should fail with [Timeout] (since NEXT_RELEASE)
     *)
 
 (**/**)
@@ -148,20 +157,26 @@ val read_body_full : ?bytes:bytes -> ?buf_size:int -> IO.Input.t t -> string t
 module Private_ : sig
   val parse_req_start :
     client_addr:Unix.sockaddr ->
-    get_time_s:(unit -> float) ->
+    deadline:float ->
     buf:Buf.t ->
-    IO.Input.t ->
+    IO.Input_with_timeout.t ->
     unit t option resp_result
 
   val parse_req_start_exn :
     ?buf:Buf.t ->
     client_addr:Unix.sockaddr ->
-    get_time_s:(unit -> float) ->
-    IO.Input.t ->
+    deadline:float ->
+    #IO.Input_with_timeout.t ->
     unit t option
 
   val close_after_req : _ t -> bool
-  val parse_body : ?bytes:bytes -> unit t -> IO.Input.t -> IO.Input.t t
+
+  val parse_body :
+    ?bytes:bytes ->
+    unit t ->
+    #IO.Input_with_timeout.t ->
+    IO.Input_with_timeout.t t
+
   val set_body : 'a -> _ t -> 'a t
 end
 

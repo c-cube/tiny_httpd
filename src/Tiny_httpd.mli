@@ -85,6 +85,10 @@ module Buf = Buf
 
 module IO = Tiny_httpd_core.IO
 
+(** {2 Time} *)
+
+module Time = Time
+
 (** {2 Logging *)
 
 module Log = Tiny_httpd_core.Log

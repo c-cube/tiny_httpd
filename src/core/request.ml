@@ -88,29 +88,33 @@ let pp out self : unit =
   pp_with ~pp_body () out self
 
 (* decode a "chunked" stream into a normal stream *)
-let read_stream_chunked_ ~bytes (bs : #IO.Input.t) : IO.Input.t =
+let read_stream_chunked_ ~bytes (bs : #IO.Input_with_timeout.t) :
+    IO.Input_with_timeout.t =
   Log.debug (fun k -> k "body: start reading chunked stream...");
-  IO.Input.read_chunked ~bytes ~fail:(fun s -> Bad_req (400, s)) bs
+  IO.Input_with_timeout.read_chunked ~bytes ~fail:(fun s -> Bad_req (400, s)) bs
 
-let limit_body_size_ ~max_size ~bytes (bs : #IO.Input.t) : IO.Input.t =
+let limit_body_size_ ~max_size ~bytes (bs : #IO.Input_with_timeout.t) :
+    IO.Input_with_timeout.t =
   Log.debug (fun k -> k "limit size of body to max-size=%d" max_size);
-  IO.Input.limit_size_to ~max_size ~close_rec:false ~bytes bs
+  IO.Input_with_timeout.limit_size_to ~max_size ~close_rec:false ~bytes bs
 
-let limit_body_size ~max_size ~bytes (req : IO.Input.t t) : IO.Input.t t =
+let limit_body_size ~max_size ~bytes (req : #IO.Input_with_timeout.t t) :
+    IO.Input_with_timeout.t t =
   { req with body = limit_body_size_ ~max_size ~bytes req.body }
 
 (** read exactly [size] bytes from the stream *)
-let read_exactly ~size ~bytes (bs : #IO.Input.t) : IO.Input.t =
+let read_exactly ~size ~bytes (bs : #IO.Input_with_timeout.t) :
+    IO.Input_with_timeout.t =
   Log.debug (fun k -> k "body: must read exactly %d bytes" size);
-  IO.Input.reading_exactly bs ~close_rec:false ~bytes ~size
+  IO.Input_with_timeout.reading_exactly bs ~close_rec:false ~bytes ~size
 
 (* parse request, but not body (yet) *)
-let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
-    unit t option resp_result =
+let parse_req_start ~client_addr ~(deadline : float) ~buf
+    (bs : #IO.Input_with_timeout.t) : unit t option resp_result =
   try
-    let line = IO.Input.read_line_using ~buf bs in
+    let line = IO.Input_with_timeout.read_line_using ~buf ~deadline bs in
     Log.debug (fun k -> k "parse request line: %s" line);
-    let start_time = get_time_s () in
+    let start_time = Time.now_s () in
     let meth, path, version =
       try
         let off = ref 0 in
@@ -134,7 +138,7 @@ let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
     in
     let meth = Meth.of_string meth in
     Log.debug (fun k -> k "got meth: %s, path %S" (Meth.to_string meth) path);
-    let headers = Headers.parse_ ~buf bs in
+    let headers = Headers.parse_ ~buf ~deadline bs in
     let host =
       match Headers.get "Host" headers with
       | None -> bad_reqf 400 "No 'Host' header in request"
@@ -170,8 +174,8 @@ let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
 
 (* parse body, given the headers.
    @param tr_stream a transformation of the input stream. *)
-let parse_body_ ~tr_stream ~bytes (req : IO.Input.t t) :
-    IO.Input.t t resp_result =
+let parse_body_ ~tr_stream ~bytes (req : #IO.Input_with_timeout.t t) :
+    IO.Input_with_timeout.t t resp_result =
   try
     let size, has_size =
       match Headers.get_exn "Content-Length" req.headers |> int_of_string with
@@ -186,7 +190,7 @@ let parse_body_ ~tr_stream ~bytes (req : IO.Input.t t) :
         bad_reqf 400 "specifying both transfer-encoding and content-length"
       | Some "chunked" ->
         (* body sent by chunks *)
-        let bs : IO.Input.t =
+        let bs : IO.Input_with_timeout.t =
           read_stream_chunked_ ~bytes @@ tr_stream req.body
         in
         if size > 0 then (
@@ -203,14 +207,15 @@ let parse_body_ ~tr_stream ~bytes (req : IO.Input.t t) :
   | Bad_req (c, s) -> Error (c, s)
   | e -> Error (400, Printexc.to_string e)
 
-let read_body_full ?bytes ?buf_size (self : IO.Input.t t) : string t =
+let read_body_full ?bytes ?buf_size ~deadline
+    (self : #IO.Input_with_timeout.t t) : string t =
   try
     let buf =
       match bytes with
       | Some b -> Buf.of_bytes b
       | None -> Buf.create ?size:buf_size ()
     in
-    let body = IO.Input.read_all_using ~buf self.body in
+    let body = IO.Input_with_timeout.read_all_using ~buf ~deadline self.body in
     { self with body }
   with
   | Bad_req _ as e -> raise e
@@ -220,11 +225,13 @@ module Private_ = struct
   let close_after_req = close_after_req
   let parse_req_start = parse_req_start
 
-  let parse_req_start_exn ?(buf = Buf.create ()) ~client_addr ~get_time_s bs =
-    parse_req_start ~client_addr ~get_time_s ~buf bs |> unwrap_resp_result
+  let parse_req_start_exn ?(buf = Buf.create ()) ~client_addr ~deadline bs =
+    parse_req_start ~client_addr ~deadline ~buf bs |> unwrap_resp_result
 
   let parse_body ?(bytes = Bytes.create 4096) req bs : _ t =
-    parse_body_ ~tr_stream:(fun s -> s) ~bytes { req with body = bs }
+    parse_body_
+      ~tr_stream:(fun s -> (s :> IO.Input_with_timeout.t))
+      ~bytes { req with body = bs }
     |> unwrap_resp_result
 
   let[@inline] set_body body self = { self with body }

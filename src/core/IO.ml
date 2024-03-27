@@ -11,6 +11,7 @@
 open Common_
 module Buf = Buf
 module Slice = Iostream.Slice
+module A = Atomic_
 
 (** Output channel (byte sink) *)
 module Output = struct
@@ -44,13 +45,11 @@ module Output = struct
         done
 
       method private close_underlying () =
-        if not !closed then (
-          closed := true;
+        if not (A.exchange closed true) then
           if close_noerr then (
             try Unix.close fd with _ -> ()
           ) else
             Unix.close fd
-        )
     end
 
   let output_buf (self : t) (buf : Buf.t) : unit =
@@ -108,38 +107,28 @@ module Input = struct
   let of_unix_fd ?(close_noerr = false) ~closed ~(buf : Slice.t)
       (fd : Unix.file_descr) : t =
     let eof = ref false in
+    let input buf i len : int =
+      let n = ref 0 in
+      if not !eof then (
+        n := Unix.read fd buf i len;
+        if !n = 0 then eof := true
+      );
+      !n
+    in
+
     object
       inherit Iostream.In_buf.t_from_refill ~bytes:buf.bytes ()
 
       method private refill (slice : Slice.t) =
         if not !eof then (
           slice.off <- 0;
-          let continue = ref true in
-          while !continue do
-            match Unix.read fd slice.bytes 0 (Bytes.length slice.bytes) with
-            | n ->
-              slice.len <- n;
-              continue := false
-            | exception
-                Unix.Unix_error
-                  ( ( Unix.EBADF | Unix.ENOTCONN | Unix.ESHUTDOWN
-                    | Unix.ECONNRESET | Unix.EPIPE ),
-                    _,
-                    _ ) ->
-              eof := true;
-              continue := false
-            | exception
-                Unix.Unix_error
-                  ((Unix.EWOULDBLOCK | Unix.EAGAIN | Unix.EINTR), _, _) ->
-              ignore (Unix.select [ fd ] [] [] 1.)
-          done;
+          slice.len <- input slice.bytes 0 (Bytes.length slice.bytes);
           (* Printf.eprintf "read returned %d B\n%!" !n; *)
           if slice.len = 0 then eof := true
         )
 
       method close () =
-        if not !closed then (
-          closed := true;
+        if not (A.exchange closed true) then (
           eof := true;
           if close_noerr then (
             try Unix.close fd with _ -> ()
@@ -147,6 +136,8 @@ module Input = struct
             Unix.close fd
         )
     end
+
+  let[@inline] of_string s : t = (of_string s :> t)
 
   let of_slice (slice : Slice.t) : t =
     object
@@ -168,7 +159,7 @@ module Input = struct
 
   (** Read exactly [len] bytes.
       @raise End_of_file if the input did not contain enough data. *)
-  let really_input (self : t) buf i len : unit =
+  let really_input (self : #t) buf i len : unit =
     let i = ref i in
     let len = ref len in
     while !len > 0 do
@@ -177,31 +168,6 @@ module Input = struct
       i := !i + n;
       len := !len - n
     done
-
-  let append (i1 : #t) (i2 : #t) : t =
-    let use_i1 = ref true in
-    let rec input_rec (slice : Slice.t) =
-      if !use_i1 then (
-        slice.len <- input i1 slice.bytes 0 (Bytes.length slice.bytes);
-        if slice.len = 0 then (
-          use_i1 := false;
-          input_rec slice
-        )
-      ) else
-        slice.len <- input i1 slice.bytes 0 (Bytes.length slice.bytes)
-    in
-
-    object
-      inherit Iostream.In_buf.t_from_refill ()
-
-      method private refill (slice : Slice.t) =
-        slice.off <- 0;
-        input_rec slice
-
-      method close () =
-        close i1;
-        close i2
-    end
 
   let iter_slice (f : Slice.t -> unit) (self : #t) : unit =
     let continue = ref true in
@@ -231,11 +197,131 @@ module Input = struct
         Iostream.Out.output oc slice.bytes slice.off slice.len)
       self
 
-  let read_all_using ~buf (self : #t) : string =
+  (** Output a stream using chunked encoding *)
+  let output_chunked' ?buf (oc : #Iostream.Out_buf.t) (self : #t) : unit =
+    let oc' = Output.chunk_encoding ?buf oc ~close_rec:false in
+    match to_chan' oc' self with
+    | () -> Output.close oc'
+    | exception e ->
+      let bt = Printexc.get_raw_backtrace () in
+      Output.close oc';
+      Printexc.raise_with_backtrace e bt
+
+  (** print a stream as a series of chunks *)
+  let output_chunked ?buf (oc : out_channel) (self : #t) : unit =
+    output_chunked' ?buf (Output.of_out_channel oc) self
+end
+
+(** Input channel (byte source) with read-with-timeout *)
+module Input_with_timeout = struct
+  include Iostream.In_buf
+
+  class type t = Iostream.In_buf.t_with_timeout
+
+  exception Timeout = Iostream.Timeout
+  (** Exception for timeouts *)
+
+  exception Timeout_partial_read of int
+  (** Exception for timeouts with a partial read *)
+
+  (** fill buffer, but stop at the deadline *)
+  let fill_buf_with_deadline (self : #t) ~(deadline : float) : Slice.t =
+    let timeout = deadline -. Time.now_s () in
+    if timeout <= 0. then raise Timeout;
+    fill_buf_with_timeout self timeout
+
+  (** fill buffer, but stop at the deadline if provided *)
+  let fill_buf_with_deadline_opt (self : #t) ~(deadline : float option) :
+      Slice.t =
+    match deadline with
+    | None -> fill_buf self
+    | Some d -> fill_buf_with_deadline self ~deadline:d
+
+  let of_unix_fd ?(close_noerr = false) ~closed ~(buf : Slice.t)
+      (fd : Unix.file_descr) : t =
+    let eof = ref false in
+
+    let input_with_timeout t buf i len : int =
+      let deadline = Time.now_s () +. t in
+      let n = ref 0 in
+      while
+        (not (Atomic.get closed))
+        && (not !eof)
+        &&
+        try
+          n := Unix.read fd buf i len;
+          false
+        with
+        | Unix.Unix_error ((Unix.EAGAIN | Unix.EWOULDBLOCK), _, _) ->
+          (* sleep *)
+          true
+        | Unix.Unix_error ((Unix.ECONNRESET | Unix.ESHUTDOWN | Unix.EPIPE), _, _)
+          ->
+          (* exit *)
+          false
+      do
+        let now = Time.now_s () in
+        if now >= deadline then raise Timeout;
+        ignore (Unix.select [ fd ] [] [] (deadline -. now) : _ * _ * _)
+      done;
+      !n
+    in
+
+    object
+      inherit Iostream.In_buf.t_with_timeout_from_refill ~bytes:buf.bytes ()
+
+      method private refill_with_timeout t (slice : Slice.t) =
+        if not !eof then (
+          slice.off <- 0;
+          slice.len <-
+            input_with_timeout t slice.bytes 0 (Bytes.length slice.bytes);
+          (* Printf.eprintf "read returned %d B\n%!" !n; *)
+          if slice.len = 0 then eof := true
+        )
+
+      method close () =
+        if not (A.exchange closed true) then (
+          eof := true;
+          if close_noerr then (
+            try Unix.close fd with _ -> ()
+          ) else
+            Unix.close fd
+        )
+    end
+
+  let of_slice (slice : Slice.t) : t =
+    object
+      inherit Iostream.In_buf.t_with_timeout_from_refill ~bytes:slice.bytes ()
+
+      method private refill_with_timeout _t (slice : Slice.t) =
+        slice.off <- 0;
+        slice.len <- 0
+
+      method close () = ()
+    end
+
+  (** Read into the given slice.
+      @return the number of bytes read, [0] means end of input. *)
+  let[@inline] input (self : t) buf i len = self#input buf i len
+
+  (** Close the channel. *)
+  let[@inline] close self : unit = self#close ()
+
+  let iter_slice = Input.iter_slice
+  let iter = Input.iter
+  let to_chan = Input.to_chan
+  let to_chan' = Input.to_chan'
+
+  (** Read the whole body
+      @param deadline a deadline before which the operation must complete
+      @raise Timeout if deadline expires (leftovers are in [buf] *)
+  let read_all_using ~buf ~(deadline : float) (self : #t) : string =
     Buf.clear buf;
     let continue = ref true in
     while !continue do
-      let slice = fill_buf self in
+      let timeout = deadline -. Time.now_s () in
+      if timeout <= 0. then raise Timeout;
+      let slice = fill_buf_with_timeout self timeout in
       if slice.len = 0 then
         continue := false
       else (
@@ -246,12 +332,17 @@ module Input = struct
     done;
     Buf.contents_and_clear buf
 
-  (** Read [n] bytes from the input into [bytes]. *)
-  let read_exactly_ ~too_short (self : #t) (bytes : bytes) (n : int) : unit =
-    assert (Bytes.length bytes >= n);
-    let offset = ref 0 in
+  (** Read [n] bytes from the input into [bytes].
+      @raise Timeout_partial_read if timeout occurs before it's done *)
+  let read_exactly_ ?(off = 0) ~too_short ~(deadline : float) (self : #t)
+      (bytes : bytes) (n : int) : unit =
+    assert (Bytes.length bytes >= off + n);
+    let offset = ref off in
     while !offset < n do
-      let slice = self#fill_buf () in
+      let slice =
+        try fill_buf_with_deadline self ~deadline
+        with Timeout -> raise (Timeout_partial_read (!offset - off))
+      in
       let n_read = min slice.len (n - !offset) in
       Bytes.blit slice.bytes slice.off bytes !offset n_read;
       offset := !offset + n_read;
@@ -259,12 +350,16 @@ module Input = struct
       if n_read = 0 then too_short ()
     done
 
+  let[@inline] really_input (self : #t) ~deadline buf i len =
+    read_exactly_ ~off:i ~deadline self buf len ~too_short:(fun () ->
+        raise End_of_file)
+
   (** read a line into the buffer, after clearing it. *)
-  let read_line_into (self : t) ~buf : unit =
+  let read_line_into (self : #t) ~(deadline : float) ~buf : unit =
     Buf.clear buf;
     let continue = ref true in
     while !continue do
-      let slice = self#fill_buf () in
+      let slice = fill_buf_with_deadline self ~deadline in
       if slice.len = 0 then (
         continue := false;
         if Buf.size buf = 0 then raise End_of_file
@@ -286,32 +381,32 @@ module Input = struct
       )
     done
 
-  let read_line_using ~buf (self : #t) : string =
-    read_line_into self ~buf;
+  let read_line_using ~buf ~deadline (self : #t) : string =
+    read_line_into self ~deadline ~buf;
     Buf.contents_and_clear buf
 
-  let read_line_using_opt ~buf (self : #t) : string option =
-    match read_line_into self ~buf with
+  let read_line_using_opt ~buf ~deadline (self : #t) : string option =
+    match read_line_into self ~buf ~deadline with
     | () -> Some (Buf.contents_and_clear buf)
     | exception End_of_file -> None
 
   (* helper for making a new input stream that either contains at most [size]
      bytes, or contains exactly [size] bytes. *)
-  let reading_exactly_ ~skip_on_close ~close_rec ~size ~bytes (arg : t) : t =
+  let reading_exactly_ ~skip_on_close ~close_rec ~size ~bytes (arg : #t) : t =
     let remaining_size = ref size in
 
     object
-      inherit t_from_refill ~bytes ()
+      inherit t_with_timeout_from_refill ~bytes ()
 
       method close () =
         if !remaining_size > 0 && skip_on_close then skip arg !remaining_size;
         if close_rec then close arg
 
-      method private refill (slice : Slice.t) =
+      method private refill_with_timeout t (slice : Slice.t) =
         slice.off <- 0;
         slice.len <- 0;
         if !remaining_size > 0 then (
-          let sub = fill_buf arg in
+          let sub = fill_buf_with_timeout arg t in
           let n =
             min !remaining_size (min sub.len (Bytes.length slice.bytes))
           in
@@ -324,7 +419,7 @@ module Input = struct
 
   (** new stream with maximum size [max_size].
    @param close_rec if true, closing this will also close the input stream *)
-  let limit_size_to ~close_rec ~max_size ~bytes (arg : t) : t =
+  let limit_size_to ~close_rec ~max_size ~bytes (arg : #t) : t =
     reading_exactly_ ~size:max_size ~skip_on_close:false ~bytes ~close_rec arg
 
   (** New stream that consumes exactly [size] bytes from the input.
@@ -339,15 +434,15 @@ module Input = struct
 
     (* small buffer to read the chunk sizes *)
     let line_buf = Buf.create ~size:32 () in
-    let read_next_chunk_len () : int =
+    let read_next_chunk_len ~deadline () : int =
       if !first then
         first := false
       else (
-        let line = read_line_using ~buf:line_buf ic in
+        let line = read_line_using ~buf:line_buf ~deadline ic in
         if String.trim line <> "" then
           raise (fail "expected crlf between chunks")
       );
-      let line = read_line_using ~buf:line_buf ic in
+      let line = read_line_using ~buf:line_buf ~deadline ic in
       (* parse chunk length, ignore extensions *)
       let chunk_size =
         if String.trim line = "" then
@@ -367,11 +462,12 @@ module Input = struct
     let chunk_size = ref 0 in
 
     object
-      inherit t_from_refill ~bytes ()
+      inherit t_with_timeout_from_refill ~bytes ()
 
-      method private refill (slice : Slice.t) : unit =
+      method private refill_with_timeout t (slice : Slice.t) : unit =
+        let deadline = Time.now_s () +. t in
         if !chunk_size = 0 && not !eof then (
-          chunk_size := read_next_chunk_len ();
+          chunk_size := read_next_chunk_len ~deadline ();
           if !chunk_size = 0 then eof := true (* stream is finished *)
         );
         slice.off <- 0;
@@ -379,7 +475,7 @@ module Input = struct
         if !chunk_size > 0 then (
           (* read the whole chunk, or [Bytes.length bytes] of it *)
           let to_read = min !chunk_size (Bytes.length slice.bytes) in
-          read_exactly_
+          read_exactly_ ~deadline
             ~too_short:(fun () -> raise (fail "chunk is too short"))
             ic slice.bytes to_read;
           slice.len <- to_read;
@@ -389,19 +485,8 @@ module Input = struct
       method close () = eof := true (* do not close underlying stream *)
     end
 
-  (** Output a stream using chunked encoding *)
-  let output_chunked' ?buf (oc : #Iostream.Out_buf.t) (self : #t) : unit =
-    let oc' = Output.chunk_encoding ?buf oc ~close_rec:false in
-    match to_chan' oc' self with
-    | () -> Output.close oc'
-    | exception e ->
-      let bt = Printexc.get_raw_backtrace () in
-      Output.close oc';
-      Printexc.raise_with_backtrace e bt
-
-  (** print a stream as a series of chunks *)
-  let output_chunked ?buf (oc : out_channel) (self : #t) : unit =
-    output_chunked' ?buf (Output.of_out_channel oc) self
+  let output_chunked = Input.output_chunked
+  let output_chunked' = Input.output_chunked'
 end
 
 (** A writer abstraction. *)
@@ -441,7 +526,8 @@ end
 (** A TCP server abstraction. *)
 module TCP_server = struct
   type conn_handler = {
-    handle: client_addr:Unix.sockaddr -> Input.t -> Output.t -> unit;
+    handle:
+      client_addr:Unix.sockaddr -> Input_with_timeout.t -> Output.t -> unit;
         (** Handle client connection *)
   }
 

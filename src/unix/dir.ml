@@ -93,12 +93,12 @@ let vfs_of_dir (top : string) : vfs =
     let contains f = Sys.file_exists (top // f)
     let list_dir f = Sys.readdir (top // f)
 
-    let read_file_content f =
+    let read_file_content f : IO.Input.t =
       let fpath = top // f in
       match Unix.stat fpath with
       | { st_kind = Unix.S_REG; _ } ->
         let ic = Unix.(openfile fpath [ O_RDONLY ] 0) in
-        let closed = ref false in
+        let closed = Atomic_.make false in
         let buf = IO.Slice.create 4096 in
         IO.Input.of_unix_fd ~buf ~close_noerr:true ~closed ic
       | _ -> failwith (Printf.sprintf "not a regular file: %S" f)

@@ -46,9 +46,9 @@ let for_all pred s =
     true
   with Exit -> false
 
-let parse_ ~(buf : Buf.t) (bs : IO.Input.t) : t =
+let parse_ ~(buf : Buf.t) ~deadline (bs : #IO.Input_with_timeout.t) : t =
   let rec loop acc =
-    match IO.Input.read_line_using_opt ~buf bs with
+    match IO.Input_with_timeout.read_line_using_opt ~buf ~deadline bs with
     | None -> raise End_of_file
     | Some "\r" -> acc
     | Some line ->
