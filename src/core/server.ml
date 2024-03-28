@@ -315,8 +315,6 @@ let string_as_list_contains_ (s : string) (sub : string) : bool =
 let client_handle_for (self : t) ~client_addr ic oc : unit =
   Pool.with_resource self.bytes_pool @@ fun bytes_req ->
   Pool.with_resource self.bytes_pool @@ fun bytes_res ->
-  let (module B) = self.backend in
-
   (* how to log the response to this query *)
   let log_response (req : _ Request.t) (resp : Response.t) =
     if not Log.dummy then (
