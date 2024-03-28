@@ -1,8 +1,9 @@
 module W = IO.Writer
 
-let decode_deflate_stream_ ~buf_size (ic : IO.Input.t) : IO.Input.t =
+let decode_deflate_stream_ ~buf_size (ic : #IO.Input_with_timeout.t) :
+    IO.Input_with_timeout.t =
   Log.debug (fun k -> k "wrap stream with deflate.decode");
-  Iostream_camlzip.decompress_in_buf ~buf_size ic
+  Iostream_camlzip.decompress_in_buf_with_timeout ~now_s:Time.now_s ~buf_size ic
 
 let encode_deflate_writer_ ~buf_size (w : W.t) : W.t =
   Log.debug (fun k -> k "wrap writer with deflate.encode");
@@ -27,8 +28,8 @@ let has_deflate s =
   try Scanf.sscanf s "deflate, %s" (fun _ -> true) with _ -> false
 
 (* decompress [req]'s body if needed *)
-let decompress_req_stream_ ~buf_size (req : IO.Input.t Request.t) : _ Request.t
-    =
+let decompress_req_stream_ ~buf_size (req : #IO.Input_with_timeout.t Request.t)
+    : _ Request.t =
   match Request.get_header ~f:String.trim req "Transfer-Encoding" with
   (* TODO
      | Some "gzip" ->

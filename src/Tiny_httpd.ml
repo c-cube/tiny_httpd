@@ -10,6 +10,7 @@ module Meth = Tiny_httpd_core.Meth
 module Pool = Tiny_httpd_core.Pool
 module Log = Tiny_httpd_core.Log
 module Server = Tiny_httpd_core.Server
+module Time = Time
 module Util = Tiny_httpd_core.Util
 include Server
 module Dir = Tiny_httpd_unix.Dir

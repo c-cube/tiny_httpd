@@ -189,12 +189,12 @@ let http_middleware (reg : Registry.t) : Server.Middleware.t =
 
   fun h : Server.Middleware.handler ->
     fun req ~resp : unit ->
-     let start = Time_.now_us () in
+     let start = Time.now_us () in
      Counter.incr c_req;
      h req ~resp:(fun (response : Response.t) ->
          let code = response.code in
 
-         let elapsed_us = Time_.now_us () -. start in
+         let elapsed_us = Time.now_us () -. start in
          let elapsed_s = elapsed_us /. 1e6 in
          Histogram.add h_latency elapsed_s;
 

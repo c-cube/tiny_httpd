@@ -3,7 +3,9 @@ open Common_
 type resp_error = Response_code.t * string
 
 module Middleware = struct
-  type handler = IO.Input.t Request.t -> resp:(Response.t -> unit) -> unit
+  type handler =
+    IO.Input_with_timeout.t Request.t -> resp:(Response.t -> unit) -> unit
+
   type t = handler -> handler
 
   (** Apply a list of middlewares to [h] *)
@@ -40,7 +42,11 @@ module type UPGRADE_HANDLER = sig
       code is [101] alongside these headers. *)
 
   val handle_connection :
-    Unix.sockaddr -> handshake_state -> IO.Input.t -> IO.Output.t -> unit
+    Unix.sockaddr ->
+    handshake_state ->
+    IO.Input_with_timeout.t ->
+    IO.Output.t ->
+    unit
   (** Take control of the connection and take it from there *)
 end
 
@@ -51,9 +57,6 @@ exception Upgrade of unit Request.t * upgrade_handler
 module type IO_BACKEND = sig
   val init_addr : unit -> string
   val init_port : unit -> int
-
-  val get_time_s : unit -> float
-  (** obtain the current timestamp in seconds. *)
 
   val tcp_server : unit -> IO.TCP_server.builder
   (** Server  that can listen on a port and handle clients. *)
@@ -72,13 +75,14 @@ let unwrap_handler_result req = function
 type t = {
   backend: (module IO_BACKEND);
   mutable tcp_server: IO.TCP_server.t option;
-  mutable handler: IO.Input.t Request.t -> Response.t;
+  mutable handler: IO.Input_with_timeout.t Request.t -> Response.t;
       (** toplevel handler, if any *)
   mutable middlewares: (int * Middleware.t) list;  (** Global middlewares *)
   mutable middlewares_sorted: (int * Middleware.t) list lazy_t;
       (** sorted version of {!middlewares} *)
   mutable path_handlers: (unit Request.t -> handler_result option) list;
       (** path handlers *)
+  request_timeout_s: float;  (** Timeout for parsing requests *)
   bytes_pool: bytes Pool.t;
 }
 
@@ -169,7 +173,8 @@ let add_route_handler (type a) ?accept ?middlewares ?meth self
   let tr_req _oc req ~resp f =
     let req =
       Pool.with_resource self.bytes_pool @@ fun bytes ->
-      Request.read_body_full ~bytes req
+      let deadline = Time.now_s () +. self.request_timeout_s in
+      Request.read_body_full ~bytes ~deadline req
     in
     resp (f req)
   in
@@ -190,7 +195,8 @@ let add_route_server_sent_handler ?accept self route f =
   let tr_req (oc : IO.Output.t) req ~resp f =
     let req =
       Pool.with_resource self.bytes_pool @@ fun bytes ->
-      Request.read_body_full ~bytes req
+      let deadline = Time.now_s () +. self.request_timeout_s in
+      Request.read_body_full ~bytes ~deadline req
     in
     let headers =
       ref Headers.(empty |> set "content-type" "text/event-stream")
@@ -257,7 +263,11 @@ let add_upgrade_handler ?(accept = fun _ -> Ok ()) (self : t) route f : unit =
 
 let clear_bytes_ bs = Bytes.fill bs 0 (Bytes.length bs) '\x00'
 
-let create_from ?(buf_size = 16 * 1_024) ?(middlewares = []) ~backend () : t =
+(* client has at most 10s to send the request, unless it's a streaming request *)
+let default_req_timeout_s_ = 30.
+
+let create_from ?(buf_size = 16 * 1_024) ?(middlewares = [])
+    ?(request_timeout_s = default_req_timeout_s_) ~backend () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let self =
     {
@@ -267,6 +277,7 @@ let create_from ?(buf_size = 16 * 1_024) ?(middlewares = []) ~backend () : t =
       path_handlers = [];
       middlewares = [];
       middlewares_sorted = lazy [];
+      request_timeout_s;
       bytes_pool =
         Pool.create ~clear:clear_bytes_
           ~mk_item:(fun () -> Bytes.create buf_size)
@@ -304,13 +315,11 @@ let string_as_list_contains_ (s : string) (sub : string) : bool =
 let client_handle_for (self : t) ~client_addr ic oc : unit =
   Pool.with_resource self.bytes_pool @@ fun bytes_req ->
   Pool.with_resource self.bytes_pool @@ fun bytes_res ->
-  let (module B) = self.backend in
-
   (* how to log the response to this query *)
   let log_response (req : _ Request.t) (resp : Response.t) =
     if not Log.dummy then (
       let msgf k =
-        let elapsed = B.get_time_s () -. req.start_time in
+        let elapsed = Time.now_s () -. req.start_time in
         k
           ("response to=%s code=%d time=%.3fs meth=%s path=%S" : _ format4)
           (Util.show_sockaddr client_addr)
@@ -387,10 +396,10 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
   let continue = ref true in
 
   let handle_one_req () =
+    let deadline = Time.now_s () +. self.request_timeout_s in
     match
       let buf = Buf.of_bytes bytes_req in
-      Request.Private_.parse_req_start ~client_addr ~get_time_s:B.get_time_s
-        ~buf ic
+      Request.Private_.parse_req_start ~client_addr ~deadline ~buf ic
     with
     | Ok None -> continue := false (* client is done *)
     | Error (c, s) ->

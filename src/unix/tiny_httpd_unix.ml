@@ -92,15 +92,15 @@ module Unix_tcp_server_ = struct
 
             Pool.with_resource self.slice_pool @@ fun ic_buf ->
             Pool.with_resource self.slice_pool @@ fun oc_buf ->
-            let closed = ref false in
+            let closed = Atomic_.make false in
 
             let oc =
               new IO.Output.of_unix_fd
                 ~close_noerr:true ~closed ~buf:oc_buf client_sock
             in
             let ic =
-              IO.Input.of_unix_fd ~close_noerr:true ~closed ~buf:ic_buf
-                client_sock
+              IO.Input_with_timeout.of_unix_fd ~close_noerr:true ~closed
+                ~buf:ic_buf client_sock
             in
             handle.handle ~client_addr ic oc
           in

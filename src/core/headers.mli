@@ -32,4 +32,4 @@ val contains : string -> t -> bool
 val pp : Format.formatter -> t -> unit
 (** Pretty print the headers. *)
 
-val parse_ : buf:Buf.t -> IO.Input.t -> t
+val parse_ : buf:Buf.t -> deadline:float -> #IO.Input_with_timeout.t -> t
