@@ -1,3 +1,6 @@
+# 0.2.1
+
+- bugfix for iostream-camlzip
 
 # 0.2
 
