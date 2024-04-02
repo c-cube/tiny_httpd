@@ -35,12 +35,14 @@ module type UPGRADE_HANDLER = sig
   val name : string
   (** Name in the "upgrade" header *)
 
-  val handshake : unit Request.t -> (Headers.t * handshake_state, string) result
+  val handshake :
+    Unix.sockaddr ->
+    unit Request.t ->
+    (Headers.t * handshake_state, string) result
   (** Perform the handshake and upgrade the connection. The returned
       code is [101] alongside these headers. *)
 
-  val handle_connection :
-    Unix.sockaddr -> handshake_state -> IO.Input.t -> IO.Output.t -> unit
+  val handle_connection : handshake_state -> IO.Input.t -> IO.Output.t -> unit
   (** Take control of the connection and take it from there *)
 end
 
@@ -362,7 +364,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
       | None -> bad_reqf 426 "expected 'connection: upgrade' header");
 
       (* ok, this is the upgrade we expected *)
-      match UP.handshake req with
+      match UP.handshake client_addr req with
       | Error msg ->
         (* fail the upgrade *)
         Log.error (fun k -> k "upgrade failed: %s" msg);
@@ -378,7 +380,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
         log_response req resp;
         Response.Private_.output_ ~bytes:bytes_res oc resp;
 
-        UP.handle_connection client_addr handshake_st ic oc
+        UP.handle_connection handshake_st ic oc
     with e ->
       let bt = Printexc.get_raw_backtrace () in
       handle_bad_req req e bt

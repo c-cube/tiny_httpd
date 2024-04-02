@@ -10,9 +10,9 @@ let setup_logging ~debug () =
        else
          Logs.Info)
 
-let handle_ws _client_addr ic oc =
+let handle_ws (req : unit Request.t) ic oc =
   Log.info (fun k ->
-      k "new client connection from %s" (Util.show_sockaddr _client_addr));
+      k "new client connection from %s" (Util.show_sockaddr req.client_addr));
 
   let (_ : Thread.t) =
     Thread.create

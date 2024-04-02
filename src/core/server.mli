@@ -250,14 +250,18 @@ module type UPGRADE_HANDLER = sig
   val name : string
   (** Name in the "upgrade" header *)
 
-  val handshake : unit Request.t -> (Headers.t * handshake_state, string) result
-  (** Perform the handshake and upgrade the connection. The returned
-      code is [101] alongside these headers.
-      In case the handshake fails, this only returns [Error log_msg].
-      The connection is closed without further ado. *)
+  val handshake :
+    Unix.sockaddr ->
+    unit Request.t ->
+    (Headers.t * handshake_state, string) result
+  (** Perform the handshake and upgrade the connection. This returns either
+      [Ok (resp_headers, state)] in case of success, in which case the
+      server sends a [101] response with [resp_headers];
+      or it returns [Error log_msg] if the the handshake fails, in which case
+      the connection is closed without further ado and [log_msg] is logged
+      locally (but not returned to the client). *)
 
-  val handle_connection :
-    Unix.sockaddr -> handshake_state -> IO.Input.t -> IO.Output.t -> unit
+  val handle_connection : handshake_state -> IO.Input.t -> IO.Output.t -> unit
   (** Take control of the connection and take it from ther.e *)
 end
 

@@ -1,6 +1,6 @@
 open Common_ws_
 
-type handler = Unix.sockaddr -> IO.Input.t -> IO.Output.t -> unit
+type handler = unit Request.t -> IO.Input.t -> IO.Output.t -> unit
 
 module Frame_type = struct
   type t = int
@@ -407,8 +407,9 @@ let upgrade ic oc : _ * _ =
 module Make_upgrade_handler (X : sig
   val accept_ws_protocol : string -> bool
   val handler : handler
-end) : Server.UPGRADE_HANDLER = struct
-  type handshake_state = unit
+end) : Server.UPGRADE_HANDLER with type handshake_state = unit Request.t =
+struct
+  type handshake_state = unit Request.t
 
   let name = "websocket"
 
@@ -443,14 +444,14 @@ end) : Server.UPGRADE_HANDLER = struct
     let headers = [ "sec-websocket-accept", accept ] in
     Log.debug (fun k ->
         k "websocket: upgrade successful, accept key is %S" accept);
-    headers, ()
+    headers, req
 
-  let handshake req : _ result =
+  let handshake _addr req : _ result =
     try Ok (handshake_ req) with Bad_req s -> Error s
 
-  let handle_connection addr () ic oc =
+  let handle_connection req ic oc =
     let ws_ic, ws_oc = upgrade ic oc in
-    try X.handler addr ws_ic ws_oc
+    try X.handler req ws_ic ws_oc
     with Close_connection ->
       Log.debug (fun k -> k "websocket: requested to close the connection");
       ()

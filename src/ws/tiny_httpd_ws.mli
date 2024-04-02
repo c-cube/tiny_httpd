@@ -4,7 +4,7 @@
     for a websocket server. It has no additional dependencies.
     *)
 
-type handler = Unix.sockaddr -> IO.Input.t -> IO.Output.t -> unit
+type handler = unit Request.t -> IO.Input.t -> IO.Output.t -> unit
 (** Websocket handler *)
 
 val upgrade : IO.Input.t -> IO.Output.t -> IO.Input.t * IO.Output.t
