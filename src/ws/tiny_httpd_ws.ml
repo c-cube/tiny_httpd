@@ -314,10 +314,11 @@ module Reader = struct
       n
     | Begin ->
       read_frame_header self;
-      (*Log.debug (fun k ->
+      Log.debug (fun k ->
           k "websocket: read frame of type=%s payload_len=%d"
             (Frame_type.show self.header.ty)
-            self.header.payload_len);*)
+            self.header.payload_len);
+
       (match self.header.ty with
       | 0 ->
         (* continuation *)
@@ -332,10 +333,12 @@ module Reader = struct
         );
         read_rec self buf i len
       | 1 ->
+        (* text *)
         self.state <-
           Reading_frame { remaining_bytes = self.header.payload_len };
         read_rec self buf i len
       | 2 ->
+        (* binary *)
         self.state <-
           Reading_frame { remaining_bytes = self.header.payload_len };
         read_rec self buf i len
@@ -351,7 +354,7 @@ module Reader = struct
         );
         0
       | 9 ->
-        (* pong, just ignore *)
+        (* ping, reply *)
         skip_body self;
         Writer.send_pong self.writer;
         read_rec self buf i len
