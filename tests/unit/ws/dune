@@ -1,0 +1,6 @@
+
+(tests
+  (names t_ws t_ws_q)
+  (package tiny_httpd)
+  (deps masked.data)
+  (libraries tiny_httpd.ws qcheck-core qcheck-core.runner test_util))
