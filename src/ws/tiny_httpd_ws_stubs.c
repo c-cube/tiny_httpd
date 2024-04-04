@@ -13,9 +13,9 @@ CAMLprim value tiny_httpd_ws_apply_masking(value _mask_key, value _buf,
   intnat len = Int_val(_len);
 
   for (intnat i = 0; i < len; ++i) {
-    char c = buf[offset + i];
-    char c_m = mask_key[i & 0x3];
-    buf[offset + i] = c ^ c_m;
+    unsigned char c = buf[offset + i];
+    unsigned char c_m = mask_key[i & 0x3];
+    buf[offset + i] = (unsigned char)(c ^ c_m);
   }
   CAMLreturn(Val_unit);
 }

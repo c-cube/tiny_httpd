@@ -192,7 +192,8 @@ module Reader = struct
   type state =
     | Begin  (** At the beginning of a frame *)
     | Reading_frame of { mutable remaining_bytes: int }
-        (** Currently reading the payload of a frame with [remaining_bytes] left to read *)
+        (** Currently reading the payload of a frame with [remaining_bytes]
+        left to read from the underlying [ic] *)
     | Close
 
   type t = {
@@ -245,7 +246,7 @@ module Reader = struct
       ) else if len = 127 then (
         IO.Input.really_input self.ic self.header_buf 0 8;
         let len64 = Bytes.get_int64_be self.header_buf 0 in
-        if compare len64 (Int64.of_int max_fragment_size) > 0 then (
+        if Int64.compare len64 (Int64.of_int max_fragment_size) > 0 then (
           Log.error (fun k ->
               k "websocket: maximum frame fragment exceeded (%Ld > %d)" len64
                 max_fragment_size);
@@ -267,14 +268,15 @@ module Reader = struct
           self.header.payload_len self.header.mask);*)
     ()
 
-  external apply_masking_ : bytes -> bytes -> int -> int -> unit
+  external apply_masking_ : key:bytes -> buf:bytes -> int -> int -> unit
     = "tiny_httpd_ws_apply_masking"
     [@@noalloc]
   (** Apply masking to the parsed data *)
 
   let[@inline] apply_masking ~mask_key (buf : bytes) off len : unit =
-    assert (off >= 0 && off + len <= Bytes.length buf);
-    apply_masking_ mask_key buf off len
+    assert (
+      Bytes.length mask_key = 4 && off >= 0 && off + len <= Bytes.length buf);
+    apply_masking_ ~key:mask_key ~buf off len
 
   let read_body_to_string (self : t) : string =
     let len = self.header.payload_len in
@@ -465,3 +467,7 @@ let add_route_handler ?accept ?(accept_ws_protocol = fun _ -> true)
   end) in
   let up : Server.upgrade_handler = (module M) in
   Server.add_upgrade_handler ?accept server route up
+
+module Private_ = struct
+  let apply_masking = Reader.apply_masking
+end

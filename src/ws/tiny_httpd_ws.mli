@@ -20,3 +20,11 @@ val add_route_handler :
 (** Add a route handler for a websocket endpoint.
     @param accept_ws_protocol decides whether this endpoint accepts the websocket protocol
     sent by the client. Default accepts everything. *)
+
+(**/**)
+
+module Private_ : sig
+  val apply_masking : mask_key:bytes -> bytes -> int -> int -> unit
+end
+
+(**/**)
