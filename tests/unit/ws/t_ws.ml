@@ -1,5 +1,3 @@
-open Test_util
-
 let read_file file : string =
   let buf = Buffer.create 32 in
   let ic = open_in_bin file in
