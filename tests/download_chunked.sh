@@ -20,4 +20,4 @@ curl -N "http://localhost:${PORT}/foo_50" -o data23 \
   -H 'Accept-encoding: chunked' --max-time 10
 
 kill $PID
-wc data21 data22 data23
+wc -m data21 data22 data23
