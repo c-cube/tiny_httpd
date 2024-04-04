@@ -178,31 +178,6 @@ module Input = struct
       len := !len - n
     done
 
-  let append (i1 : #t) (i2 : #t) : t =
-    let use_i1 = ref true in
-    let rec input_rec (slice : Slice.t) =
-      if !use_i1 then (
-        slice.len <- input i1 slice.bytes 0 (Bytes.length slice.bytes);
-        if slice.len = 0 then (
-          use_i1 := false;
-          input_rec slice
-        )
-      ) else
-        slice.len <- input i1 slice.bytes 0 (Bytes.length slice.bytes)
-    in
-
-    object
-      inherit Iostream.In_buf.t_from_refill ()
-
-      method private refill (slice : Slice.t) =
-        slice.off <- 0;
-        input_rec slice
-
-      method close () =
-        close i1;
-        close i2
-    end
-
   let iter_slice (f : Slice.t -> unit) (self : #t) : unit =
     let continue = ref true in
     while !continue do

@@ -299,6 +299,9 @@ module Reader = struct
   let rec read_rec (self : t) buf i len : int =
     match self.state with
     | Close -> 0
+    | Reading_frame r when r.remaining_bytes = 0 ->
+      self.state <- Begin;
+      read_rec self buf i len
     | Reading_frame r ->
       let len = min len r.remaining_bytes in
       let n = IO.Input.input self.ic buf i len in
