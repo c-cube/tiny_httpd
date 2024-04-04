@@ -1,3 +1,8 @@
+
+# 0.2.2
+
+- bugfix for iostream-camlzip (assertion failure)
+
 # 0.2.1
 
 - bugfix for iostream-camlzip
