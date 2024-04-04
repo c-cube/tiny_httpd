@@ -203,15 +203,6 @@ let html_list_dir (module VFS : VFS) ~prefix ~parent d : Html.elt =
   in
   html [] [ head; body ]
 
-let finally_ ~h x f =
-  try
-    let y = f x in
-    h x;
-    y
-  with e ->
-    h x;
-    raise e
-
 (* @param on_fs: if true, we assume the file exists on the FS *)
 let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
     : unit =

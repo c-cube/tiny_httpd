@@ -6,10 +6,6 @@ module Middleware = struct
   type handler = IO.Input.t Request.t -> resp:(Response.t -> unit) -> unit
   type t = handler -> handler
 
-  (** Apply a list of middlewares to [h] *)
-  let apply_l (l : t list) (h : handler) : handler =
-    List.fold_right (fun m h -> m h) l h
-
   let[@inline] nil : t = fun h -> h
 end
 
