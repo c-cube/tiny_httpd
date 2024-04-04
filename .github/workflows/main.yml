@@ -26,6 +26,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - run: sudo apt-get update
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+
       - name: Use OCaml ${{ matrix.ocaml-compiler }}
         uses: ocaml/setup-ocaml@v2
         with:
