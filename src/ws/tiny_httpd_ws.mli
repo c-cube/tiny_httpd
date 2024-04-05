@@ -10,6 +10,10 @@ type handler = unit Request.t -> IO.Input.t -> IO.Output.t -> unit
 val upgrade : IO.Input.t -> IO.Output.t -> IO.Input.t * IO.Output.t
 (** Upgrade a byte stream to the websocket framing protocol. *)
 
+exception Close_connection
+(** Exception that can be raised from IOs inside the handler,
+    when the connection is closed from underneath. *)
+
 val add_route_handler :
   ?accept:(unit Request.t -> (unit, int * string) result) ->
   ?accept_ws_protocol:(string -> bool) ->

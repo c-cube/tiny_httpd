@@ -76,12 +76,7 @@ module Writer = struct
       Mutex.unlock self.mutex;
       raise e
 
-  let close self =
-    if not self.closed then (
-      self.closed <- true;
-      raise Close_connection
-    )
-
+  let[@inline] close self = self.closed <- true
   let int_of_bool : bool -> int = Obj.magic
 
   (** Write the frame header to [self.oc] *)
