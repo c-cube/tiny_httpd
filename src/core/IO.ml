@@ -245,10 +245,11 @@ module Input = struct
         if Buf.size buf = 0 then raise End_of_file
       );
       let j = ref slice.off in
-      while !j < slice.off + slice.len && Bytes.get slice.bytes !j <> '\n' do
+      let limit = slice.off + slice.len in
+      while !j < limit && Bytes.get slice.bytes !j <> '\n' do
         incr j
       done;
-      if !j - slice.off < slice.len then (
+      if !j < limit then (
         assert (Bytes.get slice.bytes !j = '\n');
         (* line without '\n' *)
         Buf.add_bytes buf slice.bytes slice.off (!j - slice.off);
