@@ -307,13 +307,8 @@ module Reader = struct
       self.state <- Begin;
       read_rec self buf i len
     | Reading_frame r ->
-      Printf.printf "reading len=%d from frame remaining=%d (key=%S)\n%!" len
-        r.remaining_bytes
-        (Bytes.unsafe_to_string self.header.mask_key);
       let len = min len r.remaining_bytes in
       let n = IO.Input.input self.ic buf i len in
-      Printf.printf "got n=%d bytes\n%!" n;
-      Printf.printf "in buf: %S\n%!" (Bytes.sub_string buf i n);
 
       (* apply masking *)
       if self.header.mask then
@@ -328,8 +323,6 @@ module Reader = struct
       r.remaining_bytes <- r.remaining_bytes - n;
       r.num_read <- r.num_read + n;
       if r.remaining_bytes = 0 then self.state <- Begin;
-
-      Printf.printf "in buf (unmasked): %S\n%!" (Bytes.sub_string buf i n);
       n
     | Begin ->
       read_frame_header self;
