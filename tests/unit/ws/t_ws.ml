@@ -6,9 +6,9 @@ let read_file file : string =
 
 let apply_masking = Tiny_httpd_ws.Private_.apply_masking
 
-let decode ~key b =
+let decode ?(mask_offset = 0) ~key b =
   let buf = Bytes.copy b in
-  apply_masking ~mask_key:key buf 0 (Bytes.length buf);
+  apply_masking ~mask_key:key ~mask_offset buf 0 (Bytes.length buf);
   buf
 
 let () =
