@@ -242,7 +242,7 @@ module Reader = struct
       let len = b1 land 0b0111_1111 in
       if len = 126 then (
         IO.Input.really_input self.ic self.header_buf 0 2;
-        Bytes.get_int16_be self.header_buf 0
+        Bytes.get_uint16_be self.header_buf 0
       ) else if len = 127 then (
         IO.Input.really_input self.ic self.header_buf 0 8;
         let len64 = Bytes.get_int64_be self.header_buf 0 in
