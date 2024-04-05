@@ -24,7 +24,8 @@ val add_route_handler :
 (**/**)
 
 module Private_ : sig
-  val apply_masking : mask_key:bytes -> bytes -> int -> int -> unit
+  val apply_masking :
+    mask_key:bytes -> mask_offset:int -> bytes -> int -> int -> unit
 end
 
 (**/**)
