@@ -12,6 +12,7 @@ end
 module Head_middleware = struct
   type t = { handle: 'a. 'a Request.t -> 'a Request.t }
 
+  let trivial = { handle = Fun.id }
   let[@inline] apply (self : t) req = self.handle req
   let[@inline] apply' req (self : t) = self.handle req
 

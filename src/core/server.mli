@@ -42,7 +42,11 @@ end
 module Head_middleware : sig
   type t = { handle: 'a. 'a Request.t -> 'a Request.t }
   (** A handler that takes the request, without its body,
-    and possibly modifies it. *)
+    and possibly modifies it.
+    @since NEXT_RELEASE *)
+
+  val trivial : t
+  (** Pass through *)
 
   val to_middleware : t -> Middleware.t
 end
