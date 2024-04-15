@@ -90,3 +90,26 @@
   (= %{system} "linux"))
  (action
   (bash "dd if=/dev/zero of=%{targets} bs=1M count=50")))
+
+(rule
+ (targets test_ws.out)
+ (deps
+  (:bin ../examples/echo_ws.exe)
+  testfile
+  (:dir ws-client))
+ (locks /port)
+ (package tiny_httpd)
+ (enabled_if
+  (= %{system} "linux"))
+ (action
+  (with-stdout-to
+   %{targets}
+   (run ./test_ws.sh %{bin}))))
+
+(rule
+ (alias runtest)
+ (package tiny_httpd)
+ (enabled_if
+  (= %{system} "linux"))
+ (action
+  (diff test_ws.expect test_ws.out)))

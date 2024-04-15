@@ -1,0 +1,4 @@
+
+(executable
+  (name test_ws_server)
+  (libraries tiny_httpd tiny_httpd.ws logs))
