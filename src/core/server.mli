@@ -34,6 +34,19 @@ module Middleware : sig
   (** Trivial middleware that does nothing. *)
 end
 
+(** A middleware that only considers the request's head+headers.
+
+    These middlewares are simpler than full {!Middleware.t} and
+    work in more contexts.
+    @since NEXT_RELEASE *)
+module Head_middleware : sig
+  type t = { handle: 'a. 'a Request.t -> 'a Request.t }
+  (** A handler that takes the request, without its body,
+    and possibly modifies it. *)
+
+  val to_middleware : t -> Middleware.t
+end
+
 (** {2 Main Server type} *)
 
 type t
@@ -219,6 +232,7 @@ type server_sent_generator = (module SERVER_SENT_GENERATOR)
 
 val add_route_server_sent_handler :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?middlewares:Head_middleware.t list ->
   t ->
   ('a, string Request.t -> server_sent_generator -> unit) Route.t ->
   'a ->
@@ -270,6 +284,7 @@ type upgrade_handler = (module UPGRADE_HANDLER)
 
 val add_upgrade_handler :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->
+  ?middlewares:Head_middleware.t list ->
   t ->
   ('a, upgrade_handler) Route.t ->
   'a ->
