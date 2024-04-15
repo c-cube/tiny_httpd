@@ -468,14 +468,14 @@ struct
       ()
 end
 
-let add_route_handler ?accept ?(accept_ws_protocol = fun _ -> true)
+let add_route_handler ?accept ?(accept_ws_protocol = fun _ -> true) ?middlewares
     (server : Server.t) route (f : handler) : unit =
   let module M = Make_upgrade_handler (struct
     let handler = f
     let accept_ws_protocol = accept_ws_protocol
   end) in
   let up : Server.upgrade_handler = (module M) in
-  Server.add_upgrade_handler ?accept server route up
+  Server.add_upgrade_handler ?accept ?middlewares server route up
 
 module Private_ = struct
   let apply_masking = Reader.apply_masking

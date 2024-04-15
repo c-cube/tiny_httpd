@@ -17,6 +17,7 @@ exception Close_connection
 val add_route_handler :
   ?accept:(unit Request.t -> (unit, int * string) result) ->
   ?accept_ws_protocol:(string -> bool) ->
+  ?middlewares:Server.Head_middleware.t list ->
   Server.t ->
   (Server.upgrade_handler, Server.upgrade_handler) Route.t ->
   handler ->
