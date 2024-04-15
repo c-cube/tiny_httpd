@@ -364,14 +364,14 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
 
   let handle_upgrade ~(middlewares : Head_middleware.t list) req
       (module UP : UPGRADE_HANDLER) : unit =
+    Log.debug (fun k -> k "upgrade connection");
+
+    let send_resp resp =
+      log_response req resp;
+      Response.Private_.output_ ~bytes:bytes_res oc resp
+    in
+
     try
-      Log.debug (fun k -> k "upgrade connection");
-
-      let send_resp resp =
-        log_response req resp;
-        Response.Private_.output_ ~bytes:bytes_res oc resp
-      in
-
       (* apply head middlewares *)
       let req = List.fold_left Head_middleware.apply' req middlewares in
 
@@ -399,7 +399,9 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
 
         (* handshake successful, proceed with the upgrade handler *)
         UP.handle_connection handshake_st ic oc
-    with e ->
+    with
+    | Bad_req (code, err) -> send_resp @@ Response.make_raw ~code err
+    | e ->
       let bt = Printexc.get_raw_backtrace () in
       handle_bad_req req e bt
   in
