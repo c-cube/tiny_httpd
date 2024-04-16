@@ -2,6 +2,8 @@ open Common_
 
 type resp_error = Response_code.t * string
 
+exception Bad_req = Common_.Bad_req
+
 module Middleware = struct
   type handler = IO.Input.t Request.t -> resp:(Response.t -> unit) -> unit
   type t = handler -> handler

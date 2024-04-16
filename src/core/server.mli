@@ -8,6 +8,9 @@
     @since 0.13
 *)
 
+exception Bad_req of int * string
+(** Exception raised to exit request handlers with a code+error message *)
+
 (** {2 Middlewares}
 
     A middleware can be inserted in a handler to modify or observe
