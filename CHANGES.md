@@ -1,3 +1,6 @@
+## Pending
+
+- fix: No setting of sigprocmask on Windows
 
 ## 0.16
 
