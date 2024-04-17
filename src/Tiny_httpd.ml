@@ -27,7 +27,7 @@ open struct
     slice.len <- 0
 end
 
-let create ?(masksigpipe = true) ?max_connections ?(timeout = 0.0) ?buf_size
+let create ?(masksigpipe = not (Sys.win32)) ?max_connections ?(timeout = 0.0) ?buf_size
     ?(get_time_s = Unix.gettimeofday)
     ?(new_thread = fun f -> ignore (Thread.create f () : Thread.t))
     ?(addr = "127.0.0.1") ?(port = 8080) ?sock ?middlewares () : t =

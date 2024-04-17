@@ -144,7 +144,8 @@ val create :
     {!set_top_handler} to specify how to handle incoming requests.
 
     @param masksigpipe if true, block the signal {!Sys.sigpipe} which otherwise
-    tends to kill client threads when they try to write on broken sockets. Default: [true].
+    tends to kill client threads when they try to write on broken sockets.
+    Default: [true] except when on Windows, which defaults to [false].
 
     @param buf_size size for buffers (since 0.11)
 
