@@ -21,4 +21,22 @@ let () =
     |> Input.read_chunked ~bytes:(Bytes.create 4) ~fail:failwith
     |> Input.read_all_using ~buf:(Buf.create ())
   in
-  assert_eq ~to_string:(spf "%S") "hello world" str
+  assert_eq ~to_string:(spf "%S") "hello world" str;
+
+  let str_rest = io |> Input.read_all_using ~buf:(Buf.create ()) in
+  assert_eq ~to_string:(spf "%S") "ARGH" str_rest;
+  ()
+
+(* two chunks *)
+let () =
+  let io = Input.of_string "10\r\n{\"poCheck\":true}\r\n0\r\n\r\n" in
+  let str =
+    io
+    |> Input.read_chunked ~bytes:(Bytes.create 4) ~fail:failwith
+    |> Input.read_all_using ~buf:(Buf.create ())
+  in
+  assert_eq ~to_string:(spf "%S") {|{"poCheck":true}|} str;
+
+  let str_rest = io |> Input.read_all_using ~buf:(Buf.create ()) in
+  assert_eq ~to_string:(spf "%S") "" str_rest;
+  ()
