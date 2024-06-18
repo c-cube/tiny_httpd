@@ -126,10 +126,11 @@ let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
         meth, path, version
       with
       | Invalid_argument msg ->
-        Log.error (fun k -> k "invalid request line: `%s`: %s" line msg);
+        Log.error (fun k -> k "invalid request line: %S: %s" line msg);
         raise (Bad_req (400, "Invalid request line"))
-      | _ ->
-        Log.error (fun k -> k "invalid request line: `%s`" line);
+      | exn ->
+        Log.error (fun k ->
+            k "invalid request line: %S: %s" line (Printexc.to_string exn));
         raise (Bad_req (400, "Invalid request line"))
     in
     let meth = Meth.of_string meth in
