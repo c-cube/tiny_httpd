@@ -109,7 +109,7 @@ let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
     unit t option resp_result =
   try
     let line = IO.Input.read_line_using ~buf bs in
-    Log.debug (fun k -> k "parse request line: %s" line);
+    Log.debug (fun k -> k "parse request line: %S" line);
     let start_time = get_time_s () in
     let meth, path, version =
       try
@@ -121,7 +121,7 @@ let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
           match http_version with
           | "HTTP/1.1" -> 1
           | "HTTP/1.0" -> 0
-          | v -> invalid_arg (spf "unsupported HTTP version: %s" v)
+          | v -> invalid_arg (spf "unsupported HTTP version: %S" v)
         in
         meth, path, version
       with
@@ -134,7 +134,7 @@ let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
         raise (Bad_req (400, "Invalid request line"))
     in
     let meth = Meth.of_string meth in
-    Log.debug (fun k -> k "got meth: %s, path %S" (Meth.to_string meth) path);
+    Log.debug (fun k -> k "got meth: %S, path %S" (Meth.to_string meth) path);
     let headers = Headers.parse_ ~buf bs in
     let host =
       match Headers.get "Host" headers with
@@ -146,7 +146,7 @@ let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
     let query =
       match Util.parse_query query with
       | Ok l -> l
-      | Error e -> bad_reqf 400 "invalid query: %s" e
+      | Error e -> bad_reqf 400 "invalid query: %S" e
     in
     let req =
       {
