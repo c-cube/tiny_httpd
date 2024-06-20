@@ -9,6 +9,9 @@ build:
 test:
 	@dune runtest --no-buffer --force $(OPTS)
 
+test-autopromote:
+	@dune runtest --no-buffer --force $(OPTS) --auto-promote
+
 clean:
 	@dune clean
 
