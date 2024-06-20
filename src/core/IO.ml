@@ -348,7 +348,14 @@ module Input = struct
       method private refill (slice : Slice.t) : unit =
         if !chunk_size = 0 && not !eof then (
           chunk_size := read_next_chunk_len ();
-          if !chunk_size = 0 then eof := true (* stream is finished *)
+          if !chunk_size = 0 then (
+            (* stream is finished, consume trailing \r\n *)
+            eof := true;
+            let line = read_line_using ~buf:line_buf ic in
+            if String.trim line <> "" then
+              raise
+                (fail (spf "expected \\r\\n to follow last chunk, got %S" line))
+          )
         );
         slice.off <- 0;
         slice.len <- 0;
