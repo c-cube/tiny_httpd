@@ -41,12 +41,12 @@ end
 
     These middlewares are simpler than full {!Middleware.t} and
     work in more contexts.
-    @since NEXT_RELEASE *)
+    @since 0.17 *)
 module Head_middleware : sig
   type t = { handle: 'a. 'a Request.t -> 'a Request.t }
   (** A handler that takes the request, without its body,
     and possibly modifies it.
-    @since NEXT_RELEASE *)
+    @since 0.17 *)
 
   val trivial : t
   (** Pass through *)
@@ -260,10 +260,10 @@ val add_route_server_sent_handler :
 (** {2 Upgrade handlers}
 
     These handlers upgrade the connection to another protocol.
-    @since NEXT_RELEASE *)
+    @since 0.17 *)
 
 (** Handler that upgrades to another protocol.
-  @since NEXT_RELEASE *)
+  @since 0.17 *)
 module type UPGRADE_HANDLER = sig
   type handshake_state
   (** Some specific state returned after handshake *)
@@ -287,7 +287,7 @@ module type UPGRADE_HANDLER = sig
 end
 
 type upgrade_handler = (module UPGRADE_HANDLER)
-(** @since NEXT_RELEASE *)
+(** @since 0.17 *)
 
 val add_upgrade_handler :
   ?accept:(unit Request.t -> (unit, Response_code.t * string) result) ->

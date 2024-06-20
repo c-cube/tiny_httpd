@@ -1,6 +1,32 @@
 ## Pending
 
+## 0.17
+
+- add optional middlewares to tiny_httpd_ws
+- add `Head_middleware.trivial`
+- add `Head_middleware.t`; accept it for SSE/websocket
+- add `Request.pp_with` which is a customizable printer
+- expose `Response.Bad_req`
+- use `iostream` for IOs
+- add a `hmap`-typed field to requests, to carry request specific data
+    across middlewares
+- http_of_dir: ability to setup socket timeout
+- add `tiny_httpd.ws`, a websocket library
+- add `Response_code.is_success`
+
 - fix: No setting of sigprocmask on Windows
+- fix: give the correct code+error if protocol upgrade fails
+- remove potentially security-leaking debug line
+- fix: avoid collisions in `Mime_` private module
+- fix middlewares: merge-sort per-request middleares and global ones
+- fix tiny_httpd dir: handle html files
+
+- perf: optim in read_line
+- perf: remove some uses of scanf in parsing
+
+- require iostream-camlzip >= 0.2.1
+- add optional dependency on `logs`
+- logs is a testdep for tiny_httpd_camlzip
 
 ## 0.16
 

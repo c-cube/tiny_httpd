@@ -17,4 +17,4 @@ val descr : t -> string
 
 val is_success : t -> bool
 (** [is_success code] is true iff [code] is in the [2xx] or [3xx] range.
-      @since NEXT_RELEASE *)
+      @since 0.17 *)

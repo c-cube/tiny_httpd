@@ -38,7 +38,7 @@ val update_headers : (Headers.t -> Headers.t) -> t -> t
 
 val remove_header : string -> t -> t
 (** Remove one instance of this header.
-      @since NEXT_RELEASE *)
+      @since 0.17 *)
 
 val set_headers : Headers.t -> t -> t
 (** Set all headers.

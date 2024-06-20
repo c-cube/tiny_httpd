@@ -11,7 +11,7 @@ type 'body t = private {
       (** Host header, mandatory. It can also be found in {!headers}. *)
   client_addr: Unix.sockaddr;  (** Client address. Available since 0.14. *)
   headers: Headers.t;  (** List of headers. *)
-  mutable meta: Hmap.t;  (** Metadata. @since NEXT_RELEASE *)
+  mutable meta: Hmap.t;  (** Metadata. @since 0.17 *)
   http_version: int * int;
       (** HTTP version. This should be either [1, 0] or [1, 1]. *)
   path: string;  (** Full path of the requested URL. *)
@@ -38,16 +38,16 @@ type 'body t = private {
 
 val add_meta : _ t -> 'a Hmap.key -> 'a -> unit
 (** Add metadata
- @since NEXT_RELEASE *)
+ @since 0.17 *)
 
 val get_meta : _ t -> 'a Hmap.key -> 'a option
 (** Get metadata
- @since NEXT_RELEASE *)
+ @since 0.17 *)
 
 val get_meta_exn : _ t -> 'a Hmap.key -> 'a
 (** Like {!get_meta} but can fail
     @raise Invalid_argument if not present
- @since NEXT_RELEASE *)
+ @since 0.17 *)
 
 val pp_with :
   ?mask_header:(string -> bool) ->
@@ -94,7 +94,7 @@ val set_header : string -> string -> 'a t -> 'a t
 
 val remove_header : string -> 'a t -> 'a t
 (** Remove one instance of this header.
-      @since NEXT_RELEASE *)
+      @since 0.17 *)
 
 val update_headers : (Headers.t -> Headers.t) -> 'a t -> 'a t
 (** Modify headers using the given function.
