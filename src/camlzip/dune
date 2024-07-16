@@ -3,4 +3,6 @@
  (public_name tiny_httpd_camlzip)
  (synopsis "A wrapper around camlzip to bring compression to Tiny_httpd")
  (flags :standard -open Tiny_httpd_core -safe-string -warn-error -a+8)
- (libraries tiny_httpd.core iostream-camlzip camlzip))
+ (libraries (re_export tiny_httpd.core)
+            (re_export iostream-camlzip)
+            camlzip))

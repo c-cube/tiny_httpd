@@ -7,7 +7,7 @@
  (private_modules common_p_ time_)
  (flags :standard -open Tiny_httpd_core)
  (libraries
-  tiny_httpd.core unix
+  (re_export tiny_httpd.core) unix
   (select time_.ml from
    (mtime mtime.clock.os -> time_.mtime.ml)
    (-> time_.default.ml))))

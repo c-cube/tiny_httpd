@@ -9,4 +9,4 @@
     (language c)
     (names tiny_httpd_ws_stubs)
     (flags :standard -std=c99 -fPIC -O2))
-  (libraries tiny_httpd.core threads))
+  (libraries (re_export tiny_httpd.core) threads))
