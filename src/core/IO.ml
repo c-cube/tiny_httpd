@@ -32,11 +32,13 @@ module Output = struct
             len := !len - n
           | exception
               Unix.Unix_error
-                ( ( Unix.EBADF | Unix.ENOTCONN | Unix.ESHUTDOWN
-                  | Unix.ECONNRESET | Unix.EPIPE ),
-                  _,
+                ( (( Unix.EBADF | Unix.ENOTCONN | Unix.ESHUTDOWN
+                   | Unix.ECONNRESET | Unix.EPIPE ) as err),
+                  fn,
                   _ ) ->
-            failwith "write failed"
+            failwith
+            @@ Printf.sprintf "write failed in %s: %s" fn
+                 (Unix.error_message err)
           | exception
               Unix.Unix_error
                 ((Unix.EWOULDBLOCK | Unix.EAGAIN | Unix.EINTR), _, _) ->
