@@ -1,12 +1,17 @@
-
 (library
-  (name tiny_httpd_core)
-  (public_name tiny_httpd.core)
-  (private_modules parse_ common_)
-  (libraries threads seq hmap iostream
-             (select log.ml from
-              (logs -> log.logs.ml)
-              (-> log.default.ml))))
+ (name tiny_httpd_core)
+ (public_name tiny_httpd.core)
+ (private_modules parse_ common_)
+ (libraries
+  threads
+  seq
+  hmap
+  iostream
+  (select
+   log.ml
+   from
+   (logs -> log.logs.ml)
+   (-> log.default.ml))))
 
 (rule
  (targets Atomic_.ml)

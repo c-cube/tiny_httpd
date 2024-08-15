@@ -31,7 +31,7 @@ module Unix_tcp_server_ = struct
     {
       IO.TCP_server.serve =
         (fun ~after_init ~handle () : unit ->
-          if self.masksigpipe && not (Sys.win32) then
+          if self.masksigpipe && not Sys.win32 then
             ignore (Unix.sigprocmask Unix.SIG_BLOCK [ Sys.sigpipe ] : _ list);
           let sock, should_bind =
             match self.sock with
@@ -83,7 +83,7 @@ module Unix_tcp_server_ = struct
                   (Thread.id @@ Thread.self ())
                   (Util.show_sockaddr client_addr));
 
-            if self.masksigpipe && not (Sys.win32) then
+            if self.masksigpipe && not Sys.win32 then
               ignore (Unix.sigprocmask Unix.SIG_BLOCK [ Sys.sigpipe ] : _ list);
             Unix.set_nonblock client_sock;
             Unix.setsockopt client_sock Unix.TCP_NODELAY true;
@@ -113,7 +113,7 @@ module Unix_tcp_server_ = struct
               Sem.acquire 1 self.sem_max_connections;
               (* Block INT/HUP while cloning to avoid children handling them.
                  When thread gets them, our Unix.accept raises neatly. *)
-              if not (Sys.win32) then
+              if not Sys.win32 then
                 ignore Unix.(sigprocmask SIG_BLOCK Sys.[ sigint; sighup ]);
               self.new_thread (fun () ->
                   try
@@ -137,7 +137,7 @@ module Unix_tcp_server_ = struct
                           (Util.show_sockaddr client_addr)
                           (Printexc.to_string e)
                           (Printexc.raw_backtrace_to_string bt)));
-              if not (Sys.win32) then
+              if not Sys.win32 then
                 ignore Unix.(sigprocmask SIG_UNBLOCK Sys.[ sigint; sighup ])
             | exception Unix.Unix_error ((Unix.EAGAIN | Unix.EWOULDBLOCK), _, _)
               ->

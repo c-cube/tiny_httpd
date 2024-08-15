@@ -1,12 +1,15 @@
-
 (library
-  (name tiny_httpd_unix)
-  (public_name tiny_httpd.unix)
-  (synopsis "Backend based on Unix and blocking IOs for Tiny_httpd")
-  (flags :standard -open Tiny_httpd_core)
-  (private_modules mime_)
-  (libraries tiny_httpd.core tiny_httpd.html unix
-             (select mime_.ml from
-              (magic-mime -> mime_.magic.ml)
-              ( -> mime_.dummy.ml))
-             ))
+ (name tiny_httpd_unix)
+ (public_name tiny_httpd.unix)
+ (synopsis "Backend based on Unix and blocking IOs for Tiny_httpd")
+ (flags :standard -open Tiny_httpd_core)
+ (private_modules mime_)
+ (libraries
+  tiny_httpd.core
+  tiny_httpd.html
+  unix
+  (select
+   mime_.ml
+   from
+   (magic-mime -> mime_.magic.ml)
+   (-> mime_.dummy.ml))))
