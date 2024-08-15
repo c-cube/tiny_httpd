@@ -15,6 +15,12 @@ test-autopromote:
 clean:
 	@dune clean
 
+format:
+	@dune build @fmt --auto-promote
+
+format-check:
+	@dune build @fmt --ignore-promoted-rules
+
 doc:
 	@dune build @doc
 
