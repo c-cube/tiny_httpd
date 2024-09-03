@@ -20,6 +20,27 @@
   (diff echo1.expect echo1.out)))
 
 (rule
+ (targets echo_mio1.out)
+ (deps
+  (:bin ../examples/echo_mio.exe))
+ (locks /port)
+ (enabled_if
+  (= %{system} "linux"))
+ (package tiny_httpd_moonpool)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run ./echo_mio1.sh %{bin}))))
+
+(rule
+ (alias runtest)
+ (package tiny_httpd_moonpool)
+ (enabled_if
+  (= %{system} "linux"))
+ (action
+  (diff echo_mio1.expect echo_mio1.out)))
+
+(rule
  (targets sse_count.out)
  (deps
   (:bin ../examples/sse_server.exe))
