@@ -199,6 +199,18 @@ let () =
     Route.(exact "alice" @/ return)
     (fun _req -> Response.make_string (Ok alice_text));
 
+  Server.add_route_handler server
+    Route.(exact "alice10" @/ return)
+    (fun _req ->
+      let writer =
+        IO.Writer.make () ~write:(fun oc ->
+            for _i = 1 to 10 do
+              IO.Output.output_string oc alice_text;
+              IO.Output.flush oc
+            done)
+      in
+      Response.make_writer (Ok writer));
+
   (* main page *)
   Server.add_route_handler server
     Route.(return)
