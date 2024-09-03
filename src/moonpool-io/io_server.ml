@@ -122,7 +122,7 @@ let to_tcp_server (self : t) : IO.TCP_server.builder =
             let fd = Fd.create sock in
             fd, true (* Because we're creating the socket ourselves *)
         in
-        MIO.Unix.clear_nonblock sock;
+        MIO.Unix.set_nonblock sock;
         MIO.Unix.setsockopt_optint sock Unix.SO_LINGER None;
         if should_bind then (
           let inet_addr = Unix.inet_addr_of_string self.addr in
