@@ -1,4 +1,9 @@
 
+# 0.3
+
+- refactor: extract type definitions to `iostream.types`
+- perf slice: improve `Slice.find_index_from`
+
 # 0.2.2
 
 - bugfix for iostream-camlzip (assertion failure)
