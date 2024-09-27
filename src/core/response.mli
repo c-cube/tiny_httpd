@@ -109,6 +109,25 @@ val fail_raise : code:int -> ('a, unit, string, 'b) format4 -> 'a
     @raise Bad_req always
   *)
 
+val pp_with :
+  ?mask_header:(string -> bool) ->
+  ?headers_to_mask:string list ->
+  ?pp_body:(Format.formatter -> body -> unit) ->
+  unit ->
+  Format.formatter ->
+  t ->
+  unit
+(** Pretty print the response. The exact format of this printing
+    is not specified.
+    @param mask_header function which is given each header name. If it
+      returns [true], the header's value is masked. The presence of
+      the header is still printed. Default [fun _ -> false].
+    @param headers_to_mask a list of headers masked by default.
+      Default is ["set-cookie"].
+    @param pp_body body printer
+      (default fully prints String bodies, but omits stream bodies)
+    @since NEXT_RELEASE *)
+
 val pp : Format.formatter -> t -> unit
 (** Pretty print the response. The exact format is not specified. *)
 

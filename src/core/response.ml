@@ -68,15 +68,32 @@ exception Bad_req = Bad_req
 let fail_raise ~code fmt =
   Printf.ksprintf (fun msg -> raise (Bad_req (code, msg))) fmt
 
-let pp out self : unit =
-  let pp_body out = function
-    | `String s -> Format.fprintf out "%S" s
-    | `Stream _ -> Format.pp_print_string out "<stream>"
-    | `Writer _ -> Format.pp_print_string out "<writer>"
-    | `Void -> ()
+let default_pp_body_ out = function
+  | `String s -> Format.fprintf out "%S" s
+  | `Stream _ -> Format.pp_print_string out "<stream>"
+  | `Writer _ -> Format.pp_print_string out "<writer>"
+  | `Void -> ()
+
+let pp_with ?(mask_header = fun _ -> false)
+    ?(headers_to_mask = [ "set-cookie" ]) ?(pp_body = default_pp_body_) () out
+    self : unit =
+  let headers_to_mask = List.rev_map String.lowercase_ascii headers_to_mask in
+  (* hide some headers *)
+  let headers =
+    List.map
+      (fun (k, v) ->
+        let hidden = List.mem k headers_to_mask || mask_header k in
+        if hidden then
+          k, "<hidden>"
+        else
+          k, v)
+      self.headers
   in
+
   Format.fprintf out "{@[code=%d;@ headers=[@[%a@]];@ body=%a@]}" self.code
-    Headers.pp self.headers pp_body self.body
+    Headers.pp headers pp_body self.body
+
+let[@inline] pp out self : unit = pp_with () out self
 
 let output_ ~bytes (oc : IO.Output.t) (self : t) : unit =
   (* double indirection:
