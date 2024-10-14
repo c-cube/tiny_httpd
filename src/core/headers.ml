@@ -50,7 +50,10 @@ let parse_ ~(buf : Buf.t) (bs : IO.Input.t) : t =
   let rec loop acc =
     match IO.Input.read_line_using_opt ~buf bs with
     | None -> raise End_of_file
+    | Some "" -> assert false
     | Some "\r" -> acc
+    | Some line when line.[String.length line - 1] <> '\r' ->
+      bad_reqf 400 "bad header line, not ended in CRLF"
     | Some line ->
       let k, v =
         try

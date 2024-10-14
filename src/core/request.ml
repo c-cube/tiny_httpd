@@ -110,6 +110,9 @@ let parse_req_start ~client_addr ~get_time_s ~buf (bs : IO.Input.t) :
   try
     let line = IO.Input.read_line_using ~buf bs in
     Log.debug (fun k -> k "parse request line: %S" line);
+
+    if line <> "" && line.[String.length line - 1] <> '\r' then
+      bad_reqf 400 "invalid status line, not ending in CRLF";
     let start_time = get_time_s () in
     let meth, path, version =
       try
