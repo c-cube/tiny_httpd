@@ -311,9 +311,11 @@ let find_map f l =
   in
   aux f l
 
-let string_as_list_contains_ (s : string) (sub : string) : bool =
+let header_list_contains_ (s : string) (name : string) : bool =
+  let name' = String.lowercase_ascii name in
   let fragments = String.split_on_char ',' s in
-  List.exists (fun fragment -> String.trim fragment = sub) fragments
+  List.exists (fun fragment -> 
+    String.lowercase_ascii (String.trim fragment) = name') fragments
 
 (* handle client on [ic] and [oc] *)
 let client_handle_for (self : t) ~client_addr ic oc : unit =
@@ -379,7 +381,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
 
       (* check headers *)
       (match Request.get_header req "connection" with
-      | Some str when string_as_list_contains_ str "Upgrade" -> ()
+      | Some str when header_list_contains_ str "Upgrade" -> ()
       | _ -> bad_reqf 426 "connection header must contain 'Upgrade'");
       (match Request.get_header req "upgrade" with
       | Some u when u = UP.name -> ()
