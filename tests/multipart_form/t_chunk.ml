@@ -40,11 +40,14 @@ let () =
   test
     "hello--YOLO\n\
     \  world\n\
-    \    what is the meaning of--YOLOthis??--YOLOok ok ok--YOLO";
+    \    what is the meaning of\r\n\
+     --YOLOthis??\r\n\
+     --YOLOok ok ok\r\n\
+     --YOLO";
   pf "T2\n";
-  test "--YOLO--YOLOah bon--YOLOaight--YOLO--YOLO";
+  test "--YOLO\r\n--YOLOah bon\r\n--YOLOaight\r\n--YOLO\r\n--YOLO";
   pf "T3\n";
   test
-    (spf "--YOLO%s--YOLO--YOLO%s--YOLO%s" (String.make 400 'a')
+    (spf "--YOLO%s\r\n--YOLO\r\n--YOLO%s\r\n--YOLO%s" (String.make 400 'a')
        (String.make 512 'b') (String.make 400 'c'));
   ()

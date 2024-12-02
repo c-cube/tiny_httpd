@@ -46,10 +46,12 @@ let () =
      ohlook: here\r\n\
      \r\n\
      and now for the b-o-d-y 👏\n\
+     \r\n\
      --YOLO\r\n\
      more: headers\r\n\
      \r\n\
      and another body\r\n\
+     \r\n\
      --YOLO--";
   pf "T1\n";
   test
@@ -60,8 +62,11 @@ let () =
         \r\n\
         and now for the bigger body:\n\
         %s\n\
+        \r\n\
         --YOLO\r\n\
         more: headers\r\n\
         \r\n\
-        and another body--YOLO--" (String.make 500 'a'));
+        and another body\r\n\
+        --YOLO--"
+       (String.make 500 'a'));
   ()
