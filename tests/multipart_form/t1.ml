@@ -25,7 +25,7 @@ let read_stream (st : MFD.st) : _ list =
 
 let test input_str =
   let st =
-    MFD.create ~buf_size:16 ~delim:"YOLO" (Iostream.In.of_string input_str)
+    MFD.create ~buf_size:16 ~boundary:"YOLO" (Iostream.In.of_string input_str)
   in
   let chunks = read_stream st in
   List.iter
@@ -38,13 +38,17 @@ let test input_str =
 let () =
   pf "T1\n";
   test
-    {|hello--YOLO
-  world
-    what is the meaning of--YOLOthis??--YOLOok ok ok--YOLO|};
+    "hello\r\n\
+     --YOLO\n\
+    \  world\n\
+    \    what is the meaning of\r\n\
+     --YOLOthis??\r\n\
+     --YOLOok ok ok\r\n\
+     --YOLO";
   pf "T2\n";
-  test "--YOLO--YOLOah bon--YOLOaight--YOLO--YOLO";
+  test "\r\n--YOLO\r\n--YOLOah bon\r\n--YOLOaight\r\n--YOLO\r\n--YOLO";
   pf "T3\n";
   test
-    (spf "--YOLO%s--YOLO--YOLO%s--YOLO%s" (String.make 400 'a')
-       (String.make 400 'b') (String.make 400 'c'));
+    (spf "\r\n--YOLO%s\r\n--YOLO\r\n--YOLO%s\r\n--YOLO%s" (String.make 400 'a')
+       (String.make 512 'b') (String.make 400 'c'));
   ()

@@ -1,4 +1,4 @@
 
 (tests
-  (names t1)
+  (names t1 t2)
   (libraries tiny_httpd tiny_httpd.multipart-form-data))
