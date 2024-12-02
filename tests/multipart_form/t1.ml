@@ -1,5 +1,6 @@
 module MFD = Tiny_httpd_multipart_form_data
 
+let spf = Printf.sprintf
 let pf = Printf.printf
 
 let read_stream (st : MFD.st) : _ list =
@@ -42,4 +43,8 @@ let () =
     what is the meaning of--YOLOthis??--YOLOok ok ok--YOLO|};
   pf "T2\n";
   test "--YOLO--YOLOah bon--YOLOaight--YOLO--YOLO";
+  pf "T3\n";
+  test
+    (spf "--YOLO%s--YOLO--YOLO%s--YOLO%s" (String.make 400 'a')
+       (String.make 400 'b') (String.make 400 'c'));
   ()
