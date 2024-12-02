@@ -204,6 +204,30 @@ and parse_headers_rec (self : st) acc : Headers.t =
       )
   )
 
+let parse_content_type (hs : Tiny_httpd.Headers.t) : _ option =
+  match Tiny_httpd.Headers.get "content-type" hs with
+  | None -> None
+  | Some s ->
+    (match String.split_on_char ';' s with
+    | "multipart/form-data" :: tl ->
+      let boundary = ref None in
+      List.iter
+        (fun s ->
+          match Utils_.split1_on ~c:'=' @@ String.trim s with
+          | Some ("boundary", "") -> ()
+          | Some ("boundary", s) ->
+            let s =
+              if s.[0] = '"' && s.[String.length s - 1] = '"' then
+                String.sub s 1 (String.length s - 2)
+              else
+                s
+            in
+            boundary := Some (`boundary s)
+          | _ -> ())
+        tl;
+      !boundary
+    | _ -> None)
+
 module Private_ = struct
   type nonrec chunk = chunk = Delim | Eof | Read of int
 
