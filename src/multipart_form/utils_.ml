@@ -1,13 +1,18 @@
-module StringMap = Map.Make (String)
+(* module StringMap = Map.Make (String) *)
 
-let string_eq ~a ~a_start ~b ~len =
-  let r = ref true in
-  for i = 0 to len - 1 do
-    let a_i = a_start + i in
-    let b_i = i in
-    if a.[a_i] <> b.[b_i] then r := false
-  done;
-  !r
+let string_eq ~a ~a_start ~b ~len : bool =
+  assert (len <= String.length b);
+  if String.length a >= a_start + len then (
+    try
+      for i = 0 to len - 1 do
+        let a_i = a_start + i in
+        if String.unsafe_get a a_i <> String.unsafe_get b i then
+          raise_notrace Exit
+      done;
+      true
+    with Exit -> false
+  ) else
+    false
 
 let ends_with ~suffix ~suffix_length s =
   let s_length = String.length s in
@@ -37,6 +42,7 @@ let find_common_idx a b =
   in
   go (String.length b)
 
+(*
 let[@inline] word = function
   | "" -> []
   | w -> [ Some w ]
@@ -60,3 +66,4 @@ let split_and_process_string ~boundary s =
     | Some w -> `Word w
   in
   List.map f @@ split_on_string ~pattern:boundary s
+  *)

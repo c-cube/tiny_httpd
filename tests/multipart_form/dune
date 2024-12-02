@@ -1,0 +1,4 @@
+
+(tests
+  (names t1)
+  (libraries tiny_httpd tiny_httpd.multipart-form-data))
