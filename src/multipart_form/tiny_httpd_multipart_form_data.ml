@@ -46,7 +46,7 @@ let create ?(buf_size = 64 * 1024) ?(out_buf_size = 8 * 1024) ~boundary ic : st
 
 type chunk = Delim | Eof | Read of int
 
-let[@inline] min_len_ (self : st) : int = 4 + String.length self.boundary
+let[@inline] min_len_ (self : st) : int = 2 + String.length self.boundary
 
 exception Found_boundary of int
 
@@ -74,16 +74,14 @@ let rec read_chunk_ (self : st) buf i_buf len : chunk =
   ) else (
     try
       let i = ref 0 in
-      let end_pos = min len self.buf.len - 4 - String.length self.boundary in
+      let end_pos = min len self.buf.len - 2 - String.length self.boundary in
       while !i <= end_pos do
         if
-          Bytes.unsafe_get self.buf.bs !i = '\r'
-          && Bytes.unsafe_get self.buf.bs (!i + 1) = '\n'
-          && Bytes.unsafe_get self.buf.bs (!i + 2) = '-'
-          && Bytes.unsafe_get self.buf.bs (!i + 3) = '-'
+          Bytes.unsafe_get self.buf.bs !i = '-'
+          && Bytes.unsafe_get self.buf.bs (!i + 1) = '-'
           && Utils_.string_eq
                ~a:(Bytes.unsafe_to_string self.buf.bs)
-               ~a_start:(!i + 4) ~b:self.boundary
+               ~a_start:(!i + 2) ~b:self.boundary
                ~len:(String.length self.boundary)
         then
           raise_notrace (Found_boundary !i);
@@ -95,7 +93,7 @@ let rec read_chunk_ (self : st) buf i_buf len : chunk =
       Read n_read
     with
     | Found_boundary 0 ->
-      shift_left_ self.buf (4 + String.length self.boundary);
+      shift_left_ self.buf (2 + String.length self.boundary);
       Delim
     | Found_boundary n ->
       let n_read = min n len in
@@ -191,7 +189,6 @@ and parse_headers_rec (self : st) acc : Headers.t =
       )
     | i ->
       let line = Bytes.sub_string self.buf_out.bs 0 i in
-      Printf.eprintf "parse header line %S\n%!" line;
       shift_left_ self.buf_out (i + 2);
       if line = "" then
         List.rev acc
