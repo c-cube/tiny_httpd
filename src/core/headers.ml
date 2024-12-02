@@ -46,6 +46,21 @@ let for_all pred s =
     true
   with Exit -> false
 
+let parse_line_ (line : string) : _ result =
+  try
+    let i =
+      try String.index line ':'
+      with Not_found -> failwith "invalid header, missing ':'"
+    in
+    let k = String.sub line 0 i in
+    if not (for_all is_tchar k) then
+      failwith (Printf.sprintf "Invalid header key: %S" k);
+    let v =
+      String.sub line (i + 1) (String.length line - i - 1) |> String.trim
+    in
+    Ok (k, v)
+  with Failure msg -> Error msg
+
 let parse_ ~(buf : Buf.t) (bs : IO.Input.t) : t =
   let rec loop acc =
     match IO.Input.read_line_using_opt ~buf bs with
@@ -56,16 +71,10 @@ let parse_ ~(buf : Buf.t) (bs : IO.Input.t) : t =
       bad_reqf 400 "bad header line, not ended in CRLF"
     | Some line ->
       let k, v =
-        try
-          let i = String.index line ':' in
-          let k = String.sub line 0 i in
-          if not (for_all is_tchar k) then
-            invalid_arg (Printf.sprintf "Invalid header key: %S" k);
-          let v =
-            String.sub line (i + 1) (String.length line - i - 1) |> String.trim
-          in
-          k, v
-        with _ -> bad_reqf 400 "invalid header line: %S" line
+        match parse_line_ line with
+        | Ok r -> r
+        | Error msg ->
+          bad_reqf 400 "invalid header line: %s\nline is: %S" msg line
       in
       loop ((String.lowercase_ascii k, v) :: acc)
   in

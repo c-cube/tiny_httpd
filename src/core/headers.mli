@@ -33,3 +33,7 @@ val pp : Format.formatter -> t -> unit
 (** Pretty print the headers. *)
 
 val parse_ : buf:Buf.t -> IO.Input.t -> t
+(**/*)
+
+val parse_line_ : string -> (string * string, string) result
+(**/*)
