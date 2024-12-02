@@ -41,34 +41,27 @@ let test input_str =
 let () =
   pf "T1\n";
   test
-    "\r\n\
-     --YOLO\r\n\
+    "--YOLO\r\n\
      some-super-cool: header here\r\n\
      ohlook: here\r\n\
      \r\n\
      and now for the b-o-d-y 👏\n\
-     \r\n\
      --YOLO\r\n\
      more: headers\r\n\
      \r\n\
      and another body\r\n\
-     \r\n\
      --YOLO--";
   pf "T1\n";
   test
     (spf
-       "\r\n\
-        --YOLO\r\n\
+       "--YOLO\r\n\
         some-super-cool: header here\r\n\
         ohlook: here\r\n\
         \r\n\
         and now for the bigger body:\n\
         %s\n\
-        \r\n\
         --YOLO\r\n\
         more: headers\r\n\
         \r\n\
-        and another body\r\n\
-        --YOLO--"
-       (String.make 500 'a'));
+        and another body--YOLO--" (String.make 500 'a'));
   ()
