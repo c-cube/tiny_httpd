@@ -1,4 +1,3 @@
-
 (tests
-  (names t1 t2)
-  (libraries tiny_httpd tiny_httpd.multipart-form-data))
+ (names t_chunk t_parse t_content_type)
+ (libraries tiny_httpd tiny_httpd.multipart-form-data))

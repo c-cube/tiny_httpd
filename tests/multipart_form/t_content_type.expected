@@ -1,0 +1,3 @@
+h: ["content-type": "yolo";"other": "whatev"], no content type
+h ["content-type": "multipart/form-data; boundary=helloworld; junk";"other": "whatev"]: got "helloworld", expected "helloworld", same=true
+h ["content-type": "multipart/form-data; lol=mdr;  boundary=\"some quoted boundary\""]: got "some quoted boundary", expected "some quoted boundary", same=true
