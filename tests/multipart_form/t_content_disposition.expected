@@ -1,0 +1,3 @@
+h: ["content-foobar": "yolo";"other": "whatev"], no content disp
+h ["content-disposition": "form-data; name=helloworld; junk";"other": "whatev"]: got {kind="form-data"; name="helloworld"; filename=None}, expected {kind="form-data"; name="helloworld"; filename=None}, same=true
+h ["content-disposition": "form-data; lol=mdr; filename=\"some quoted stuff\""]: got {kind="form-data"; name=None; filename="some quoted stuff"}, expected {kind="form-data"; name=None; filename="some quoted stuff"}, same=true
