@@ -1,3 +1,5 @@
+let spf = Printf.sprintf
+
 let string_eq ~a ~a_start ~b ~len : bool =
   assert (len <= String.length b);
   if String.length a >= a_start + len then (
@@ -16,3 +18,11 @@ let split1_on ~c s =
   match String.index s c with
   | exception Not_found -> None
   | i -> Some (String.sub s 0 i, String.sub s (i + 1) (String.length s - i - 1))
+
+let remove_quotes s : string =
+  if String.length s < 2 then
+    s
+  else if s.[0] = '"' && s.[String.length s - 1] = '"' then
+    String.sub s 1 (String.length s - 2)
+  else
+    s

@@ -2,6 +2,7 @@
 
 open Tiny_httpd
 module Slice = Iostream.Slice
+module Content_disposition = Content_disposition
 
 let spf = Printf.sprintf
 
@@ -216,12 +217,7 @@ let parse_content_type (hs : Tiny_httpd.Headers.t) : _ option =
           match Utils_.split1_on ~c:'=' @@ String.trim s with
           | Some ("boundary", "") -> ()
           | Some ("boundary", s) ->
-            let s =
-              if s.[0] = '"' && s.[String.length s - 1] = '"' then
-                String.sub s 1 (String.length s - 2)
-              else
-                s
-            in
+            let s = Utils_.remove_quotes s in
             boundary := Some (`boundary s)
           | _ -> ())
         tl;

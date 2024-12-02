@@ -1,4 +1,7 @@
-(** Parser for multipart/form-data *)
+(** Streaming parser for multipart/form-data *)
+
+module Content_disposition = Content_disposition
+
 type st
 (** Parser state *)
 
