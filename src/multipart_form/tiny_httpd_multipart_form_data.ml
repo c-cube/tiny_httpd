@@ -211,7 +211,6 @@ and parse_headers_rec (self : st) acc : Headers.t =
       )
     | i ->
       let line = Bytes.sub_string self.buf_out.bs 0 i in
-      Printf.eprintf "parse header line %S\n%!" line;
       shift_left_ self.buf_out (i + 2);
       if line = "" then
         List.rev acc
