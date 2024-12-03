@@ -1,0 +1,5 @@
+(library
+ (name tiny_httpd_multipart_form_data)
+ (public_name tiny_httpd.multipart-form-data)
+ (synopsis "Port of multipart-form-data for tiny_httpd")
+ (libraries iostream tiny_httpd))

@@ -1,5 +1,6 @@
 open Tiny_httpd_core
 module Log = Tiny_httpd.Log
+module MFD = Tiny_httpd_multipart_form_data
 
 let now_ = Unix.gettimeofday
 
@@ -77,6 +78,58 @@ let base64 x =
 let setup_logging () =
   Logs.set_reporter @@ Logs.format_reporter ();
   Logs.set_level ~all:true (Some Logs.Debug)
+
+let setup_upload server : unit =
+  Server.add_route_handler_stream ~meth:`POST server
+    Route.(exact "upload" @/ return)
+    (fun req ->
+      let (`boundary boundary) =
+        match MFD.parse_content_type req.headers with
+        | Some b -> b
+        | None -> Response.fail_raise ~code:400 "no boundary found"
+      in
+
+      let st = MFD.create ~boundary req.body in
+      let tbl = Hashtbl.create 16 in
+      let cur = ref "" in
+      let cur_kind = ref "" in
+      let buf = Buffer.create 16 in
+      let rec loop () =
+        match MFD.next st with
+        | End_of_input ->
+          if !cur <> "" then
+            Hashtbl.add tbl !cur (!cur_kind, Buffer.contents buf)
+        | Part headers ->
+          if !cur <> "" then
+            Hashtbl.add tbl !cur (!cur_kind, Buffer.contents buf);
+          (match MFD.Content_disposition.parse headers with
+          | Some { kind; name = Some name; filename = _ } ->
+            cur := name;
+            cur_kind := kind;
+            Buffer.clear buf;
+            loop ()
+          | _ -> Response.fail_raise ~code:400 "content disposition missing")
+        | Read sl ->
+          Buffer.add_subbytes buf sl.bytes sl.off sl.len;
+          loop ()
+      in
+      loop ();
+
+      let open Tiny_httpd_html in
+      let data =
+        Hashtbl.fold
+          (fun name (kind, data) acc ->
+            Printf.sprintf "%S (kind: %S): %S" name kind data :: acc)
+          tbl []
+      in
+      let html =
+        body []
+          [
+            pre []
+              [ txt (Printf.sprintf "{\n%s\n}" @@ String.concat "\n" data) ];
+          ]
+      in
+      Response.make_string ~code:201 @@ Ok (to_string_top html))
 
 let () =
   let port_ = ref 8080 in
@@ -198,6 +251,8 @@ let () =
          ~dir_behavior:Tiny_httpd.Dir.Index_or_lists ())
     ~vfs:Vfs.vfs ~prefix:"vfs";
 
+  setup_upload server;
+
   (* main page *)
   Server.add_route_handler server
     Route.(return)
@@ -265,6 +320,34 @@ let () =
                           [
                             a [ A.href "/logout" ] [ txt "/logout" ];
                             txt " (POST) to log out";
+                          ];
+                      ];
+                    li []
+                      [
+                        form
+                          [
+                            A.action "/upload";
+                            A.enctype "multipart/form-data";
+                            A.target "_self";
+                            A.method_ "POST";
+                          ]
+                          [
+                            label [] [ txt "my beautiful form" ];
+                            input [ A.type_ "file"; A.name "file1" ];
+                            input [ A.type_ "file"; A.name "file2" ];
+                            input
+                              [
+                                A.type_ "text";
+                                A.name "a";
+                                A.placeholder "text A";
+                              ];
+                            input
+                              [
+                                A.type_ "text";
+                                A.name "b";
+                                A.placeholder "text B";
+                              ];
+                            input [ A.type_ "submit" ];
                           ];
                       ];
                   ];

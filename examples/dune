@@ -12,7 +12,7 @@
  (name echo)
  (flags :standard -warn-error -a+8)
  (modules echo vfs)
- (libraries tiny_httpd logs tiny_httpd_camlzip))
+ (libraries tiny_httpd logs tiny_httpd_camlzip tiny_httpd.multipart-form-data))
 
 (executable
  (name writer)
