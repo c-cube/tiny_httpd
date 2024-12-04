@@ -314,10 +314,11 @@ let find_map f l =
 let header_list_contains_ (s : string) (name : string) : bool =
   let name' = String.lowercase_ascii name in
   let fragments = String.split_on_char ',' s in
-  List.exists (fun fragment -> 
-    String.lowercase_ascii (String.trim fragment) = name') fragments
+  List.exists
+    (fun fragment -> String.lowercase_ascii (String.trim fragment) = name')
+    fragments
 
-(* handle client on [ic] and [oc] *)
+(** handle client on [ic] and [oc] *)
 let client_handle_for (self : t) ~client_addr ic oc : unit =
   Pool.with_resource self.bytes_pool @@ fun bytes_req ->
   Pool.with_resource self.bytes_pool @@ fun bytes_res ->
@@ -414,10 +415,10 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
 
   (* merge per-request middlewares with the server-global middlewares *)
   let get_middlewares ~handler_middlewares () : _ list =
-    let global_middlewares = Lazy.force self.middlewares_sorted in
-    if handler_middlewares = [] then
+    if handler_middlewares = [] then (
+      let global_middlewares = Lazy.force self.middlewares_sorted in
       global_middlewares
-    else
+    ) else
       sort_middlewares_ (List.rev_append handler_middlewares self.middlewares)
   in
 
