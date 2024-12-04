@@ -125,6 +125,7 @@ include module type of struct
 end
 
 val create :
+  ?enable_logging:bool ->
   ?masksigpipe:bool ->
   ?max_connections:int ->
   ?timeout:float ->
@@ -167,6 +168,8 @@ val create :
       systemd on Linux (or launchd on macOS). If passed in, this socket will be
       used instead of the [addr] and [port]. If not passed in, those will be
       used. This parameter exists since 0.10.
+    @param enable_logging if true and [Logs] is installed, log requests. Default true.
+      This parameter exists since NEXT_RELEASE. Does not affect debug-level logs.
 
     @param get_time_s obtain the current timestamp in seconds.
       This parameter exists since 0.11.

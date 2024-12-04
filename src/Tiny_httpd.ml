@@ -27,8 +27,8 @@ open struct
     slice.len <- 0
 end
 
-let create ?(masksigpipe = not Sys.win32) ?max_connections ?(timeout = 0.0)
-    ?buf_size ?(get_time_s = Unix.gettimeofday)
+let create ?enable_logging ?(masksigpipe = not Sys.win32) ?max_connections
+    ?(timeout = 0.0) ?buf_size ?(get_time_s = Unix.gettimeofday)
     ?(new_thread = fun f -> ignore (Thread.create f () : Thread.t))
     ?(addr = "127.0.0.1") ?(port = 8080) ?sock ?middlewares () : t =
   let max_connections = get_max_connection_ ?max_connections () in
@@ -65,4 +65,4 @@ let create ?(masksigpipe = not Sys.win32) ?max_connections ?(timeout = 0.0)
     let tcp_server () = tcp_server_builder
   end in
   let backend = (module B : IO_BACKEND) in
-  Server.create_from ?buf_size ?middlewares ~backend ()
+  Server.create_from ?enable_logging ?buf_size ?middlewares ~backend ()

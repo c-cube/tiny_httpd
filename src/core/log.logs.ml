@@ -1,6 +1,8 @@
 (* Use Logs *)
 
-module Log = (val Logs.(src_log @@ Src.create "tiny_httpd"))
+let log_src = Logs.Src.create "tiny_httpd"
+
+module Log = (val Logs.(src_log log_src))
 
 let info k = Log.info (fun fmt -> k (fun x -> fmt ?header:None ?tags:None x))
 let debug k = Log.debug (fun fmt -> k (fun x -> fmt ?header:None ?tags:None x))
@@ -15,8 +17,9 @@ let setup ~debug () =
   Logs.set_level ~all:true
     (Some
        (if debug then
-         Logs.Debug
-       else
-         Logs.Info))
+          Logs.Debug
+        else
+          Logs.Info))
 
 let dummy = false
+let fully_disable () = Logs.Src.set_level log_src None

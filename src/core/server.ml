@@ -84,6 +84,7 @@ let unwrap_handler_result req = function
 
 type t = {
   backend: (module IO_BACKEND);
+  enable_logging: bool;
   mutable tcp_server: IO.TCP_server.t option;
   mutable handler: IO.Input.t Request.t -> Response.t;
       (** toplevel handler, if any *)
@@ -250,7 +251,7 @@ let add_route_server_sent_handler ?accept ?(middlewares = []) self route f =
     end in
     (try f req (module SSG : SERVER_SENT_GENERATOR)
      with Exit_SSE -> IO.Output.close oc);
-    Log.info (fun k -> k "closed SSE connection")
+    if self.enable_logging then Log.info (fun k -> k "closed SSE connection")
   in
   add_route_handler_ self ?accept ~meth:`GET route ~tr_req f
 
@@ -272,11 +273,13 @@ let add_upgrade_handler ?(accept = fun _ -> Ok ()) ?(middlewares = [])
 
 let clear_bytes_ bs = Bytes.fill bs 0 (Bytes.length bs) '\x00'
 
-let create_from ?(buf_size = 16 * 1_024) ?(middlewares = []) ~backend () : t =
+let create_from ?(enable_logging = not Log.dummy) ?(buf_size = 16 * 1_024)
+    ?(middlewares = []) ~backend () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let self =
     {
       backend;
+      enable_logging;
       tcp_server = None;
       handler;
       path_handlers = [];
@@ -326,7 +329,7 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
 
   (* how to log the response to this query *)
   let log_response (req : _ Request.t) (resp : Response.t) =
-    if not Log.dummy then (
+    if self.enable_logging && not Log.dummy then (
       let msgf k =
         let elapsed = B.get_time_s () -. req.start_time in
         k
@@ -353,14 +356,14 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
   let handle_exn e bt : unit =
     let msg = Printexc.to_string e in
     let resp = Response.fail ~code:500 "server error: %s" msg in
-    if not Log.dummy then log_exn msg bt;
+    if self.enable_logging && not Log.dummy then log_exn msg bt;
     Response.Private_.output_ ~bytes:bytes_res oc resp
   in
 
   let handle_bad_req req e bt =
     let msg = Printexc.to_string e in
     let resp = Response.fail ~code:500 "server error: %s" msg in
-    if not Log.dummy then (
+    if self.enable_logging && not Log.dummy then (
       log_exn msg bt;
       log_response req resp
     );
@@ -393,7 +396,8 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
       match UP.handshake client_addr req with
       | Error msg ->
         (* fail the upgrade *)
-        Log.error (fun k -> k "upgrade failed: %s" msg);
+        if self.enable_logging then
+          Log.error (fun k -> k "upgrade failed: %s" msg);
         send_resp @@ Response.make_raw ~code:429 "upgrade required"
       | Ok (headers, handshake_st) ->
         (* send the upgrade reply *)

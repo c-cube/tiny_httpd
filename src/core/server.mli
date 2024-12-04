@@ -81,6 +81,7 @@ module type IO_BACKEND = sig
 end
 
 val create_from :
+  ?enable_logging:bool ->
   ?buf_size:int ->
   ?middlewares:([ `Encoding | `Stage of int ] * Middleware.t) list ->
   backend:(module IO_BACKEND) ->
@@ -94,6 +95,9 @@ val create_from :
 
     @param buf_size size for buffers (since 0.11)
     @param middlewares see {!add_middleware} for more details.
+    @param enable_logging if true and [Logs] is installed,
+      emit logs via Logs (since NEXT_RELEASE).
+      Default [true].
 
     @since 0.14
 *)
@@ -117,7 +121,7 @@ val add_decode_request_cb :
   t ->
   (unit Request.t -> (unit Request.t * (IO.Input.t -> IO.Input.t)) option) ->
   unit
-  [@@deprecated "use add_middleware"]
+[@@deprecated "use add_middleware"]
 (** Add a callback for every request.
     The callback can provide a stream transformer and a new request (with
     modified headers, typically).
@@ -129,7 +133,7 @@ val add_decode_request_cb :
 
 val add_encode_response_cb :
   t -> (unit Request.t -> Response.t -> Response.t option) -> unit
-  [@@deprecated "use add_middleware"]
+[@@deprecated "use add_middleware"]
 (** Add a callback for every request/response pair.
     Similarly to {!add_encode_response_cb} the callback can return a new
     response, for example to compress it.
