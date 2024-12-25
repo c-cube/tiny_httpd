@@ -244,6 +244,11 @@ let () =
     Route.(exact "alice" @/ return)
     (fun _req -> Response.make_string (Ok alice_text));
 
+  Server.add_route_handler ~meth:`HEAD server
+    Route.(exact "head" @/ return)
+    (fun _req ->
+      Response.make_void ~code:200 ~headers:[ "x-hello", "world" ] ());
+
   (* VFS *)
   Tiny_httpd.Dir.add_vfs server
     ~config:
