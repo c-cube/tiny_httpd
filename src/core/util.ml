@@ -5,9 +5,9 @@ let percent_encode ?(skip = fun _ -> false) s =
       | c when skip c -> Buffer.add_char buf c
       | ( ' ' | '!' | '"' | '#' | '$' | '%' | '&' | '\'' | '(' | ')' | '*' | '+'
         | ',' | '/' | ':' | ';' | '=' | '?' | '@' | '[' | ']' | '~' ) as c ->
-        Printf.bprintf buf "%%%X" (Char.code c)
+        Printf.bprintf buf "%%%02X" (Char.code c)
       | c when Char.code c < 32 || Char.code c > 127 ->
-        Printf.bprintf buf "%%%X" (Char.code c)
+        Printf.bprintf buf "%%%02X" (Char.code c)
       | c -> Buffer.add_char buf c)
     s;
   Buffer.contents buf

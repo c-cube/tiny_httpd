@@ -4,6 +4,7 @@ module U = Util
 
 let () = assert_eq "hello%20world" (U.percent_encode "hello world")
 let () = assert_eq "%23%25^%24%40^%40" (U.percent_encode "#%^$@^@")
+let () = assert_eq "%0F" (U.percent_encode "\015")
 
 let () =
   assert_eq "a%20ohm%2B5235%25%26%40%23%20---%20_"
@@ -13,11 +14,15 @@ let () = assert_eq (Some "?") (U.percent_decode @@ U.percent_encode "?")
 
 let () =
   add_qcheck
-  @@ QCheck.Test.make ~count:1_000 ~long_factor:20 Q.string (fun s ->
+  @@ QCheck.Test.make ~name:__LOC__ ~count:1_000 ~long_factor:20 Q.string
+       (fun s ->
          String.iter (fun c -> Q.assume @@ is_ascii_char c) s;
          match U.percent_decode (U.percent_encode s) with
          | Some s' -> s = s'
-         | None -> Q.Test.fail_report "invalid percent encoding")
+         | None ->
+           Q.Test.fail_reportf
+             "invalid percent encoding of %S (encoding is %S, fails to decode)"
+             s (U.percent_encode s))
 
 let () = assert_eq [ "a"; "b" ] (U.split_on_slash "/a/b")
 let () = assert_eq [ "coucou"; "lol" ] (U.split_on_slash "/coucou/lol")
@@ -34,7 +39,7 @@ let () = assert_eq (Ok [ "foo", "bar" ]) (U.parse_query "yolo#foo=bar")
 
 let () =
   add_qcheck
-  @@ QCheck.Test.make ~long_factor:20 ~count:1_000
+  @@ QCheck.Test.make ~name:__LOC__ ~long_factor:20 ~count:1_000
        Q.(small_list (pair string string))
        (fun l ->
          List.iter
