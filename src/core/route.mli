@@ -32,7 +32,7 @@ val rest_of_path : (string -> 'a, 'a) t
       @since 0.7 *)
 
 val rest_of_path_urlencoded : (string -> 'a, 'a) t
-(** Matches a string, even containing ['/'], an URL-decode it.
+(** Matches a string, even containing ['/'], and URL-decode it (piecewise).
       This will match the entirety of the remaining route.
       @since 0.7 *)
 
