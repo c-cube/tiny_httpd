@@ -18,7 +18,7 @@ jobs:
         ocaml-compiler:
           - 4.08.x
           - 4.14.x
-          - 5.01.x
+          - 5.03.x
 
     runs-on: ${{ matrix.os }}
 
@@ -30,7 +30,7 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' }}
 
       - name: Use OCaml ${{ matrix.ocaml-compiler }}
-        uses: ocaml/setup-ocaml@v2
+        uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           allow-prerelease-opam: true
