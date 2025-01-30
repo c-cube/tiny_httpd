@@ -28,24 +28,27 @@
   <span><a href="../Ident/index.html#type-t">Ident.t</a> <span class="arrow">&#45;&gt;</span></span>
   <span><a href="../Types/index.html#type-extension_constructor">Types.extension_constructor</a> <span class="arrow">&#45;&gt;</span></span>
   <span><a href="../Types/index.html#type-extension_constructor">Types.extension_constructor</a> <span class="arrow">&#45;&gt;</span></span>
-  <span><a href="#type-extension_constructor_mismatch">extension_constructor_mismatch</a> option</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-report_value_mismatch"><a href="#val-report_value_mismatch" class="anchor"></a><code><span><span class="keyword">val</span> report_value_mismatch : 
+  <span><a href="#type-extension_constructor_mismatch">extension_constructor_mismatch</a> option</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-value_descriptions_consistency"><a href="#val-value_descriptions_consistency" class="anchor"></a><code><span><span class="keyword">val</span> value_descriptions_consistency : 
+  <span><a href="../Env/index.html#type-t">Env.t</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../Types/index.html#type-value_description">Types.value_description</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../Types/index.html#type-value_description">Types.value_description</a> <span class="arrow">&#45;&gt;</span></span>
+  <a href="../Typedtree/index.html#type-module_coercion">Typedtree.module_coercion</a></span></code></div><div class="spec-doc"><p>The functions <code>value_descriptions_consistency</code> and <code>type_declarations_consistency</code> check if two declaration are consistent. Declarations are consistent when there exists an environment such that the first declaration is a subtype of the second one.</p><p>Notably, if a type declaration <code>td1</code> is consistent with <code>td2</code> then a type expression <code>te</code> which is well-formed with the <code>td2</code> declaration in scope is still well-formed with the <code>td1</code> declaration: <code>E, td2 |- te</code> =&gt; <code>E, td1
+    |- te</code>.</p></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-type_declarations_consistency"><a href="#val-type_declarations_consistency" class="anchor"></a><code><span><span class="keyword">val</span> type_declarations_consistency : 
+  <span><a href="../Env/index.html#type-t">Env.t</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../Types/index.html#type-type_declaration">Types.type_declaration</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="../Types/index.html#type-type_declaration">Types.type_declaration</a> <span class="arrow">&#45;&gt;</span></span>
+  <span><a href="#type-type_mismatch">type_mismatch</a> option</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-report_value_mismatch"><a href="#val-report_value_mismatch" class="anchor"></a><code><span><span class="keyword">val</span> report_value_mismatch : 
   <span>string <span class="arrow">&#45;&gt;</span></span>
   <span>string <span class="arrow">&#45;&gt;</span></span>
   <span><a href="../Env/index.html#type-t">Env.t</a> <span class="arrow">&#45;&gt;</span></span>
-  <span><a href="../Stdlib/Format/index.html#type-formatter">Stdlib.Format.formatter</a> <span class="arrow">&#45;&gt;</span></span>
-  <span><a href="#type-value_mismatch">value_mismatch</a> <span class="arrow">&#45;&gt;</span></span>
-  unit</span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-report_type_mismatch"><a href="#val-report_type_mismatch" class="anchor"></a><code><span><span class="keyword">val</span> report_type_mismatch : 
+  <span><a href="#type-value_mismatch">value_mismatch</a> <a href="../Format_doc/index.html#type-printer">Format_doc.printer</a></span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-report_type_mismatch"><a href="#val-report_type_mismatch" class="anchor"></a><code><span><span class="keyword">val</span> report_type_mismatch : 
   <span>string <span class="arrow">&#45;&gt;</span></span>
   <span>string <span class="arrow">&#45;&gt;</span></span>
   <span>string <span class="arrow">&#45;&gt;</span></span>
   <span><a href="../Env/index.html#type-t">Env.t</a> <span class="arrow">&#45;&gt;</span></span>
-  <span><a href="../Stdlib/Format/index.html#type-formatter">Stdlib.Format.formatter</a> <span class="arrow">&#45;&gt;</span></span>
-  <span><a href="#type-type_mismatch">type_mismatch</a> <span class="arrow">&#45;&gt;</span></span>
-  unit</span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-report_extension_constructor_mismatch"><a href="#val-report_extension_constructor_mismatch" class="anchor"></a><code><span><span class="keyword">val</span> report_extension_constructor_mismatch : 
+  <span><a href="#type-type_mismatch">type_mismatch</a> <a href="../Format_doc/index.html#type-printer">Format_doc.printer</a></span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-report_extension_constructor_mismatch"><a href="#val-report_extension_constructor_mismatch" class="anchor"></a><code><span><span class="keyword">val</span> report_extension_constructor_mismatch : 
   <span>string <span class="arrow">&#45;&gt;</span></span>
   <span>string <span class="arrow">&#45;&gt;</span></span>
   <span>string <span class="arrow">&#45;&gt;</span></span>
   <span><a href="../Env/index.html#type-t">Env.t</a> <span class="arrow">&#45;&gt;</span></span>
-  <span><a href="../Stdlib/Format/index.html#type-formatter">Stdlib.Format.formatter</a> <span class="arrow">&#45;&gt;</span></span>
-  <span><a href="#type-extension_constructor_mismatch">extension_constructor_mismatch</a> <span class="arrow">&#45;&gt;</span></span>
-  unit</span></code></div></div></div></body></html>
+  <span><a href="#type-extension_constructor_mismatch">extension_constructor_mismatch</a> <a href="../Format_doc/index.html#type-printer">Format_doc.printer</a></span></span></code></div></div></div></body></html>
