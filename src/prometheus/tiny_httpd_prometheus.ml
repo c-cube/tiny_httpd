@@ -205,7 +205,9 @@ let add_route_to_server (server : Server.t) (reg : registry) : unit =
   Server.add_route_handler server Route.(exact "metrics" @/ return)
   @@ fun _req ->
   let str = Registry.emit_str reg in
-  Response.make_string @@ Ok str
+  (* https://prometheus.io/docs/instrumenting/exposition_formats/#text-based-format *)
+  let headers = [ "content-type", "text/plain; version=0.0.4" ] in
+  Response.make_string ~headers @@ Ok str
 
 let instrument_server (server : Server.t) reg : unit =
   Server.add_middleware ~stage:(`Stage 1) server (http_middleware reg);
