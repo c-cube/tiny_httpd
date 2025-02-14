@@ -1,4 +1,4 @@
-(lang dune 2.9)
+(lang dune 3.2)
 (name tiny_httpd)
 (generate_opam_files true)
 
