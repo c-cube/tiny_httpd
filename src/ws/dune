@@ -1,3 +1,28 @@
+; Set BUILD_TINY_HTTPD_OPTLEVEL to the -O<num> level.
+; Defaults to 2, which means -O2 is the default C optimization flag.
+; Use -1 to remove the -O<num> flag entirely.
+(rule
+ (enabled_if (>= %{env:BUILD_TINY_HTTPD_OPTLEVEL=2} 0))
+ (target optlevel.string)
+ (deps (env_var BUILD_TINY_HTTPD_OPTLEVEL))
+ (action (with-stdout-to %{target} (echo "-O%{env:BUILD_TINY_HTTPD_OPTLEVEL=2}"))))
+(rule
+ (enabled_if (< %{env:BUILD_TINY_HTTPD_OPTLEVEL=2} 0))
+ (target optlevel.string)
+ (deps (env_var BUILD_TINY_HTTPD_OPTLEVEL))
+ (action (with-stdout-to %{target} (echo ""))))
+
+; All compilers will include the optimization level.
+; Non-MSVC compilers will include `-std=c99 -fPIC`.
+(rule
+ (enabled_if (= %{ocaml-config:ccomp_type} msvc))
+ (target cflags.sexp)
+ (action (with-stdout-to %{target} (echo "(%{read:optlevel.string})"))))
+(rule
+ (enabled_if (not (= %{ocaml-config:ccomp_type} msvc)))
+ (target cflags.sexp)
+ (action (with-stdout-to %{target} (echo "(-std=c99 -fPIC %{read:optlevel.string})"))))
+
 (library
  (name tiny_httpd_ws)
  (public_name tiny_httpd.ws)
@@ -7,7 +32,7 @@
  (foreign_stubs
   (language c)
   (names tiny_httpd_ws_stubs)
-  (flags :standard -std=c99 -fPIC -O2))
+  (flags :standard (:include cflags.sexp)))
  (libraries
   (re_export tiny_httpd.core)
   threads))
