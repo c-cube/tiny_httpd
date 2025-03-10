@@ -1,0 +1,6 @@
+
+
+(library
+ (name tiny_httpd_moonpool)
+ (public_name tiny_httpd_moonpool)
+ (libraries tiny_httpd moonpool moonpool.sync moonpool.fib moonpool-io))

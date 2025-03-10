@@ -39,3 +39,14 @@
     (iostream-camlzip (>= 0.2.1))
     (logs :with-test)
     (odoc :with-doc)))
+
+(package
+  (name tiny_httpd_moonpool)
+  (synopsis "Moonpool+picos_stdio backend for Tiny_httpd")
+  (depends
+    seq
+    (tiny_httpd (= :version))
+    (moonpool (>= 0.7))
+    (moonpool-io (>= 0.7))
+    (ocaml (>= 5.0))
+    (odoc :with-doc)))
