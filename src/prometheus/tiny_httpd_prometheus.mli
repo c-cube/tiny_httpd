@@ -72,11 +72,6 @@ module Histogram : sig
   val add : t -> float -> unit
 end
 
-(* TODO:
-   module Histogram : sig
-   end
-*)
-
 val http_middleware : Registry.t -> Server.Middleware.t
 (** Middleware to get basic metrics about HTTP requests *)
 
