@@ -1,7 +1,5 @@
 module S = Tiny_httpd
-module U = Tiny_httpd.Util
 module D = Tiny_httpd.Dir
-module Pf = Printf
 module Log = Tiny_httpd.Log
 
 let serve ~config ~timeout (dir : string) addr port j : _ result =
@@ -9,9 +7,9 @@ let serve ~config ~timeout (dir : string) addr port j : _ result =
   let after_init () =
     Printf.printf "serve directory %s on http://%(%s%):%d\n%!" dir
       (if S.is_ipv6 server then
-        "[%s]"
-      else
-        "%s")
+         "[%s]"
+       else
+         "%s")
       addr (S.port server)
   in
 
@@ -63,9 +61,9 @@ let main () =
              (fun b ->
                config.dir_behavior <-
                  (if b then
-                   Index_or_lists
-                 else
-                   Lists)),
+                    Index_or_lists
+                  else
+                    Lists)),
            " <bool> automatically redirect to index.html if present" );
          ( "--delete",
            Unit (fun () -> config.delete <- true),
