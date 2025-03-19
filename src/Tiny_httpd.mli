@@ -135,6 +135,7 @@ val create :
   ?addr:string ->
   ?port:int ->
   ?sock:Unix.file_descr ->
+  ?head_middlewares:Head_middleware.t list ->
   ?middlewares:([ `Encoding | `Stage of int ] * Middleware.t) list ->
   unit ->
   t

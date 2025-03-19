@@ -30,7 +30,8 @@ end
 let create ?enable_logging ?(masksigpipe = not Sys.win32) ?max_connections
     ?(timeout = 0.0) ?buf_size ?(get_time_s = Unix.gettimeofday)
     ?(new_thread = fun f -> ignore (Thread.create f () : Thread.t))
-    ?(addr = "127.0.0.1") ?(port = 8080) ?sock ?middlewares () : t =
+    ?(addr = "127.0.0.1") ?(port = 8080) ?sock ?head_middlewares ?middlewares ()
+    : t =
   let max_connections = get_max_connection_ ?max_connections () in
   let server =
     {
@@ -65,4 +66,5 @@ let create ?enable_logging ?(masksigpipe = not Sys.win32) ?max_connections
     let tcp_server () = tcp_server_builder
   end in
   let backend = (module B : IO_BACKEND) in
-  Server.create_from ?enable_logging ?buf_size ?middlewares ~backend ()
+  Server.create_from ?enable_logging ?buf_size ?head_middlewares ?middlewares
+    ~backend ()

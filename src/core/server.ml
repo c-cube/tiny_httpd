@@ -88,6 +88,7 @@ type t = {
   mutable tcp_server: IO.TCP_server.t option;
   mutable handler: IO.Input.t Request.t -> Response.t;
       (** toplevel handler, if any *)
+  mutable head_middlewares: Head_middleware.t list;
   mutable middlewares: (int * Middleware.t) list;  (** Global middlewares *)
   mutable middlewares_sorted: (int * Middleware.t) list lazy_t;
       (** sorted version of {!middlewares} *)
@@ -127,6 +128,9 @@ let add_middleware ~stage self m =
   in
   self.middlewares <- (stage, m) :: self.middlewares;
   self.middlewares_sorted <- lazy (sort_middlewares_ self.middlewares)
+
+let add_head_middleware (self : t) m : unit =
+  self.head_middlewares <- m :: self.head_middlewares
 
 let add_decode_request_cb self f =
   (* turn it into a middleware *)
@@ -258,6 +262,7 @@ let add_route_server_sent_handler ?accept ?(middlewares = []) self route f =
 let add_upgrade_handler ?(accept = fun _ -> Ok ()) ?(middlewares = [])
     (self : t) route f : unit =
   let ph req : handler_result option =
+    let middlewares = List.rev_append self.head_middlewares middlewares in
     if req.Request.meth <> `GET then
       None
     else (
@@ -274,7 +279,7 @@ let add_upgrade_handler ?(accept = fun _ -> Ok ()) ?(middlewares = [])
 let clear_bytes_ bs = Bytes.fill bs 0 (Bytes.length bs) '\x00'
 
 let create_from ?(enable_logging = not Log.dummy) ?(buf_size = 16 * 1_024)
-    ?(middlewares = []) ~backend () : t =
+    ?(head_middlewares = []) ?(middlewares = []) ~backend () : t =
   let handler _req = Response.fail ~code:404 "no top handler" in
   let self =
     {
@@ -283,6 +288,7 @@ let create_from ?(enable_logging = not Log.dummy) ?(buf_size = 16 * 1_024)
       tcp_server = None;
       handler;
       path_handlers = [];
+      head_middlewares;
       middlewares = [];
       middlewares_sorted = lazy [];
       bytes_pool =
