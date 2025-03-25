@@ -5,6 +5,7 @@ let not_found = 404
 
 let descr = function
   | 100 -> "Continue"
+  | 101 -> "Switching Protocols"
   | 200 -> "OK"
   | 201 -> "Created"
   | 202 -> "Accepted"
