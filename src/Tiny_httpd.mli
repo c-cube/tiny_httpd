@@ -170,7 +170,7 @@ val create :
       used instead of the [addr] and [port]. If not passed in, those will be
       used. This parameter exists since 0.10.
     @param enable_logging if true and [Logs] is installed, log requests. Default true.
-      This parameter exists since NEXT_RELEASE. Does not affect debug-level logs.
+      This parameter exists since 0.18. Does not affect debug-level logs.
 
     @param get_time_s obtain the current timestamp in seconds.
       This parameter exists since 0.11.

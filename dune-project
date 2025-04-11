@@ -4,7 +4,7 @@
 
 (authors c-cube)
 (maintainers c-cube)
-(version 0.17)
+(version 0.18)
 (source (github c-cube/tiny_httpd))
 (homepage https://github.com/c-cube/tiny_httpd/)
 (license MIT)

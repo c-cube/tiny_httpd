@@ -126,7 +126,7 @@ val pp_with :
       Default is ["set-cookie"].
     @param pp_body body printer
       (default fully prints String bodies, but omits stream bodies)
-    @since NEXT_RELEASE *)
+    @since 0.18 *)
 
 val pp : Format.formatter -> t -> unit
 (** Pretty print the response. The exact format is not specified. *)

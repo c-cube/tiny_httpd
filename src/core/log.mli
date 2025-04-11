@@ -14,4 +14,4 @@ val dummy : bool
 val fully_disable : unit -> unit
 (** Totally silence logs for tiny_httpd. With [Logs] installed this means setting
     the level of the tiny_httpd source to [None]. 
-  @since NEXT_RELEASE *)
+  @since 0.18 *)
