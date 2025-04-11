@@ -95,10 +95,10 @@ val create_from :
     {!set_top_handler} to specify how to handle incoming requests.
 
     @param buf_size size for buffers (since 0.11)
-    @param head_middlewares see {!add_head_middleware} for details (since NEXT_RELEASE)
+    @param head_middlewares see {!add_head_middleware} for details (since 0.18)
     @param middlewares see {!add_middleware} for more details.
     @param enable_logging if true and [Logs] is installed,
-      emit logs via Logs (since NEXT_RELEASE).
+      emit logs via Logs (since 0.18).
       Default [true].
 
     @since 0.14
@@ -158,7 +158,7 @@ val add_head_middleware : t -> Head_middleware.t -> unit
 (** Add a request-header only {!Head_middleware.t}.
     This is called on requests, to modify them, and returns a new request
     immediately.
-    @since NEXT_RELEASE *)
+    @since 0.18 *)
 
 (** {2 Request handlers} *)
 
