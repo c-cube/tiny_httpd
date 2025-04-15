@@ -23,3 +23,12 @@ val with_resource : 'a t -> ('a -> 'b) -> 'b
 (** [with_resource pool f] runs [f x] with [x] a resource;
     when [f] fails or returns, [x] is returned to the pool for
     future reuse. *)
+
+(** Low level control over the pool.
+    This is easier to get wrong (e.g. releasing the same resource twice)
+    so use with caution.
+  @since NEXT_RELEASE *)
+module Raw : sig
+  val acquire : 'a t -> 'a
+  val release : 'a t -> 'a -> unit
+end
