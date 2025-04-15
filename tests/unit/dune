@@ -1,4 +1,4 @@
 (tests
- (names t_util t_buf t_server t_io)
+ (names t_util t_buf t_server t_io t_response)
  (package tiny_httpd)
  (libraries tiny_httpd.core qcheck-core qcheck-core.runner test_util))
