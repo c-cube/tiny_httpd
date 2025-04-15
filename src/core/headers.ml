@@ -35,7 +35,15 @@ let get ?(f = fun x -> x) x h =
   try Some (get_exn ~f x h) with Not_found -> None
 
 let remove x h = List.filter (fun (k, _) -> not (equal_name_ k x)) h
-let set x y h = (x, y) :: List.filter (fun (k, _) -> not (equal_name_ k x)) h
+
+let set x y h =
+  let h =
+    if contains x h then
+      remove x h
+    else
+      h
+  in
+  (x, y) :: h
 
 let pp out l =
   let pp_pair out (k, v) = Format.fprintf out "@[<h>%s: %s@]" k v in
