@@ -4,24 +4,38 @@ type t = (string * string) list
 
 let empty = []
 
-let contains name headers =
-  let name' = String.lowercase_ascii name in
-  List.exists (fun (n, _) -> name' = n) headers
+(* [Char.lowercase_ascii] but easier to inline *)
+let[@inline] lower_char_ = function
+  | 'A' .. 'Z' as c -> Char.unsafe_chr (Char.code c + 32)
+  | c -> c
 
-let get_exn ?(f = fun x -> x) x h =
-  let x' = String.lowercase_ascii x in
-  List.assoc x' h |> f
+(** Are these two header names equal? This is case insensitive *)
+let equal_name_ (s1 : string) (s2 : string) : bool =
+  String.length s1 = String.length s2
+  &&
+  try
+    for i = 0 to String.length s1 - 1 do
+      let c1 = String.unsafe_get s1 i |> lower_char_ in
+      let c2 = String.unsafe_get s2 i |> lower_char_ in
+      if c1 <> c2 then raise_notrace Exit
+    done;
+    true
+  with Exit -> false
+
+let contains name headers =
+  List.exists (fun (n, _) -> equal_name_ name n) headers
+
+let rec get_exn ?(f = fun x -> x) x h =
+  match h with
+  | [] -> raise Not_found
+  | (k, v) :: _ when equal_name_ x k -> f v
+  | _ :: tl -> get_exn ~f x tl
 
 let get ?(f = fun x -> x) x h =
   try Some (get_exn ~f x h) with Not_found -> None
 
-let remove x h =
-  let x' = String.lowercase_ascii x in
-  List.filter (fun (k, _) -> k <> x') h
-
-let set x y h =
-  let x' = String.lowercase_ascii x in
-  (x', y) :: List.filter (fun (k, _) -> k <> x') h
+let remove x h = List.filter (fun (k, _) -> not (equal_name_ k x)) h
+let set x y h = (x, y) :: List.filter (fun (k, _) -> not (equal_name_ k x)) h
 
 let pp out l =
   let pp_pair out (k, v) = Format.fprintf out "@[<h>%s: %s@]" k v in
@@ -76,6 +90,6 @@ let parse_ ~(buf : Buf.t) (bs : IO.Input.t) : t =
         | Error msg ->
           bad_reqf 400 "invalid header line: %s\nline is: %S" msg line
       in
-      loop ((String.lowercase_ascii k, v) :: acc)
+      loop ((k, v) :: acc)
   in
   loop []
