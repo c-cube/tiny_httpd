@@ -15,7 +15,11 @@ let set_code code self = { self with code }
 let make_raw ?(headers = []) ~code body : t =
   (* add content length to response *)
   let headers =
-    Headers.set "Content-Length" (string_of_int (String.length body)) headers
+    if Headers.contains "content-length" headers then
+      (* do not override user-provided headers (e.g. in HEAD), see #92 *)
+      headers
+    else
+      Headers.set "Content-Length" (string_of_int (String.length body)) headers
   in
   { code; headers; body = `String body }
 
