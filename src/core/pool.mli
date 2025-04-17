@@ -27,7 +27,7 @@ val with_resource : 'a t -> ('a -> 'b) -> 'b
 (** Low level control over the pool.
     This is easier to get wrong (e.g. releasing the same resource twice)
     so use with caution.
-  @since NEXT_RELEASE *)
+  @since 0.18 *)
 module Raw : sig
   val acquire : 'a t -> 'a
   val release : 'a t -> 'a -> unit
