@@ -1,4 +1,23 @@
 
+## 0.19
+
+- feat(headers): `set` will not reallocate whole list if not needed
+- feat(headers): use case insensitive comparison
+- fix(response): do not override "content-length" in raw response
+- feat pool: expose `acquire/release` for advanced uses
+
+## 0.18
+
+- feat: add ?head_middlewares to `create`
+- add content-type header for prometheus endpoint
+- new flag ?enable_logging to disable regular logs (not debug)
+- new sublibrary to deal with multipart-form-data
+- feat response: add `pp_with`; have `pp` hide set-cookie headers
+
+- fix percent encoding for < 0x10 chars
+- Processing to fix incompatible -O and gcc flags
+- fix: make check for 'Connection: Upgrade' header case-insensitive
+
 ## 0.17
 
 - add optional middlewares to tiny_httpd_ws
