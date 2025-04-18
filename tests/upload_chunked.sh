@@ -5,7 +5,7 @@ if [ -f data ]; then rm data ; fi
 SERVER=$1
 PORT=8087
 
-"$SERVER" . -p $PORT --upload --max-upload 100000000000 &
+"$SERVER" . -p $PORT --upload --max-upload 1000M &
 PID=$!
 
 sleep 0.1
