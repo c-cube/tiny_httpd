@@ -10,7 +10,7 @@ bug-reports: "https://github.com/c-cube/tiny_httpd/issues"
 depends: [
   "dune" {>= "3.2"}
   "tiny_httpd" {= version}
-  "eio"
+  "eio" {>= "1.0" & < "2.0"}
   "logs" {with-test}
   "odoc" {with-doc}
 ]

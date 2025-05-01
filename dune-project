@@ -45,6 +45,6 @@
   (synopsis "Use eio for tiny_httpd")
   (depends
     (tiny_httpd (= :version))
-    eio
+    (eio (and (>= 1.0) (< 2.0)))
     (logs :with-test)
     (odoc :with-doc)))
