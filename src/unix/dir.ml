@@ -151,9 +151,9 @@ let html_list_dir (module VFS : VFS) ~prefix ~parent d : Html.elt =
              [
                sub_e @@ a [ A.href ("/" // prefix // fpath) ] [ txt f ];
                (if VFS.is_directory fpath then
-                 sub_e @@ txt "[dir]"
-               else
-                 sub_empty);
+                  sub_e @@ txt "[dir]"
+                else
+                  sub_empty);
                sub_e @@ txt size;
              ])
       )
@@ -176,21 +176,21 @@ let html_list_dir (module VFS : VFS) ~prefix ~parent d : Html.elt =
         @@ ul' []
              [
                (if !n_hidden > 0 then
-                 sub_e
-                 @@ details' []
-                      [
-                        sub_e
-                        @@ summary [] [ txtf "(%d hidden files)" !n_hidden ];
-                        sub_seq
-                          (seq_of_array entries
-                          |> Seq.filter_map (fun f ->
-                                 if is_hidden f then
-                                   file_to_elt f
-                                 else
-                                   None));
-                      ]
-               else
-                 sub_empty);
+                  sub_e
+                  @@ details' []
+                       [
+                         sub_e
+                         @@ summary [] [ txtf "(%d hidden files)" !n_hidden ];
+                         sub_seq
+                           (seq_of_array entries
+                           |> Seq.filter_map (fun f ->
+                                  if is_hidden f then
+                                    file_to_elt f
+                                  else
+                                    None));
+                       ]
+                else
+                  sub_empty);
                sub_seq
                  (seq_of_array entries
                  |> Seq.filter_map (fun f ->

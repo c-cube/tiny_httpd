@@ -1,12 +1,11 @@
 (** IO abstraction.
 
-    We abstract IO so we can support classic unix blocking IOs
-    with threads, and modern async IO with Eio.
+    We abstract IO so we can support classic unix blocking IOs with threads, and
+    modern async IO with Eio.
 
     {b NOTE}: experimental.
 
-    @since 0.14
-*)
+    @since 0.14 *)
 
 open Common_
 module Buf = Buf
@@ -17,7 +16,8 @@ module Output = struct
   include Iostream.Out_buf
 
   class of_unix_fd ?(close_noerr = false) ~closed ~(buf : Slice.t)
-    (fd : Unix.file_descr) : t =
+    (fd : Unix.file_descr) :
+    t =
     object
       inherit t_from_output ~bytes:buf.bytes ()
 
@@ -62,10 +62,10 @@ module Output = struct
   (** [chunk_encoding oc] makes a new channel that outputs its content into [oc]
       in chunk encoding form.
       @param close_rec if true, closing the result will also close [oc]
-      @param buf a buffer used to accumulate data into chunks.
-        Chunks are emitted when [buf]'s size gets over a certain threshold,
-        or when [flush] is called.
-      *)
+      @param buf
+        a buffer used to accumulate data into chunks. Chunks are emitted when
+        [buf]'s size gets over a certain threshold, or when [flush] is called.
+  *)
   let chunk_encoding ?(buf = Buf.create ()) ~close_rec (oc : #t) : t =
     (* write content of [buf] as a chunk if it's big enough.
        If [force=true] then write content of [buf] if it's simply non empty. *)
@@ -301,14 +301,14 @@ module Input = struct
     end
 
   (** new stream with maximum size [max_size].
-   @param close_rec if true, closing this will also close the input stream *)
+      @param close_rec if true, closing this will also close the input stream *)
   let limit_size_to ~close_rec ~max_size ~bytes (arg : t) : t =
     reading_exactly_ ~size:max_size ~skip_on_close:false ~bytes ~close_rec arg
 
-  (** New stream that consumes exactly [size] bytes from the input.
-        If fewer bytes are read before [close] is called, we read and discard
-        the remaining quota of bytes before [close] returns.
-   @param close_rec if true, closing this will also close the input stream *)
+  (** New stream that consumes exactly [size] bytes from the input. If fewer
+      bytes are read before [close] is called, we read and discard the remaining
+      quota of bytes before [close] returns.
+      @param close_rec if true, closing this will also close the input stream *)
   let reading_exactly ~close_rec ~size ~bytes (arg : t) : t =
     reading_exactly_ ~size ~close_rec ~skip_on_close:true ~bytes arg
 
@@ -394,16 +394,15 @@ module Writer = struct
   type t = { write: Output.t -> unit } [@@unboxed]
   (** Writer.
 
-    A writer is a push-based stream of bytes.
-    Give it an output channel and it will write the bytes in it.
+      A writer is a push-based stream of bytes. Give it an output channel and it
+      will write the bytes in it.
 
-    This is useful for responses: an http endpoint can return a writer
-    as its response's body; the writer is given access to the connection
-    to the client and can write into it as if it were a regular
-    [out_channel], including controlling calls to [flush].
-    Tiny_httpd will convert these writes into valid HTTP chunks.
-    @since 0.14
-    *)
+      This is useful for responses: an http endpoint can return a writer as its
+      response's body; the writer is given access to the connection to the
+      client and can write into it as if it were a regular [out_channel],
+      including controlling calls to [flush]. Tiny_httpd will convert these
+      writes into valid HTTP chunks.
+      @since 0.14 *)
 
   let[@inline] make ~write () : t = { write }
 
@@ -432,32 +431,32 @@ module TCP_server = struct
 
   type t = {
     endpoint: unit -> string * int;
-        (** Endpoint we listen on. This can only be called from within [serve]. *)
+        (** Endpoint we listen on. This can only be called from within [serve].
+        *)
     active_connections: unit -> int;
         (** Number of connections currently active *)
     running: unit -> bool;  (** Is the server currently running? *)
     stop: unit -> unit;
-        (** Ask the server to stop. This might not take effect immediately,
-      and is idempotent. After this [server.running()] must return [false]. *)
+        (** Ask the server to stop. This might not take effect immediately, and
+            is idempotent. After this [server.running()] must return [false]. *)
   }
   (** A running TCP server.
 
-     This contains some functions that provide information about the running
-     server, including whether it's active (as opposed to stopped), a function
-     to stop it, and statistics about the number of connections. *)
+      This contains some functions that provide information about the running
+      server, including whether it's active (as opposed to stopped), a function
+      to stop it, and statistics about the number of connections. *)
 
   type builder = {
     serve: after_init:(t -> unit) -> handle:conn_handler -> unit -> unit;
         (** Blocking call to listen for incoming connections and handle them.
             Uses the connection handler [handle] to handle individual client
             connections in individual threads/fibers/tasks.
-            @param after_init is called once with the server after the server
-            has started. *)
+            @param after_init
+              is called once with the server after the server has started. *)
   }
   (** A TCP server builder implementation.
 
       Calling [builder.serve ~after_init ~handle ()] starts a new TCP server on
-      an unspecified endpoint
-      (most likely coming from the function returning this builder)
-      and returns the running server. *)
+      an unspecified endpoint (most likely coming from the function returning
+      this builder) and returns the running server. *)
 end

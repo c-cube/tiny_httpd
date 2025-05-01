@@ -187,8 +187,8 @@ module Reader = struct
   type state =
     | Begin  (** At the beginning of a frame *)
     | Reading_frame of { mutable remaining_bytes: int; mutable num_read: int }
-        (** Currently reading the payload of a frame with [remaining_bytes]
-        left to read from the underlying [ic] *)
+        (** Currently reading the payload of a frame with [remaining_bytes] left
+            to read from the underlying [ic] *)
     | Close
 
   type t = {
@@ -266,7 +266,7 @@ module Reader = struct
   external apply_masking_ :
     key:bytes -> key_offset:int -> buf:bytes -> int -> int -> unit
     = "tiny_httpd_ws_apply_masking"
-    [@@noalloc]
+  [@@noalloc]
   (** Apply masking to the parsed data *)
 
   let[@inline] apply_masking ~mask_key ~mask_offset (buf : bytes) off len : unit
@@ -414,7 +414,8 @@ let upgrade ic oc : _ * _ =
   in
   ws_ic, ws_oc
 
-(** Turn a regular connection handler (provided by the user) into a websocket upgrade handler *)
+(** Turn a regular connection handler (provided by the user) into a websocket
+    upgrade handler *)
 module Make_upgrade_handler (X : sig
   val accept_ws_protocol : string -> bool
   val handler : handler

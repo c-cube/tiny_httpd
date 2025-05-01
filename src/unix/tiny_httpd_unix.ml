@@ -43,9 +43,9 @@ module Unix_tcp_server_ = struct
             | None ->
               ( Unix.socket
                   (if Util.is_ipv6_str self.addr then
-                    Unix.PF_INET6
-                  else
-                    Unix.PF_INET)
+                     Unix.PF_INET6
+                   else
+                     Unix.PF_INET)
                   Unix.SOCK_STREAM 0,
                 true (* Because we're creating the socket ourselves *) )
           in

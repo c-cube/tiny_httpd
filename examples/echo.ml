@@ -142,12 +142,14 @@ let () =
          "-p", Arg.Set_int port_, " set port";
          "--debug", Arg.Unit setup_logging, " enable debug";
          "-j", Arg.Set_int j, " maximum number of connections";
-        "--addr", Arg.Set_string addr, " binding address";
+         "--addr", Arg.Set_string addr, " binding address";
        ])
     (fun _ -> raise (Arg.Bad ""))
     "echo [option]*";
 
-  let server = Tiny_httpd.create ~addr:!addr ~port:!port_ ~max_connections:!j () in
+  let server =
+    Tiny_httpd.create ~addr:!addr ~port:!port_ ~max_connections:!j ()
+  in
 
   Tiny_httpd_camlzip.setup ~compress_above:1024 ~buf_size:(16 * 1024) server;
   let m_stats, get_stats = middleware_stat () in
