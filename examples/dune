@@ -11,10 +11,27 @@
 (executable
  (name echo)
  (flags :standard -warn-error -a+8)
- (modules echo vfs)
+ (modules echo)
  (libraries
   tiny_httpd
   logs
+  echo_vfs
+  tiny_httpd_camlzip
+  tiny_httpd.multipart-form-data))
+
+(executable
+ (name echo_eio)
+ (flags :standard -warn-error -a+8)
+ (modules echo_eio)
+ (libraries
+  tiny_httpd
+  tiny_httpd_eio
+  eio
+  eio_main
+  logs
+  echo_vfs
+  trace.core
+  trace-tef
   tiny_httpd_camlzip
   tiny_httpd.multipart-form-data))
 
@@ -54,6 +71,12 @@
   (diff test_output.txt.expected test_output.txt)))
 
 ; produce an embedded FS
+
+(library
+  (name echo_vfs)
+  (modules vfs)
+  (wrapped false)
+  (libraries tiny_httpd))
 
 (rule
  (targets vfs.ml)
