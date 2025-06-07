@@ -8,7 +8,7 @@ CAMLprim value tiny_httpd_ws_apply_masking(value _mask_key, value _mask_offset, 
   CAMLparam5(_mask_key, _mask_offset, _buf, _offset, _len);
 
   char const *mask_key = String_val(_mask_key);
-  char *buf = Bytes_val(_buf);
+  unsigned char *buf = Bytes_val(_buf);
   intnat mask_offset = Int_val(_mask_offset);
   intnat offset = Int_val(_offset);
   intnat len = Int_val(_len);
