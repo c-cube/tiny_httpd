@@ -73,9 +73,9 @@ let rec pp_ : type a b. Buffer.t -> (a, b) t -> unit =
   | Rest { url_encoded } ->
     bpf out "<rest_of_url%s>"
       (if url_encoded then
-        "_urlencoded"
-      else
-        "")
+         "_urlencoded"
+       else
+         "")
   | Compose (Exact s, tl) -> bpf out "%s/%a" s pp_ tl
   | Compose (Int, tl) -> bpf out "<int>/%a" pp_ tl
   | Compose (String, tl) -> bpf out "<str>/%a" pp_ tl
@@ -96,17 +96,29 @@ let rec to_url_rec : type b. Buffer.t -> (b, string) t -> b =
  fun buf route ->
   match route with
   | Fire -> Buffer.contents buf
-  | Rest {url_encoded=_} ->
-    (fun str -> Buffer.add_string buf str; Buffer.contents buf)
+  | Rest { url_encoded = _ } ->
+    fun str ->
+      Buffer.add_string buf str;
+      Buffer.contents buf
   | Compose (comp, rest) ->
     (match comp with
-    | Exact s -> Buffer.add_string buf s; Buffer.add_char buf '/'; to_url_rec buf rest
-    | Int -> (fun i -> Printf.bprintf buf "%d/" i; to_url_rec buf rest)
+    | Exact s ->
+      Buffer.add_string buf s;
+      Buffer.add_char buf '/';
+      to_url_rec buf rest
+    | Int ->
+      fun i ->
+        Printf.bprintf buf "%d/" i;
+        to_url_rec buf rest
     | String ->
-      (fun s -> Printf.bprintf buf "%s/" s; to_url_rec buf rest)
-    | String_urlencoded -> 
-      (fun s -> Printf.bprintf buf "%s/" (Util.percent_encode s); to_url_rec buf rest))
+      fun s ->
+        Printf.bprintf buf "%s/" s;
+        to_url_rec buf rest
+    | String_urlencoded ->
+      fun s ->
+        Printf.bprintf buf "%s/" (Util.percent_encode s);
+        to_url_rec buf rest)
 
-let to_url (h: ('a, string) t) : 'a =
+let to_url (h : ('a, string) t) : 'a =
   let buf = Buffer.create 16 in
   to_url_rec buf h
