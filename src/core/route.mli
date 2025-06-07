@@ -53,6 +53,8 @@ val to_string : _ t -> string
 (** Print the route.
       @since 0.7 *)
 
+val to_url : ('a, string) t -> 'a
+
 module Private_ : sig
   val eval : string list -> ('a, 'b) t -> 'a -> 'b option
 end
