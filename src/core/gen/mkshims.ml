@@ -26,11 +26,6 @@ let atomic_before_412 =
 
 let atomic_after_412 = {|include Atomic|}
 
-let write_file file s =
-  let oc = open_out file in
-  output_string oc s;
-  close_out oc
-
 let () =
   let version = Scanf.sscanf Sys.ocaml_version "%d.%d.%s" (fun x y _ -> x, y) in
   print_endline

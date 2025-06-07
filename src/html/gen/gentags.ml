@@ -1,7 +1,6 @@
 (* adapted from https://github.com/sindresorhus/html-tags (MIT licensed) *)
 
 let pf = Printf.printf
-let spf = Printf.sprintf
 
 let void =
   [
