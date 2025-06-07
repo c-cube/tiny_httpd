@@ -3,3 +3,4 @@ _build
 _opam
 *.install
 .merlin
+todo.md
