@@ -1,7 +1,9 @@
 open Tiny_httpd_core
+module Trace = Trace_core
 module Log = Tiny_httpd.Log
 module MFD = Tiny_httpd_multipart_form_data
 
+let ( let@ ) = ( @@ )
 let now_ = Unix.gettimeofday
 
 let alice_text =
@@ -64,6 +66,18 @@ let middleware_stat () : Server.Middleware.t * (unit -> string) =
       (!write_time_ /. float !n_req *. 1e3)
   in
   m, get_stat
+
+let middleware_trace : Server.Middleware.t =
+ fun (h : Server.Middleware.handler) req ~resp ->
+  let _sp =
+    Trace.enter_manual_toplevel_span ~__FILE__ ~__LINE__ "http.handle"
+  in
+  let new_resp (r : Response.t) =
+    Trace.add_data_to_manual_span _sp [ "http.code", `Int r.code ];
+    Trace.exit_manual_span _sp;
+    resp r
+  in
+  h req ~resp:new_resp
 
 (* ugly AF *)
 let base64 x =
@@ -132,24 +146,49 @@ let setup_upload server : unit =
       Response.make_string ~code:201 @@ Ok (to_string_top html))
 
 let () =
+  let@ () = Trace_tef.with_setup () in
   let port_ = ref 8080 in
-  let j = ref 32 in
+  let max_conns = ref 16_000 in
+  let pool_buf_size = ref None in
+  let buf_size = ref 4096 in
+  let unix_sock = ref "" in
   let addr = ref "127.0.0.1" in
   Arg.parse
     (Arg.align
        [
          "--port", Arg.Set_int port_, " set port";
          "-p", Arg.Set_int port_, " set port";
+         "--unix", Arg.Set_string unix_sock, " set unix socket";
          "--debug", Arg.Unit setup_logging, " enable debug";
-         "-j", Arg.Set_int j, " maximum number of connections";
+         ( "--max-buf-pool-size",
+           Arg.Int (fun i -> pool_buf_size := Some i),
+           " maximum buffer pool size" );
+         "--buf-size", Arg.Set_int buf_size, " buffer size";
+         "--max-conns", Arg.Set_int max_conns, " maximum number of connections";
          "--addr", Arg.Set_string addr, " binding address";
        ])
     (fun _ -> raise (Arg.Bad ""))
     "echo [option]*";
 
+  let@ stdenv = Eio_main.run in
+  let@ sw = Eio.Switch.run ~name:"main" in
   let server =
-    Tiny_httpd.create ~addr:!addr ~port:!port_ ~max_connections:!j ()
+    Tiny_httpd_eio.create ~addr:!addr ~port:!port_ ~max_connections:!max_conns
+      ~buf_size:!buf_size ?max_buf_pool_size:!pool_buf_size ~stdenv ~sw ()
   in
+
+  if Trace.enabled () then (
+    Tiny_httpd.Server.add_middleware server ~stage:(`Stage 1) middleware_trace;
+
+    (* fiber that emits metrics *)
+    Eio.Fiber.fork_daemon ~sw (fun () ->
+        while Eio.Switch.get_error sw |> Option.is_none do
+          Trace.counter_int "http.active-conns"
+            (Server.active_connections server);
+          Eio_unix.sleep 0.5
+        done;
+        `Stop_daemon)
+  );
 
   Tiny_httpd_camlzip.setup ~compress_above:1024 ~buf_size:(16 * 1024) server;
   let m_stats, get_stats = middleware_stat () in

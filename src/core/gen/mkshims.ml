@@ -30,7 +30,7 @@ let () =
   let version = Scanf.sscanf Sys.ocaml_version "%d.%d.%s" (fun x y _ -> x, y) in
   print_endline
     (if version >= (4, 12) then
-      atomic_after_412
-    else
-      atomic_before_412);
+       atomic_after_412
+     else
+       atomic_before_412);
   ()

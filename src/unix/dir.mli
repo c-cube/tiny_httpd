@@ -1,29 +1,30 @@
 (** Serving static content from directories
 
-    This module provides the same functionality as the "http_of_dir" tool.
-    It exposes a directory (and its subdirectories), with the optional ability
-    to delete or upload files.
+    This module provides the same functionality as the "http_of_dir" tool. It
+    exposes a directory (and its subdirectories), with the optional ability to
+    delete or upload files.
 
     @since 0.11 *)
 
 (** behavior of static directory.
 
-    This controls what happens when the user requests the path to
-    a directory rather than a file. *)
+    This controls what happens when the user requests the path to a directory
+    rather than a file. *)
 type dir_behavior =
   | Index  (** Redirect to index.html if present, else fails. *)
   | Lists
       (** Lists content of directory. Be careful of security implications. *)
   | Index_or_lists
-      (** Redirect to index.html if present and lists content otherwise.
-      This is useful for tilde ("~") directories and other per-user behavior,
-      but be mindful of security implications *)
+      (** Redirect to index.html if present and lists content otherwise. This is
+          useful for tilde ("~") directories and other per-user behavior, but be
+          mindful of security implications *)
   | Forbidden
-      (** Forbid access to directory. This is suited for serving assets, for example. *)
+      (** Forbid access to directory. This is suited for serving assets, for
+          example. *)
 
 type hidden
-(** Type used to prevent users from building a config directly.
-    Use {!default_config} or {!config} instead. *)
+(** Type used to prevent users from building a config directly. Use
+    {!default_config} or {!config} instead. *)
 
 type config = {
   mutable download: bool;  (** Is downloading files allowed? *)
@@ -32,21 +33,17 @@ type config = {
   mutable delete: bool;  (** Is deleting a file allowed? (with method DELETE) *)
   mutable upload: bool;  (** Is uploading a file allowed? (with method PUT) *)
   mutable max_upload_size: int;
-      (** If {!upload} is true, this is the maximum size in bytes for
-      uploaded files. *)
+      (** If {!upload} is true, this is the maximum size in bytes for uploaded
+          files. *)
   _rest: hidden;  (** Just ignore this field. *)
 }
-(** configuration for static file handlers. This might get
-    more fields over time. *)
+(** configuration for static file handlers. This might get more fields over
+    time. *)
 
 val default_config : unit -> config
-(** default configuration: [
-  { download=true
-  ; dir_behavior=Forbidden
-  ; delete=false
-  ; upload=false
-  ; max_upload_size = 10 * 1024 * 1024
-  }] *)
+(** default configuration:
+    [ { download=true ; dir_behavior=Forbidden ; delete=false ; upload=false ;
+     max_upload_size = 10 * 1024 * 1024 }] *)
 
 val config :
   ?download:bool ->
@@ -61,16 +58,15 @@ val config :
 
 val add_dir_path :
   config:config -> dir:string -> prefix:string -> Server.t -> unit
-(** [add_dirpath ~config ~dir ~prefix server] adds route handle to the
-    [server] to serve static files in [dir] when url starts with [prefix],
-    using the given configuration [config]. *)
+(** [add_dirpath ~config ~dir ~prefix server] adds route handle to the [server]
+    to serve static files in [dir] when url starts with [prefix], using the
+    given configuration [config]. *)
 
 (** Virtual file system.
 
     This is used to emulate a file system from pure OCaml functions and data,
     e.g. for resources bundled inside the web server.
-    @since 0.12
-*)
+    @since 0.12 *)
 module type VFS = sig
   val descr : string
   (** Description of the VFS *)
@@ -78,12 +74,12 @@ module type VFS = sig
   val is_directory : string -> bool
 
   val contains : string -> bool
-  (** [file_exists vfs path] returns [true] if [path] points to a file
-      or directory inside [vfs]. *)
+  (** [file_exists vfs path] returns [true] if [path] points to a file or
+      directory inside [vfs]. *)
 
   val list_dir : string -> string array
-  (** List directory. This only returns basenames, the files need
-      to be put in the directory path using {!Filename.concat}. *)
+  (** List directory. This only returns basenames, the files need to be put in
+      the directory path using {!Filename.concat}. *)
 
   val delete : string -> unit
   (** Delete path *)
@@ -102,23 +98,19 @@ module type VFS = sig
 end
 
 val vfs_of_dir : string -> (module VFS)
-(** [vfs_of_dir dir] makes a virtual file system that reads from the
-    disk.
-    @since 0.12
-*)
+(** [vfs_of_dir dir] makes a virtual file system that reads from the disk.
+    @since 0.12 *)
 
 val add_vfs :
   config:config -> vfs:(module VFS) -> prefix:string -> Server.t -> unit
 (** Similar to {!add_dir_path} but using a virtual file system instead.
-    @since 0.12
-*)
+    @since 0.12 *)
 
-(** An embedded file system, as a list of files with (relative) paths.
-    This is useful in combination with the "tiny-httpd-mkfs" tool,
-    which embeds the files it's given into a OCaml module.
+(** An embedded file system, as a list of files with (relative) paths. This is
+    useful in combination with the "tiny-httpd-mkfs" tool, which embeds the
+    files it's given into a OCaml module.
 
-    @since 0.12
-*)
+    @since 0.12 *)
 module Embedded_fs : sig
   type t
   (** The pseudo-filesystem *)
@@ -127,8 +119,9 @@ module Embedded_fs : sig
 
   val add_file : ?mtime:float -> t -> path:string -> string -> unit
   (** Add file to the virtual file system.
-      @raise Invalid_argument if the path contains '..' or if it tries to
-      make a directory out of an existing path that is a file. *)
+      @raise Invalid_argument
+        if the path contains '..' or if it tries to make a directory out of an
+        existing path that is a file. *)
 
   val to_vfs : t -> (module VFS)
 end

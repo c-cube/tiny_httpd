@@ -39,3 +39,12 @@
     (iostream-camlzip (>= 0.2.1))
     (logs :with-test)
     (odoc :with-doc)))
+
+(package
+  (name tiny_httpd_eio)
+  (synopsis "Use eio for tiny_httpd")
+  (depends
+    (tiny_httpd (= :version))
+    (eio (and (>= 1.0) (< 2.0)))
+    (logs :with-test)
+    (odoc :with-doc)))

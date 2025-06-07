@@ -36,9 +36,9 @@ let () =
         EV.send_event
           ~event:
             (if !tick then
-              "tick"
-            else
-              "tock")
+               "tick"
+             else
+               "tock")
           ~data:(Ptime.to_rfc3339 now) ();
         tick := not !tick;
 

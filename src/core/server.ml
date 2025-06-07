@@ -49,8 +49,8 @@ module type UPGRADE_HANDLER = sig
     Unix.sockaddr ->
     unit Request.t ->
     (Headers.t * handshake_state, string) result
-  (** Perform the handshake and upgrade the connection. The returned
-      code is [101] alongside these headers. *)
+  (** Perform the handshake and upgrade the connection. The returned code is
+      [101] alongside these headers. *)
 
   val handle_connection : handshake_state -> IO.Input.t -> IO.Output.t -> unit
   (** Take control of the connection and take it from there *)
@@ -68,7 +68,7 @@ module type IO_BACKEND = sig
   (** obtain the current timestamp in seconds. *)
 
   val tcp_server : unit -> IO.TCP_server.builder
-  (** Server  that can listen on a port and handle clients. *)
+  (** Server that can listen on a port and handle clients. *)
 end
 
 type handler_result =
