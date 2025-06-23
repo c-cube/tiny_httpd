@@ -19,8 +19,6 @@ module With_lock = struct
             Mutex.unlock mutex;
             raise e);
     }
-
-  let builder : builder ref = ref default_builder
 end
 
 type handler = unit Request.t -> IO.Input.t -> IO.Output.t -> unit
@@ -78,7 +76,7 @@ module Writer = struct
     mutex: With_lock.t;
   }
 
-  let create ?(buf_size = 16 * 1024) ~oc () : t =
+  let create ?(buf_size = 16 * 1024) ~with_lock ~oc () : t =
     {
       header = Header.create ();
       header_buf = Bytes.create 16;
@@ -86,7 +84,7 @@ module Writer = struct
       offset = 0;
       oc;
       closed = false;
-      mutex = !With_lock.builder ();
+      mutex = with_lock;
     }
 
   let[@inline] close self = self.closed <- true
@@ -403,8 +401,8 @@ module Reader = struct
     )
 end
 
-let upgrade ic oc : _ * _ =
-  let writer = Writer.create ~oc () in
+let upgrade ?(with_lock = With_lock.default_builder ()) ic oc : _ * _ =
+  let writer = Writer.create ~with_lock ~oc () in
   let reader = Reader.create ~ic ~writer () in
   let ws_ic : IO.Input.t =
     object
@@ -431,6 +429,7 @@ let upgrade ic oc : _ * _ =
     upgrade handler *)
 module Make_upgrade_handler (X : sig
   val accept_ws_protocol : string -> bool
+  val with_lock : With_lock.builder
   val handler : handler
 end) : Server.UPGRADE_HANDLER with type handshake_state = unit Request.t =
 struct
@@ -475,7 +474,8 @@ struct
     try Ok (handshake_ req) with Bad_req s -> Error s
 
   let handle_connection req ic oc =
-    let ws_ic, ws_oc = upgrade ic oc in
+    let with_lock = X.with_lock () in
+    let ws_ic, ws_oc = upgrade ~with_lock ic oc in
     try X.handler req ws_ic ws_oc
     with Close_connection ->
       Log.debug (fun k -> k "websocket: requested to close the connection");
@@ -483,9 +483,11 @@ struct
 end
 
 let add_route_handler ?accept ?(accept_ws_protocol = fun _ -> true) ?middlewares
-    (server : Server.t) route (f : handler) : unit =
+    ?(with_lock = With_lock.default_builder) (server : Server.t) route
+    (f : handler) : unit =
   let module M = Make_upgrade_handler (struct
     let handler = f
+    let with_lock = with_lock
     let accept_ws_protocol = accept_ws_protocol
   end) in
   let up : Server.upgrade_handler = (module M) in
