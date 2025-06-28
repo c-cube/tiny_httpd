@@ -1,0 +1,10 @@
+listening on http://127.0.0.1:8085
+test moonpool_io
+echo:
+{meth=GET; host=localhost:8085;
+ headers=[user-agent: test
+          accept: */*
+          host: localhost:8085];
+ path="/echo/?a=b&c=d"; body=""; path_components=["echo"];
+ query=["c","d";"a","b"]}
+(query: "c" = "d";"a" = "b")
