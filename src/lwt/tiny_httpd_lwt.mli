@@ -6,6 +6,8 @@
     {b NOTE}: this is very experimental and will absolutely change over time,
     @since NEXT_RELEASE *)
 
+module Task = Task
+
 type 'a with_args =
   ?addr:string ->
   ?port:int ->
@@ -21,6 +23,6 @@ val io_backend : (unit -> (module Tiny_httpd.Server.IO_BACKEND)) with_args
 val create :
   (?middlewares:([ `Encoding | `Stage of int ] * Tiny_httpd.Middleware.t) list ->
   unit ->
-  Tiny_httpd.Server.t)
+  Tiny_httpd.Server.t Lwt.t)
   with_args
 (** Create a server *)

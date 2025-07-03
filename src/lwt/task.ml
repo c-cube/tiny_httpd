@@ -62,7 +62,7 @@ let run_inside_effect_handler_ (type a) (promise : a Lwt.u) f () : unit =
        let r = f () in
        res := Ok r
      with exn -> res := Error exn);
-    Lwt.wakeup_later_result promise !res
+    Lwt.wakeup_result promise !res
   in
   ED.try_with run_f_and_set_res () handler
 
@@ -72,3 +72,5 @@ let run f : _ Lwt.t =
   lwt
 
 let run_async f : unit = ignore (run f : unit Lwt.t)
+
+(* TODO: yield, use that in loops? *)
