@@ -21,7 +21,7 @@ let get_max_connection_ ?(max_connections = 64) () : int =
   let max_connections = max 4 max_connections in
   max_connections
 
-let default_buf_size = 4 * 1024
+let default_buf_size = 16 * 1024
 
 let show_sockaddr = function
   | Unix.ADDR_UNIX s -> s
@@ -30,16 +30,15 @@ let show_sockaddr = function
 
 let ic_of_fd ~(num_open : int ref) ~bytes (fd : Lwt_unix.file_descr) :
     IO.Input.t =
-  let lwt_bytes = Lwt_bytes.create (Bytes.length bytes) in
   object
     inherit Iostream.In_buf.t_from_refill ~bytes ()
 
     method private refill (sl : Slice.t) =
       assert (sl.len = 0);
+      sl.off <- 0;
       let n =
-        Lwt_bytes.read fd lwt_bytes 0 (Lwt_bytes.length lwt_bytes) |> Task.await
+        Lwt_unix.read fd sl.bytes 0 (Bytes.length sl.bytes) |> Task.await
       in
-      Lwt_bytes.blit_to_bytes lwt_bytes 0 bytes 0 n;
       sl.len <- n
 
     method close () =
@@ -49,17 +48,15 @@ let ic_of_fd ~(num_open : int ref) ~bytes (fd : Lwt_unix.file_descr) :
 
 let oc_of_fd ~(num_open : int ref) ~bytes (fd : Lwt_unix.file_descr) :
     IO.Output.t =
-  let lwt_bytes = Lwt_bytes.create (Bytes.length bytes) in
   object
     inherit IO.Output.t_from_output ~bytes ()
     (* method flush () : unit = Lwt_io.flush oc |> Task.await *)
 
     method private output_underlying buf i len =
-      Lwt_bytes.blit_from_bytes buf i lwt_bytes 0 len;
-      let i = ref 0 in
+      let i = ref i in
       let len = ref len in
       while !len > 0 do
-        let n = Lwt_bytes.write fd lwt_bytes !i !len |> Task.await in
+        let n = Lwt_unix.write fd buf !i !len |> Task.await in
         i := !i + n;
         len := !len - n
       done
