@@ -14,12 +14,11 @@ let on_uncaught_exn : (exn -> Printexc.raw_backtrace -> unit) ref =
         (Printexc.raw_backtrace_to_string bt))
 
 let run_all_tasks () : unit =
-  (* use local queue to prevent the hook from running forever in case
-    tasks keep scheduling new tasks. *)
-  let local = Queue.create () in
-  Queue.transfer tasks local;
-  while not (Queue.is_empty local) do
-    let t = Queue.pop local in
+  let n_processed = ref 0 in
+  let max_number_of_steps = min 10_000 (2 * Queue.length tasks) in
+  while (not (Queue.is_empty tasks)) && !n_processed < max_number_of_steps do
+    let t = Queue.pop tasks in
+    incr n_processed;
     try t ()
     with exn ->
       let bt = Printexc.get_raw_backtrace () in
