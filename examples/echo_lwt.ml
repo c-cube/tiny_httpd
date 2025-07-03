@@ -148,6 +148,9 @@ let () =
     (fun _ -> raise (Arg.Bad ""))
     "echo [option]*";
 
+  let ev = new Lwt_engine.libev () in
+  Lwt_engine.set ev;
+
   Lwt_main.run @@ Task.run
   @@ fun () ->
   let server =
