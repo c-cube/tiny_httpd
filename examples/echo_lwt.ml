@@ -1,7 +1,7 @@
 open Tiny_httpd_core
 module Log = Tiny_httpd.Log
 module MFD = Tiny_httpd_multipart_form_data
-module Task = Tiny_httpd_lwt.Task
+module Lwt_direct = Tiny_httpd_lwt.Lwt_direct
 
 let now_ = Unix.gettimeofday
 
@@ -151,11 +151,11 @@ let () =
   let ev = new Lwt_engine.libev () in
   Lwt_engine.set ev;
 
-  Lwt_main.run @@ Task.run
+  Lwt_main.run @@ Lwt_direct.run
   @@ fun () ->
   let server =
     Tiny_httpd_lwt.create ~addr:!addr ~port:!port_ ~max_connections:!j ()
-    |> Task.await
+    |> Lwt_direct.await
   in
 
   Tiny_httpd_camlzip.setup ~compress_above:1024 ~buf_size:(16 * 1024) server;

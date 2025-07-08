@@ -6,7 +6,7 @@
     {b NOTE}: this is very experimental and will absolutely change over time,
     @since NEXT_RELEASE *)
 
-module Task = Task
+module Lwt_direct = Lwt_direct
 
 type 'a with_args =
   ?addr:string ->

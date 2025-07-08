@@ -3,7 +3,7 @@ module H = Tiny_httpd.Server
 module Pool = Tiny_httpd.Pool
 module Slice = IO.Slice
 module Log = Tiny_httpd.Log
-module Task = Task
+module Lwt_direct = Lwt_direct
 
 let spf = Printf.sprintf
 let ( let@ ) = ( @@ )
@@ -37,33 +37,33 @@ let ic_of_fd ~(num_open : int ref) ~bytes (fd : Lwt_unix.file_descr) :
       assert (sl.len = 0);
       sl.off <- 0;
       let n =
-        Lwt_unix.read fd sl.bytes 0 (Bytes.length sl.bytes) |> Task.await
+        Lwt_unix.read fd sl.bytes 0 (Bytes.length sl.bytes) |> Lwt_direct.await
       in
       sl.len <- n
 
     method close () =
       decr num_open;
-      if !num_open <= 0 then Lwt_unix.close fd |> Task.await
+      if !num_open <= 0 then Lwt_unix.close fd |> Lwt_direct.await
   end
 
 let oc_of_fd ~(num_open : int ref) ~bytes (fd : Lwt_unix.file_descr) :
     IO.Output.t =
   object
     inherit IO.Output.t_from_output ~bytes ()
-    (* method flush () : unit = Lwt_io.flush oc |> Task.await *)
+    (* method flush () : unit = Lwt_io.flush oc |> Lwt_direct.await *)
 
     method private output_underlying buf i len =
       let i = ref i in
       let len = ref len in
       while !len > 0 do
-        let n = Lwt_unix.write fd buf !i !len |> Task.await in
+        let n = Lwt_unix.write fd buf !i !len |> Lwt_direct.await in
         i := !i + n;
         len := !len - n
       done
 
     method private close_underlying () =
       decr num_open;
-      if !num_open <= 0 then Lwt_unix.close fd |> Task.await
+      if !num_open <= 0 then Lwt_unix.close fd |> Lwt_direct.await
   end
 
 let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
@@ -80,7 +80,7 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
     | addr, port, None ->
       let addr = Option.value ~default:"127.0.0.1" addr in
       let sockaddr, port =
-        match Lwt_unix.getaddrinfo addr "" [] |> Task.await, port with
+        match Lwt_unix.getaddrinfo addr "" [] |> Lwt_direct.await, port with
         | { Unix.ai_addr = ADDR_INET (h, _); _ } :: _, None ->
           let p = 8080 in
           Unix.ADDR_INET (h, p), p
@@ -115,7 +115,7 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
             let port = ref port in
 
             let server_loop : unit Lwt.t =
-              let@ () = Task.run in
+              let@ () = Lwt_direct.run in
               let backlog = max_connections in
               let sock =
                 Lwt_unix.socket ~cloexec:true
@@ -126,7 +126,7 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
               Lwt_unix.setsockopt_optint sock Unix.SO_LINGER None;
               Lwt_unix.setsockopt sock Unix.SO_REUSEADDR true;
               Lwt_unix.setsockopt sock Unix.SO_REUSEPORT true;
-              Lwt_unix.bind sock sockaddr |> Task.await;
+              Lwt_unix.bind sock sockaddr |> Lwt_direct.await;
               Lwt_unix.listen sock backlog;
 
               (* recover real port, if any *)
@@ -136,8 +136,7 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
 
               let handle_client client_addr fd : unit =
                 Atomic.incr active_conns;
-                let@ () = Task.run_async in
-
+                Lwt_direct.run_in_the_background @@ fun () ->
                 let cleanup () =
                   Log.debug (fun k ->
                       k "Tiny_httpd_lwt: client handler returned");
@@ -169,7 +168,7 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
               in
 
               while Atomic.get running do
-                let fd, addr = Lwt_unix.accept sock |> Task.await in
+                let fd, addr = Lwt_unix.accept sock |> Lwt_direct.await in
                 handle_client addr fd
               done
             in
@@ -181,21 +180,21 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
                   (fun () ->
                     Atomic.set running false;
                     Lwt.wakeup_later set_server_done ();
-                    Task.await server_loop);
+                    Lwt_direct.await server_loop);
                 endpoint = (fun () -> addr, !port);
                 active_connections = (fun () -> Atomic.get active_conns);
               }
             in
 
             after_init tcp_server;
-            Task.await server_done);
+            Lwt_direct.await server_done);
       }
   end in
   (module M)
 
 let create ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size ?buf_size
     ?middlewares () : H.t Lwt.t =
-  let@ () = Task.run in
+  let@ () = Lwt_direct.run in
   let backend =
     io_backend ?addr ?port ?unix_sock ?max_buf_pool_size ?max_connections
       ?buf_size ()
