@@ -111,6 +111,14 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
             let running = Atomic.make true in
             let active_conns = Atomic.make 0 in
 
+            (* a pool of buffers, to reduce allocations *)
+            let buf_pool =
+              Pool.create ~max_size:pool_size
+                ~clear:(fun buf -> Bytes.fill buf 0 (Bytes.length buf) '\x00')
+                ~mk_item:(fun () -> Bytes.create buf_size)
+                ()
+            in
+
             (* Eio.Switch.on_release sw (fun () -> Atomic.set running false); *)
             let port = ref port in
 
@@ -139,33 +147,31 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
               let handle_client client_addr fd : unit =
                 Atomic.incr active_conns;
                 Lwt_direct.run_in_the_background @@ fun () ->
-                let buf_ic = Bytes.create buf_size in
-                let buf_oc = Bytes.create buf_size in
-                (*
                 let@ buf_ic = Pool.with_resource buf_pool in
                 let@ buf_oc = Pool.with_resource buf_pool in
-*)
 
                 (* close FD when both ends are closed *)
                 let num_open = ref 2 in
                 let ic = ic_of_fd ~num_open ~bytes:buf_ic fd in
                 let oc = oc_of_fd ~num_open ~bytes:buf_oc fd in
 
-                let cleanup () =
+                let cleanup ~shutdown () =
                   Log.debug (fun k ->
                       k "Tiny_httpd_lwt: client handler returned");
                   Atomic.decr active_conns;
-                  (try Lwt_unix.shutdown fd SHUTDOWN_ALL with _ -> ());
+                  if shutdown then (
+                    try Lwt_unix.shutdown fd SHUTDOWN_ALL with _ -> ()
+                  );
                   ic#close ();
                   oc#close ()
                 in
 
                 try
                   handle.handle ~client_addr ic oc;
-                  cleanup ()
+                  cleanup ~shutdown:true ()
                 with exn ->
                   let bt = Printexc.get_raw_backtrace () in
-                  cleanup ();
+                  cleanup ~shutdown:false ();
                   Log.error (fun k ->
                       k "Client handler for %s failed with %s\n%s"
                         (show_sockaddr client_addr)
