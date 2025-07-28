@@ -123,7 +123,7 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
             let port = ref port in
 
             let server_loop : unit Lwt.t =
-              let@ () = Lwt_direct.run in
+              let@ () = Lwt_direct.spawn in
               let backlog = max_connections in
               let sock =
                 Lwt_unix.socket ~cloexec:true
@@ -146,7 +146,7 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
 
               let handle_client client_addr fd : unit =
                 Atomic.incr active_conns;
-                Lwt_direct.run_in_the_background @@ fun () ->
+                Lwt_direct.spawn_in_the_background @@ fun () ->
                 let@ buf_ic = Pool.with_resource buf_pool in
                 let@ buf_oc = Pool.with_resource buf_pool in
 
@@ -212,7 +212,7 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
 
 let create ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size ?buf_size
     ?middlewares () : H.t Lwt.t =
-  let@ () = Lwt_direct.run in
+  let@ () = Lwt_direct.spawn in
   let backend =
     io_backend ?addr ?port ?unix_sock ?max_buf_pool_size ?max_connections
       ?buf_size ()
