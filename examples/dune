@@ -8,11 +8,23 @@
  (modules sse_client)
  (libraries unix))
 
+(library
+  (name example_vfs)
+  (wrapped false)
+  (modules vfs)
+  (libraries tiny_httpd))
+
 (executable
  (name echo)
  (flags :standard -warn-error -a+8)
- (modules echo vfs)
- (libraries tiny_httpd logs tiny_httpd_camlzip tiny_httpd.multipart-form-data))
+ (modules echo)
+ (libraries tiny_httpd logs tiny_httpd_camlzip tiny_httpd.multipart-form-data example_vfs))
+
+(executable
+ (name echo_lwt)
+ (flags :standard -warn-error -a+8)
+ (modules echo_lwt)
+ (libraries tiny_httpd tiny_httpd_lwt logs tiny_httpd_camlzip tiny_httpd.multipart-form-data example_vfs))
 
 (executable
  (name writer)

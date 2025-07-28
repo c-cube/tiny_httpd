@@ -1,0 +1,6 @@
+
+(library
+  (name tiny_httpd_lwt)
+  (public_name tiny_httpd_lwt)
+  (enabled_if (>= %{ocaml_version} 5.0))
+  (libraries tiny_httpd lwt lwt.unix))

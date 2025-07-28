@@ -39,3 +39,13 @@
     (iostream-camlzip (>= 0.2.1))
     (logs :with-test)
     (odoc :with-doc)))
+
+(package
+  (name tiny_httpd_lwt)
+  (synopsis "Tiny_httpd backend based on lwt.unix for OCaml 5")
+  (depends
+    (tiny_httpd (= :version))
+    (lwt (>= 5.0))
+    base-unix
+    (logs :with-test)
+    (odoc :with-doc)))
