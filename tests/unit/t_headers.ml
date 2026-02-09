@@ -1,4 +1,3 @@
-open Test_util
 open Tiny_httpd_core
 
 (* Test that header size limits are enforced *)
