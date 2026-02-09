@@ -34,7 +34,13 @@ val pp : Format.formatter -> t -> unit
 
 (**/*)
 
-val parse_ : buf:Buf.t -> IO.Input.t -> t
+val parse_ :
+  buf:Buf.t ->
+  ?max_headers:int ->
+  ?max_header_size:int ->
+  ?max_total_size:int ->
+  IO.Input.t ->
+  t
 val parse_line_ : string -> (string * string, string) result
 
 (**/*)

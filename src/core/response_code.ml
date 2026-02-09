@@ -25,6 +25,7 @@ let descr = function
   | 411 -> "Length required"
   | 413 -> "Payload too large"
   | 417 -> "Expectation failed"
+  | 431 -> "Request Header Fields Too Large"
   | 500 -> "Internal server error"
   | 501 -> "Not implemented"
   | 503 -> "Service unavailable"

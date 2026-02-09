@@ -83,8 +83,13 @@ let parse_line_ (line : string) : _ result =
     Ok (k, v)
   with Failure msg -> Error msg
 
-let parse_ ~(buf : Buf.t) (bs : IO.Input.t) : t =
-  let rec loop acc =
+let parse_ ~(buf : Buf.t) ?(max_headers = 100) ?(max_header_size = 16384)
+    ?(max_total_size = 1048576) (bs : IO.Input.t) : t =
+  let rec loop acc count total_size =
+    if count >= max_headers then
+      bad_reqf 431 "too many headers (max: %d)" max_headers;
+    if total_size >= max_total_size then
+      bad_reqf 431 "headers too large (max: %d bytes)" max_total_size;
     match IO.Input.read_line_using_opt ~buf bs with
     | None -> raise End_of_file
     | Some "" -> assert false
@@ -92,12 +97,15 @@ let parse_ ~(buf : Buf.t) (bs : IO.Input.t) : t =
     | Some line when line.[String.length line - 1] <> '\r' ->
       bad_reqf 400 "bad header line, not ended in CRLF"
     | Some line ->
+      let line_len = String.length line in
+      if line_len > max_header_size then
+        bad_reqf 431 "header too large (max: %d bytes)" max_header_size;
       let k, v =
         match parse_line_ line with
         | Ok r -> r
         | Error msg ->
           bad_reqf 400 "invalid header line: %s\nline is: %S" msg line
       in
-      loop ((k, v) :: acc)
+      loop ((k, v) :: acc) (count + 1) (total_size + line_len)
   in
-  loop []
+  loop [] 0 0
