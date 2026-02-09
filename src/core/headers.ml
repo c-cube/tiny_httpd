@@ -84,7 +84,7 @@ let parse_line_ (line : string) : _ result =
   with Failure msg -> Error msg
 
 let parse_ ~(buf : Buf.t) ?(max_headers = 100) ?(max_header_size = 16384)
-    ?(max_total_size = 1048576) (bs : IO.Input.t) : t =
+    ?(max_total_size = 262144) (bs : IO.Input.t) : t =
   let rec loop acc count total_size =
     if count >= max_headers then
       bad_reqf 431 "too many headers (max: %d)" max_headers;
