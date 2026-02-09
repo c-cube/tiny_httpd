@@ -43,6 +43,28 @@ let contains_dot_dot s =
     false
   with Exit -> true
 
+(* Check if string [s] starts with prefix [pre] *)
+let string_prefix ~pre s =
+  let len_pre = String.length pre in
+  String.length s >= len_pre &&
+  String.sub s 0 len_pre = pre
+
+(* Check if a path is safe (doesn't escape root directory).
+   Only needed for real filesystem access. *)
+let is_path_safe ~root_canonical ~path =
+  try
+    let full_path = Filename.concat root_canonical path in
+    let path_canonical = Unix.realpath full_path in
+    string_prefix ~pre:root_canonical path_canonical
+  with Unix.Unix_error _ ->
+    (* If realpath fails (e.g., file doesn't exist for uploads),
+       check parent directory *)
+    try
+      let parent = Filename.dirname (Filename.concat root_canonical path) in
+      let parent_canonical = Unix.realpath parent in
+      string_prefix ~pre:root_canonical parent_canonical
+    with Unix.Unix_error _ -> false
+
 (* Human readable size *)
 let human_size (x : int) : string =
   if x >= 1_000_000_000 then
@@ -206,6 +228,12 @@ let html_list_dir (module VFS : VFS) ~prefix ~parent d : Html.elt =
 (* @param on_fs: if true, we assume the file exists on the FS *)
 let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
     : unit =
+  let root_canonical = if on_fs then try Some (Unix.realpath top) with _ -> None else None in
+  let check_path path =
+    match root_canonical with
+    | Some root -> is_path_safe ~root_canonical:root ~path
+    | None -> not (contains_dot_dot path)
+  in
   let route () =
     if prefix = "" then
       Route.rest_of_path_urlencoded
@@ -214,7 +242,7 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
   in
   if config.delete then
     S.add_route_handler server ~meth:`DELETE (route ()) (fun path _req ->
-        if contains_dot_dot path then
+        if not (check_path path) then
           Response.fail_raise ~code:403 "invalid path in delete"
         else
           Response.make_string
@@ -233,7 +261,7 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
         | Some n when n > config.max_upload_size ->
           Error
             (403, "max upload size is " ^ string_of_int config.max_upload_size)
-        | Some _ when contains_dot_dot req.Request.path ->
+        | Some _ when not (check_path req.Request.path) ->
           Error (403, "invalid path (contains '..')")
         | _ -> Ok ())
       (fun path req ->
@@ -264,7 +292,7 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
             | None -> Response.fail_raise ~code:403 "Cannot access file"
             | Some t -> Printf.sprintf "mtime: %.4f" t)
         in
-        if contains_dot_dot path then
+        if not (check_path path) then
           Response.fail ~code:403 "Path is forbidden"
         else if not (VFS.contains path) then
           Response.fail ~code:404 "File not found"
