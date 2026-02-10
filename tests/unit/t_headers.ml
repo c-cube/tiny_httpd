@@ -17,8 +17,7 @@ let test_header_too_large () =
     let _ = Request.Private_.parse_req_start_exn ~client_addr ~buf
       ~get_time_s:(fun _ -> 0.) str in
     failwith "should have failed with 431"
-  with Common_.Bad_req (431, _) ->
-    () (* expected *)
+  with Tiny_httpd_core.Response.Bad_req (431, _) -> () (* expected *)
 
 let () =
   test_header_too_large ()
