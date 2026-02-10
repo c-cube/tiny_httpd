@@ -46,8 +46,7 @@ let contains_dot_dot s =
 (* Check if string [s] starts with prefix [pre] *)
 let string_prefix ~pre s =
   let len_pre = String.length pre in
-  String.length s >= len_pre &&
-  String.sub s 0 len_pre = pre
+  String.length s >= len_pre && String.sub s 0 len_pre = pre
 
 (* Check if a path is safe (doesn't escape root directory).
    Only needed for real filesystem access. *)
@@ -59,11 +58,11 @@ let is_path_safe ~root_canonical ~path =
   with Unix.Unix_error _ ->
     (* If realpath fails (e.g., file doesn't exist for uploads),
        check parent directory *)
-    try
-      let parent = Filename.dirname (Filename.concat root_canonical path) in
-      let parent_canonical = Unix.realpath parent in
-      string_prefix ~pre:root_canonical parent_canonical
-    with Unix.Unix_error _ -> false
+    (try
+       let parent = Filename.dirname (Filename.concat root_canonical path) in
+       let parent_canonical = Unix.realpath parent in
+       string_prefix ~pre:root_canonical parent_canonical
+     with Unix.Unix_error _ -> false)
 
 (* Human readable size *)
 let human_size (x : int) : string =
@@ -173,9 +172,9 @@ let html_list_dir (module VFS : VFS) ~prefix ~parent d : Html.elt =
              [
                sub_e @@ a [ A.href ("/" // prefix // fpath) ] [ txt f ];
                (if VFS.is_directory fpath then
-                 sub_e @@ txt "[dir]"
-               else
-                 sub_empty);
+                  sub_e @@ txt "[dir]"
+                else
+                  sub_empty);
                sub_e @@ txt size;
              ])
       )
@@ -198,21 +197,21 @@ let html_list_dir (module VFS : VFS) ~prefix ~parent d : Html.elt =
         @@ ul' []
              [
                (if !n_hidden > 0 then
-                 sub_e
-                 @@ details' []
-                      [
-                        sub_e
-                        @@ summary [] [ txtf "(%d hidden files)" !n_hidden ];
-                        sub_seq
-                          (seq_of_array entries
-                          |> Seq.filter_map (fun f ->
-                                 if is_hidden f then
-                                   file_to_elt f
-                                 else
-                                   None));
-                      ]
-               else
-                 sub_empty);
+                  sub_e
+                  @@ details' []
+                       [
+                         sub_e
+                         @@ summary [] [ txtf "(%d hidden files)" !n_hidden ];
+                         sub_seq
+                           (seq_of_array entries
+                           |> Seq.filter_map (fun f ->
+                                  if is_hidden f then
+                                    file_to_elt f
+                                  else
+                                    None));
+                       ]
+                else
+                  sub_empty);
                sub_seq
                  (seq_of_array entries
                  |> Seq.filter_map (fun f ->
@@ -228,7 +227,12 @@ let html_list_dir (module VFS : VFS) ~prefix ~parent d : Html.elt =
 (* @param on_fs: if true, we assume the file exists on the FS *)
 let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
     : unit =
-  let root_canonical = if on_fs then try Some (Unix.realpath top) with _ -> None else None in
+  let root_canonical =
+    if on_fs then (
+      try Some (Unix.realpath top) with _ -> None
+    ) else
+      None
+  in
   let check_path path =
     match root_canonical with
     | Some root -> is_path_safe ~root_canonical:root ~path

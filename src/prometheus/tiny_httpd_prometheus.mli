@@ -1,11 +1,10 @@
 (** Expose metrics over HTTP in the prometheus format.
 
- This sub-library [tiny_httpd.prometheus] provides definitions
- for counters, gauges, and histogram, and endpoints to expose
- them for {{: https://prometheus.io/} Prometheus} to scrape them.
+    This sub-library [tiny_httpd.prometheus] provides definitions for counters,
+    gauges, and histogram, and endpoints to expose them for
+    {{:https://prometheus.io/} Prometheus} to scrape them.
 
- @since 0.16
- *)
+    @since 0.16 *)
 
 type tags = (string * string) list
 
@@ -17,13 +16,13 @@ module Registry : sig
   val create : unit -> t
 
   val on_will_emit : t -> (unit -> unit) -> unit
-  (** [on_will_emit registry f] calls [f()] every time
-      [emit buf registry] is called (before the metrics start being emitted). This
-      is useful to update some metrics on demand. *)
+  (** [on_will_emit registry f] calls [f()] every time [emit buf registry] is
+      called (before the metrics start being emitted). This is useful to update
+      some metrics on demand. *)
 
   val emit : Buffer.t -> t -> unit
-  (** Write metrics into the given buffer. The buffer will be
-      cleared first thing. *)
+  (** Write metrics into the given buffer. The buffer will be cleared first
+      thing. *)
 
   val emit_str : t -> string
 end
@@ -40,8 +39,8 @@ module Counter : sig
   val incr_by : t -> int -> unit
 
   val incr_to : t -> int -> unit
-  (** Increment to the given number. If it's lower than the current
-      value this does nothing *)
+  (** Increment to the given number. If it's lower than the current value this
+      does nothing *)
 end
 
 (** Gauges *)
@@ -88,7 +87,7 @@ module GC_metrics : sig
   val update : t -> unit
 
   val create_and_update_before_emit : Registry.t -> unit
-  (** [create_and_update_before_emit reg] creates new GC metrics,
-    adds them to the registry, and uses {!Registry.on_will_emit}
-    to {!update} the metrics every time the registry is polled. *)
+  (** [create_and_update_before_emit reg] creates new GC metrics, adds them to
+      the registry, and uses {!Registry.on_will_emit} to {!update} the metrics
+      every time the registry is polled. *)
 end

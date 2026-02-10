@@ -58,7 +58,6 @@ val to_url : ('a, string) t -> 'a
 (** [to_url route args] takes a route, and turns it into a URL path.
     @since NEXT_RELEASE *)
 
-
 module Private_ : sig
   val eval : string list -> ('a, 'b) t -> 'a -> 'b option
 end

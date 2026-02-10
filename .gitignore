@@ -4,3 +4,4 @@ _opam
 *.install
 .merlin
 todo.md
+*.tmp
