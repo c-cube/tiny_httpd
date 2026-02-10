@@ -23,7 +23,7 @@
     result
     hmap
     (iostream (>= 0.2))
-    (ocaml (>= 4.08))
+    (ocaml (>= 4.13))
     (odoc :with-doc)
     (logs :with-test)
     (conf-libcurl :with-test)
