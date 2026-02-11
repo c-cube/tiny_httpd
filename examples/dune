@@ -19,6 +19,12 @@
   tiny_httpd.multipart-form-data))
 
 (executable
+ (name echo_mio)
+ (flags :standard -warn-error -a+8)
+ (modules echo_mio)
+ (libraries tiny_httpd tiny_httpd_moonpool logs))
+
+(executable
  (name writer)
  (flags :standard -warn-error -a+8)
  (modules writer)
