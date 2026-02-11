@@ -1,8 +1,8 @@
 module Result = struct
   include Result
 
-  let ( >>= ) :
-      type a b e. (a, e) result -> (a -> (b, e) result) -> (b, e) result =
+  let ( >>= ) : type a b e.
+      (a, e) result -> (a -> (b, e) result) -> (b, e) result =
    fun r f ->
     match r with
     | Ok x -> f x
@@ -121,9 +121,9 @@ module Request = struct
         Header.to_cmd t.headers;
         [ t.url ];
         (if has_body t then
-          [ "--data-binary"; "@-" ]
-        else
-          []);
+           [ "--data-binary"; "@-" ]
+         else
+           []);
       ]
 
   let pp fmt t =

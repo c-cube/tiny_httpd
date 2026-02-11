@@ -6,9 +6,9 @@ let setup_logging ~debug () =
   Logs.set_level ~all:true
   @@ Some
        (if debug then
-         Logs.Debug
-       else
-         Logs.Info)
+          Logs.Debug
+        else
+          Logs.Info)
 
 let handle_ws (req : unit Request.t) ic oc =
   Log.info (fun k ->

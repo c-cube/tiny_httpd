@@ -54,6 +54,7 @@ val to_string : _ t -> string
     @since 0.7 *)
 
 val to_url : ('a, string) t -> 'a
+
 (** [to_url route args] takes a route, and turns it into a URL path.
     @since NEXT_RELEASE *)
 
