@@ -133,7 +133,8 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
   let module M = struct
     let init_addr () = addr
     let init_port () = port
-    let get_time_s () = Unix.gettimeofday ()
+    let clock = Eio.Stdenv.clock stdenv
+    let get_time_s () = Eio.Time.now clock
     let max_connections = get_max_connection_ ?max_connections ()
 
     let pool_size =
@@ -177,7 +178,12 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
                 stop =
                   (fun () ->
                     Atomic.set running false;
-                    Eio.Switch.fail sw Exit);
+                    (* Backstop: fail the switch after 60s if handlers don't complete *)
+                    Eio.Fiber.fork_daemon ~sw (fun () ->
+                        Eio.Time.sleep clock 60.0;
+                        if Eio.Switch.get_error sw |> Option.is_none then
+                          Eio.Switch.fail sw Exit;
+                        `Stop_daemon));
                 endpoint = (fun () -> actual_addr, actual_port);
                 active_connections = (fun () -> Atomic.get active_conns);
               }
@@ -186,43 +192,50 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
             after_init tcp_server;
 
             while Atomic.get running do
-              Eio.Net.accept_fork ~sw
-                ~on_error:(fun exn ->
-                  Log.error (fun k ->
-                      k "error in client handler: %s" (Printexc.to_string exn)))
-                sock
-                (fun flow client_addr ->
-                  Eio.Semaphore.acquire sem;
-                  Eio_unix.Fd.use_exn "setsockopt" (Eio_unix.Net.fd flow)
-                    (fun fd -> Unix.setsockopt fd Unix.TCP_NODELAY true);
-                  Atomic.incr active_conns;
-                  let@ () =
-                    Fun.protect ~finally:(fun () ->
-                        Log.debug (fun k ->
-                            k "Tiny_httpd_eio: client handler returned");
-                        Atomic.decr active_conns;
-                        Eio.Semaphore.release sem)
-                  in
-                  let ic_closed = ref false in
-                  let oc_closed = ref false in
-                  let ic =
-                    ic_of_flow ~closed:ic_closed ~buf_pool:cstruct_pool flow
-                  in
-                  let oc =
-                    oc_of_flow ~closed:oc_closed ~buf_pool:cstruct_pool flow
-                  in
+              match Eio.Net.accept ~sw sock with
+              | exception (Eio.Cancel.Cancelled _ | Eio.Io _)
+                when not (Atomic.get running) ->
+                (* Socket closed or switch cancelled during shutdown; exit loop *)
+                ()
+              | conn, client_addr ->
+                (* Acquire semaphore BEFORE spawning a fiber so we
+                   bound the number of in-flight fibers. *)
+                Eio.Semaphore.acquire sem;
+                Eio.Fiber.fork ~sw (fun () ->
+                    let@ () =
+                      Fun.protect ~finally:(fun () ->
+                          Log.debug (fun k ->
+                              k "Tiny_httpd_eio: client handler returned");
+                          Atomic.decr active_conns;
+                          Eio.Semaphore.release sem;
+                          try Eio.Flow.close conn with Eio.Io _ -> ())
+                    in
+                    (try
+                       Eio_unix.Fd.use_exn "setsockopt" (Eio_unix.Net.fd conn)
+                         (fun fd -> Unix.setsockopt fd Unix.TCP_NODELAY true)
+                     with Unix.Unix_error _ -> ());
+                    Atomic.incr active_conns;
+                    let ic_closed = ref false in
+                    let oc_closed = ref false in
+                    let ic =
+                      ic_of_flow ~closed:ic_closed ~buf_pool:cstruct_pool conn
+                    in
+                    let oc =
+                      oc_of_flow ~closed:oc_closed ~buf_pool:cstruct_pool conn
+                    in
 
-                  Log.debug (fun k ->
-                      k "handling client on %a…" Eio.Net.Sockaddr.pp client_addr);
-                  let client_addr_unix = eio_sock_addr_to_unix client_addr in
-                  try handle.handle ~client_addr:client_addr_unix ic oc
-                  with exn ->
-                    let bt = Printexc.get_raw_backtrace () in
-                    Log.error (fun k ->
-                        k "Client handler for %a failed with %s\n%s"
-                          Eio.Net.Sockaddr.pp client_addr
-                          (Printexc.to_string exn)
-                          (Printexc.raw_backtrace_to_string bt)))
+                    Log.debug (fun k ->
+                        k "handling client on %a…" Eio.Net.Sockaddr.pp
+                          client_addr);
+                    let client_addr_unix = eio_sock_addr_to_unix client_addr in
+                    try handle.handle ~client_addr:client_addr_unix ic oc
+                    with exn ->
+                      let bt = Printexc.get_raw_backtrace () in
+                      Log.error (fun k ->
+                          k "Client handler for %a failed with %s\n%s"
+                            Eio.Net.Sockaddr.pp client_addr
+                            (Printexc.to_string exn)
+                            (Printexc.raw_backtrace_to_string bt)))
             done);
       }
   end in
