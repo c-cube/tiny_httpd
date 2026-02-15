@@ -73,10 +73,10 @@
 ; produce an embedded FS
 
 (library
-  (name echo_vfs)
-  (modules vfs)
-  (wrapped false)
-  (libraries tiny_httpd))
+ (name echo_vfs)
+ (modules vfs)
+ (wrapped false)
+ (libraries tiny_httpd))
 
 (rule
  (targets vfs.ml)
