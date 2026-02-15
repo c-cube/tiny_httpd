@@ -3,4 +3,4 @@
  (public_name tiny_httpd_eio)
  (synopsis "An EIO-based backend for Tiny_httpd")
  (flags :standard -safe-string -warn-error -a+8)
- (libraries tiny_httpd eio eio_posix))
+ (libraries tiny_httpd eio eio.unix))

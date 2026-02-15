@@ -11,6 +11,7 @@ depends: [
   "dune" {>= "3.2"}
   "tiny_httpd" {= version}
   "eio" {>= "1.0" & < "2.0"}
+  "base-unix"
   "logs" {with-test}
   "odoc" {with-doc}
 ]

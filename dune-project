@@ -46,5 +46,6 @@
   (depends
     (tiny_httpd (= :version))
     (eio (and (>= 1.0) (< 2.0)))
+    base-unix
     (logs :with-test)
     (odoc :with-doc)))
