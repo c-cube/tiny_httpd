@@ -173,7 +173,13 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
                 running = (fun () -> Atomic.get running);
                 stop =
                   (fun () ->
-                    Atomic.set running false);
+                    Atomic.set running false;
+                    (* Backstop: fail the switch after 60s if handlers don't complete *)
+                    Eio.Fiber.fork_daemon ~sw (fun () ->
+                      Eio.Time.sleep clock 60.0;
+                      if Eio.Switch.get_error sw |> Option.is_none then
+                        Eio.Switch.fail sw Exit;
+                      `Stop_daemon));
                 endpoint = (fun () -> actual_addr, actual_port);
                 active_connections = (fun () -> Atomic.get active_conns);
               }
@@ -197,7 +203,7 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
                             k "Tiny_httpd_eio: client handler returned");
                         Atomic.decr active_conns;
                         Eio.Semaphore.release sem;
-                        Eio.Flow.close conn)
+                        (try Eio.Flow.close conn with Eio.Io _ -> ()))
                   in
                   (try
                     Eio_unix.Fd.use_exn "setsockopt"
