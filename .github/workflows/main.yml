@@ -38,7 +38,15 @@ jobs:
 
       - run: opam install ./tiny_httpd.opam ./tiny_httpd_camlzip.opam --deps-only --with-test
 
-      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_eio
+      - name: Build (OCaml 4.x)
+        run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
+        if: ${{ !startsWith(matrix.ocaml-compiler, '5.') }}
+
+      - name: Build (OCaml 5.x, includes eio)
+        run: |
+          opam install ./tiny_httpd_eio.opam --deps-only --with-test
+          opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_eio
+        if: ${{ startsWith(matrix.ocaml-compiler, '5.') }}
 
       - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -50,4 +58,10 @@ jobs:
 
       - run: opam install logs magic-mime -y
 
-      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_eio
+      - name: Final build (OCaml 4.x)
+        run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
+        if: ${{ !startsWith(matrix.ocaml-compiler, '5.') }}
+
+      - name: Final build (OCaml 5.x, includes eio)
+        run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_eio
+        if: ${{ startsWith(matrix.ocaml-compiler, '5.') }}
