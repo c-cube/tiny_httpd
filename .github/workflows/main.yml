@@ -44,7 +44,7 @@ jobs:
 
       - name: Build (OCaml 5.x, includes eio)
         run: |
-          opam install ./tiny_httpd_eio.opam --deps-only --with-test
+          opam install ./tiny_httpd.opam ./tiny_httpd_eio.opam --deps-only --with-test
           opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_eio
         if: ${{ startsWith(matrix.ocaml-compiler, '5.') }}
 
