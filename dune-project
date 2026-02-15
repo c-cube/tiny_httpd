@@ -28,7 +28,7 @@
     (logs :with-test)
     (conf-libcurl :with-test)
     (ptime :with-test)
-    (qcheck-core (and (>= 0.9) :with-test))))
+    (qcheck-core (and (>= 0.91) :with-test))))
 
 (package
   (name tiny_httpd_camlzip)
@@ -37,5 +37,15 @@
     (tiny_httpd (= :version))
     (camlzip (>= 1.06))
     (iostream-camlzip (>= 0.2.1))
+    (logs :with-test)
+    (odoc :with-doc)))
+
+(package
+  (name tiny_httpd_eio)
+  (synopsis "Use eio for tiny_httpd")
+  (depends
+    (tiny_httpd (= :version))
+    (eio (and (>= 1.0) (< 2.0)))
+    base-unix
     (logs :with-test)
     (odoc :with-doc)))
