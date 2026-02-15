@@ -14,9 +14,9 @@ let () =
   @@ QCheck.Test.make ~count:10_000
        Q.(
          triple
-           (bytes_of_size (Gen.return 4))
-           (option small_nat)
-           (bytes_of_size Gen.(0 -- 6000))
+           (bytes_size (Gen.return 4))
+           (option nat_small)
+           (bytes_size Gen.(0 -- 6000))
          (* |> Q.add_stat ("b.size", fun (_k, b) -> Bytes.length b) *)
          |> Q.add_shrink_invariant (fun (k, _, _) -> Bytes.length k = 4))
        (fun (key, mask_offset, b) ->

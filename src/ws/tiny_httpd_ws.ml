@@ -26,11 +26,11 @@ type handler = unit Request.t -> IO.Input.t -> IO.Output.t -> unit
 module Frame_type = struct
   type t = int
 
-  let continuation : t = 0
-  let text : t = 1
+  let _continuation : t = 0
+  let _text : t = 1
   let binary : t = 2
-  let close : t = 8
-  let ping : t = 9
+  let _close : t = 8
+  let _ping : t = 9
   let pong : t = 10
 
   let show = function
@@ -132,7 +132,7 @@ module Writer = struct
     ()
 
   (** Max fragment size: send 16 kB at a time *)
-  let max_fragment_size = 16 * 1024
+  let _max_fragment_size = 16 * 1024
 
   let[@inline never] really_output_buf_ (self : t) =
     self.header.fin <- true;

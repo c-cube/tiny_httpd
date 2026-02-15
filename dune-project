@@ -28,7 +28,7 @@
     (logs :with-test)
     (conf-libcurl :with-test)
     (ptime :with-test)
-    (qcheck-core (and (>= 0.9) :with-test))))
+    (qcheck-core (and (>= 0.91) :with-test))))
 
 (package
   (name tiny_httpd_camlzip)

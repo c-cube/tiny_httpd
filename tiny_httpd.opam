@@ -22,7 +22,7 @@ depends: [
   "logs" {with-test}
   "conf-libcurl" {with-test}
   "ptime" {with-test}
-  "qcheck-core" {>= "0.9" & with-test}
+  "qcheck-core" {>= "0.91" & with-test}
 ]
 depopts: [
   "logs"
