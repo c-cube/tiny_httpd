@@ -69,12 +69,10 @@ let middleware_stat () : Server.Middleware.t * (unit -> string) =
 
 let middleware_trace : Server.Middleware.t =
  fun (h : Server.Middleware.handler) req ~resp ->
-  let _sp =
-    Trace.enter_manual_toplevel_span ~__FILE__ ~__LINE__ "http.handle"
-  in
+  let _sp = Trace.enter_span ~__FILE__ ~__LINE__ "http.handle" in
   let new_resp (r : Response.t) =
-    Trace.add_data_to_manual_span _sp [ "http.code", `Int r.code ];
-    Trace.exit_manual_span _sp;
+    Trace.add_data_to_span _sp [ "http.code", `Int r.code ];
+    Trace.exit_span _sp;
     resp r
   in
   h req ~resp:new_resp
