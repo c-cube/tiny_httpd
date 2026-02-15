@@ -56,10 +56,12 @@ let ic_of_flow ~closed ~buf_pool:ic_pool (flow : _ Eio.Net.stream_socket) :
     method close () =
       if not !closed then (
         closed := true;
-        Pool.Raw.release ic_pool cstruct);
+        Pool.Raw.release ic_pool cstruct
+      );
       if not !sent_shutdown then (
         sent_shutdown := true;
-        Eio.Flow.shutdown flow `Receive)
+        Eio.Flow.shutdown flow `Receive
+      )
   end
 
 let oc_of_flow ~closed ~buf_pool:oc_pool (flow : _ Eio.Net.stream_socket) :
@@ -100,10 +102,12 @@ let oc_of_flow ~closed ~buf_pool:oc_pool (flow : _ Eio.Net.stream_socket) :
     method close () =
       if not !closed then (
         closed := true;
-        Pool.Raw.release oc_pool wbuf);
+        Pool.Raw.release oc_pool wbuf
+      );
       if not !sent_shutdown then (
         sent_shutdown := true;
-        Eio.Flow.shutdown flow `Send)
+        Eio.Flow.shutdown flow `Send
+      )
   end
 
 let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
@@ -189,9 +193,8 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
                 sock
                 (fun flow client_addr ->
                   Eio.Semaphore.acquire sem;
-                  Eio_unix.Fd.use_exn "setsockopt"
-                    (Eio_unix.Net.fd flow) (fun fd ->
-                      Unix.setsockopt fd Unix.TCP_NODELAY true);
+                  Eio_unix.Fd.use_exn "setsockopt" (Eio_unix.Net.fd flow)
+                    (fun fd -> Unix.setsockopt fd Unix.TCP_NODELAY true);
                   Atomic.incr active_conns;
                   let@ () =
                     Fun.protect ~finally:(fun () ->
@@ -202,8 +205,12 @@ let io_backend ?addr ?port ?unix_sock ?max_connections ?max_buf_pool_size
                   in
                   let ic_closed = ref false in
                   let oc_closed = ref false in
-                  let ic = ic_of_flow ~closed:ic_closed ~buf_pool:cstruct_pool flow in
-                  let oc = oc_of_flow ~closed:oc_closed ~buf_pool:cstruct_pool flow in
+                  let ic =
+                    ic_of_flow ~closed:ic_closed ~buf_pool:cstruct_pool flow
+                  in
+                  let oc =
+                    oc_of_flow ~closed:oc_closed ~buf_pool:cstruct_pool flow
+                  in
 
                   Log.debug (fun k ->
                       k "handling client on %a…" Eio.Net.Sockaddr.pp client_addr);
