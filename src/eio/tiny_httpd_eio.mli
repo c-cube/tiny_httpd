@@ -7,8 +7,6 @@
     especially since Eio itself is also subject to change.
     @since NEXT_RELEASE *)
 
-(* TODO: pass in a switch *)
-
 type 'a with_args =
   ?addr:string ->
   ?port:int ->
@@ -28,4 +26,14 @@ val create :
   unit ->
   Tiny_httpd.Server.t)
   with_args
-(** Create a server *)
+(** Create a server.
+
+    Example:
+    {[
+      Eio_main.run @@ fun stdenv ->
+      Eio.Switch.run ~name:"my_server" @@ fun sw ->
+        let server = Tiny_httpd_eio.create ~port:8080 ~stdenv ~sw () in
+        (* add routes... *)
+        Tiny_httpd.Server.add_route_handler [....];
+        Tiny_httpd.Server.run_exn server
+    ]} *)
