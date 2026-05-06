@@ -223,8 +223,9 @@ module Reader = struct
       header = Header.create ();
     }
 
-  (** limitation: we only accept frames that are 2^30 bytes long or less *)
-  let max_fragment_size = 1 lsl 30
+  (** Max accepted frame payload: 16 MiB. One connection declaring a larger
+      frame would otherwise allocate up to 1 GiB of memory. *)
+  let max_fragment_size = 16 * 1024 * 1024
 
   (** Read next frame header into [self.header] *)
   let read_frame_header (self : t) : unit =
