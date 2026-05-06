@@ -179,6 +179,7 @@ let parse_body_ ~tr_stream ~bytes (req : IO.Input.t t) :
   try
     let size, has_size =
       match Headers.get_exn "Content-Length" req.headers |> int_of_string with
+      | n when n < 0 -> bad_reqf 400 "invalid content-length"
       | n -> n, true (* body of fixed size *)
       | exception Not_found -> 0, false
       | exception _ -> bad_reqf 400 "invalid content-length"
