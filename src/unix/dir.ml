@@ -236,7 +236,11 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
   let check_path path =
     match root_canonical with
     | Some root -> is_path_safe ~root_canonical:root ~path
-    | None -> not (contains_dot_dot path)
+    | None ->
+      (* VFS: URL decoding already happened in Route.rest_of_path_urlencoded
+         before check_path is called, so %2e%2e is already decoded to ".."
+         and caught here. *)
+      not (contains_dot_dot path)
   in
   let route () =
     if prefix = "" then
@@ -343,7 +347,10 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
               else if on_fs then (
                 (* call "file" util *)
                 let ty = Mime_.mime_of_path (top // path) in
-                [ "content-type", ty ]
+                if ty = "" then
+                  []
+                else
+                  [ "content-type", ty ]
               ) else
                 []
             in
