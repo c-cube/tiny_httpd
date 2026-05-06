@@ -136,9 +136,18 @@ let output_ ~bytes (oc : IO.Output.t) (self : t) : unit =
         (Thread.id @@ Thread.self ())
         (Format.asprintf "%a" pp { self with body = `String "<...>" }));
 
+  let validate_header_str s =
+    String.iter
+      (fun c ->
+        if c = '\r' || c = '\n' then
+          invalid_arg "Tiny_httpd: header key or value contains CRLF")
+      s
+  in
   (* write headers, using [buf] to batch writes *)
   List.iter
     (fun (k, v) ->
+      validate_header_str k;
+      validate_header_str v;
       Printf.bprintf tmp_buffer "%s: %s\r\n" k v;
       Buf.add_buffer buf tmp_buffer;
       Buffer.clear tmp_buffer)
