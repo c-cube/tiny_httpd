@@ -35,7 +35,8 @@ let () = assert_eq [] (U.split_on_slash "//")
 let () =
   assert_eq ~cmp:eq_sorted (Ok [ "a", "b"; "c", "d" ]) (U.parse_query "a=b&c=d")
 
-let () = assert_eq (Ok [ "foo", "bar" ]) (U.parse_query "yolo#foo=bar")
+(* fragment is stripped before parsing; only the part before '#' is used *)
+let () = assert_eq (Ok [ "a", "1" ]) (U.parse_query "a=1#b=2")
 
 let () =
   add_qcheck

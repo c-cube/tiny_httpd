@@ -78,9 +78,9 @@ let split_on_slash s : _ list =
 
 let parse_query s : (_ list, string) result =
   let s =
-    (* skip hash if present *)
+    (* skip hash/fragment if present *)
     match String.index_opt s '#' with
-    | Some i -> String.sub s (i + 1) (String.length s - i - 1)
+    | Some i -> String.sub s 0 i
     | None -> s
   in
   let pairs = ref [] in
