@@ -1,28 +1,16 @@
 name: format
 
 on:
-  pull_request:
   push:
     branches:
       - main
+  pull_request:
 
 jobs:
   format:
     name: format
-    strategy:
-      matrix:
-        ocaml-compiler:
-            - '5.3'
     runs-on: 'ubuntu-latest'
+    container: ghcr.io/c-cube/c-cube-commmon/ci-doc-5.3:latest
     steps:
-      - uses: actions/checkout@main
-      - name: Use OCaml ${{ matrix.ocaml-compiler }}
-        uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: ${{ matrix.ocaml-compiler }}
-          dune-cache: true
-          allow-prerelease-opam: true
-
-      - run: opam install ocamlformat.0.27.0
+      - uses: actions/checkout@v6
       - run: opam exec -- make format-check
-

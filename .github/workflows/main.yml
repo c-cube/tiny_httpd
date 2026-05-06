@@ -1,67 +1,49 @@
 name: build
 
 on:
-  pull_request:
   push:
     branches:
       - main
+  pull_request:
 
 jobs:
   build:
+    name: build
+    timeout-minutes: 15
     strategy:
       fail-fast: true
       matrix:
-        os:
-          - ubuntu-latest
-            #- macos-latest
-            #- windows-latest
-        ocaml-compiler:
-          - 4.13.x
-          - 4.14.x
-          - 5.03.x
+        container:
+          - ghcr.io/c-cube/c-cube-commmon/ci-4.14:latest
+          - ghcr.io/c-cube/c-cube-commmon/ci-5.1:latest
+          - ghcr.io/c-cube/c-cube-commmon/ci-5.4:latest
 
-    runs-on: ${{ matrix.os }}
-
+    runs-on: ubuntu-latest
+    container: ${{ matrix.container }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
-      - run: sudo apt-get update
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+      - run: apt update && opam install ./tiny_httpd.opam ./tiny_httpd_camlzip.opam --deps-only --with-test
+      - run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
 
-      - name: Use OCaml ${{ matrix.ocaml-compiler }}
-        uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: ${{ matrix.ocaml-compiler }}
-          allow-prerelease-opam: true
-          opam-depext-flags: --with-test
-
-      - run: opam install ./tiny_httpd.opam ./tiny_httpd_camlzip.opam --deps-only --with-test
-
-      - name: Build (OCaml 4.x)
-        run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
-        if: ${{ !startsWith(matrix.ocaml-compiler, '5.') }}
-
-      - name: Build (OCaml 5.x, includes eio)
+      - name: Build tiny_httpd_eio (OCaml 5.x only)
+        if: ${{ !contains(matrix.container, 'ci-4.') }}
         run: |
-          opam install ./tiny_httpd.opam ./tiny_httpd_eio.opam --deps-only --with-test
+          opam install ./tiny_httpd_eio.opam --deps-only --with-test
           opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_eio
-        if: ${{ startsWith(matrix.ocaml-compiler, '5.') }}
 
       - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd
-        if: ${{ matrix.os == 'ubuntu-latest' }}
 
       - run: opam install tiny_httpd
 
       - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd_camlzip
-        if: ${{ matrix.os == 'ubuntu-latest' }}
 
       - run: opam install logs magic-mime -y
 
       - name: Final build (OCaml 4.x)
+        if: ${{ contains(matrix.container, 'ci-4.') }}
         run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip
-        if: ${{ !startsWith(matrix.ocaml-compiler, '5.') }}
 
-      - name: Final build (OCaml 5.x, includes eio)
+      - name: Final build (OCaml 5.x)
+        if: ${{ !contains(matrix.container, 'ci-4.') }}
         run: opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_eio
-        if: ${{ startsWith(matrix.ocaml-compiler, '5.') }}
