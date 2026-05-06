@@ -430,6 +430,7 @@ let upgrade ?(with_lock = With_lock.default_builder ()) ic oc : _ * _ =
     upgrade handler *)
 module Make_upgrade_handler (X : sig
   val accept_ws_protocol : string -> bool
+  val accept_origin : string option -> bool
   val with_lock : With_lock.builder
   val handler : handler
 end) : Server.UPGRADE_HANDLER with type handshake_state = unit Request.t =
@@ -457,7 +458,10 @@ struct
       | Some k -> k
     in
 
-    (* TODO: "origin" header *)
+    let origin = Request.get_header req "origin" in
+    if not (X.accept_origin origin) then
+      bad_reqf "handler rejected origin %S"
+        (Option.value origin ~default:"(none)");
 
     (* produce the accept key *)
     let accept =
@@ -483,13 +487,15 @@ struct
       ()
 end
 
-let add_route_handler ?accept ?(accept_ws_protocol = fun _ -> true) ?middlewares
+let add_route_handler ?accept ?(accept_ws_protocol = fun _ -> true)
+    ?(accept_origin = fun _ -> true) ?middlewares
     ?(with_lock = With_lock.default_builder) (server : Server.t) route
     (f : handler) : unit =
   let module M = Make_upgrade_handler (struct
     let handler = f
     let with_lock = with_lock
     let accept_ws_protocol = accept_ws_protocol
+    let accept_origin = accept_origin
   end) in
   let up : Server.upgrade_handler = (module M) in
   Server.add_upgrade_handler ?accept ?middlewares server route up

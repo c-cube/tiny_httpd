@@ -41,6 +41,7 @@ exception Close_connection
 val add_route_handler :
   ?accept:(unit Request.t -> (unit, int * string) result) ->
   ?accept_ws_protocol:(string -> bool) ->
+  ?accept_origin:(string option -> bool) ->
   ?middlewares:Server.Head_middleware.t list ->
   ?with_lock:With_lock.builder ->
   Server.t ->
@@ -51,6 +52,11 @@ val add_route_handler :
     @param accept_ws_protocol
       decides whether this endpoint accepts the websocket protocol sent by the
       client. Default accepts everything.
+    @param accept_origin
+      decides whether this endpoint accepts the [Origin] header sent by the
+      client ([None] means the header was absent). Default accepts everything.
+      For browser-facing endpoints, provide an allowlist here to prevent
+      Cross-Site WebSocket Hijacking (CSWSH).
     @param with_lock
       if provided, use this to synchronize writes between the frame reader
       (replies "pong" to "ping") and the handler emitting writes. since
