@@ -360,14 +360,14 @@ let client_handle_for (self : t) ~client_addr ic oc : unit =
   (* handle generic exception *)
   let handle_exn e bt : unit =
     let msg = Printexc.to_string e in
-    let resp = Response.fail ~code:500 "server error: %s" msg in
+    let resp = Response.fail ~code:500 "internal server error" in
     if self.enable_logging && not Log.dummy then log_exn msg bt;
     Response.Private_.output_ ~bytes:bytes_res oc resp
   in
 
   let handle_bad_req req e bt =
     let msg = Printexc.to_string e in
-    let resp = Response.fail ~code:500 "server error: %s" msg in
+    let resp = Response.fail ~code:500 "internal server error" in
     if self.enable_logging && not Log.dummy then (
       log_exn msg bt;
       log_response req resp
