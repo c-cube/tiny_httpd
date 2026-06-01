@@ -1,0 +1,20 @@
+{0 Mtime {%html: <span class="version">v2.1.0</span>%}}
+
+Mtime has platform independent support for monotonic wall-clock time.
+This time increases monotonically and is not subject to operating
+system calendar time adjustments. The library has types to represent
+nanosecond precision timestamps and time spans.
+
+{!Mtime_clock} provides acces to {{!Mtime_clock.platform_support}a
+monotonic system clock} and its resolution (if available).
+
+{1:mtime Library [mtime]}
+
+{!modules: Mtime}
+
+{1:mtime_clock Library [mtime.clock.os]}
+
+{!modules: Mtime_clock}
+
+This library also works with JavaScript, see the
+{{!Mtime_clock.platform_support}platform support}.

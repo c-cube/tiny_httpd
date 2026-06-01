@@ -1,4 +1,12 @@
 
+## 0.20
+
+- eio backend, second try (#95)
+- hardening bugfixes
+- feat WS: abstraction for critical section
+- feat route: add `to_url`, to produce a URL path from a route
+- fix some warnings
+
 ## 0.19
 
 - feat(headers): `set` will not reallocate whole list if not needed
