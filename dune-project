@@ -8,7 +8,7 @@
 
 (maintainers c-cube)
 
-(version 0.20)
+(version 0.21)
 
 (source
  (github c-cube/tiny_httpd))

@@ -5,7 +5,7 @@ type t = [ `GET | `PUT | `POST | `HEAD | `DELETE | `OPTIONS | `QUERY ]
 
     See https://tools.ietf.org/html/rfc7231#section-4 
 
-    [`QUERY] added @since NEXT_RELEASE , see https://www.rfc-editor.org/info/rfc10008/
+    [`QUERY] added @since 0.21 , see https://www.rfc-editor.org/info/rfc10008/
   and https://blainsmith.com/articles/rfc-10008-http-query-method/
     *)
 

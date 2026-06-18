@@ -5,7 +5,7 @@
 
     {b NOTE}: this is very experimental and will absolutely change over time,
     especially since Eio itself is also subject to change.
-    @since NEXT_RELEASE *)
+    @since 0.21 *)
 
 type 'a with_args =
   ?addr:string ->

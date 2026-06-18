@@ -6,7 +6,7 @@
 (** Synchronization primitive used to allow both the reader to reply to "ping",
     and the handler to send messages, without stepping on each other's toes.
 
-    @since NEXT_RELEASE *)
+    @since 0.21 *)
 module With_lock : sig
   type t = { with_lock: 'a. (unit -> 'a) -> 'a }
   (** A primitive to run the callback in a critical section where others cannot
@@ -32,7 +32,7 @@ val upgrade :
 (** Upgrade a byte stream to the websocket framing protocol.
     @param with_lock
       if provided, use this to prevent reader and writer to compete on sending
-      frames. since NEXT_RELEASE. *)
+      frames. since 0.21. *)
 
 exception Close_connection
 (** Exception that can be raised from IOs inside the handler, when the
@@ -60,7 +60,7 @@ val add_route_handler :
     @param with_lock
       if provided, use this to synchronize writes between the frame reader
       (replies "pong" to "ping") and the handler emitting writes. since
-      NEXT_RELEASE. *)
+      0.21. *)
 
 (**/**)
 
