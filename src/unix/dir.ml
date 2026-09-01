@@ -265,13 +265,15 @@ let add_vfs_ ~on_fs ~top ~config ~vfs:((module VFS : VFS) as vfs) ~prefix server
   if config.upload then
     S.add_route_handler_stream server ~meth:`PUT (route ())
       ~accept:(fun req ->
-        match Request.get_header_int req "Content-Length" with
-        | Some n when n > config.max_upload_size ->
-          Error
-            (403, "max upload size is " ^ string_of_int config.max_upload_size)
-        | Some _ when not (check_path req.Request.path) ->
+        if not (check_path req.Request.path) then
           Error (403, "invalid path (contains '..')")
-        | _ -> Ok ())
+        else (
+          match Request.get_header_int req "Content-Length" with
+          | Some n when n > config.max_upload_size ->
+            Error
+              (403, "max upload size is " ^ string_of_int config.max_upload_size)
+          | _ -> Ok ()
+        ))
       (fun path req ->
         let write, close =
           try VFS.create path
