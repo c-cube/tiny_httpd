@@ -1,5 +1,17 @@
 
-## 0.20
+# 0.21
+
+- add QUERY method
+- ws: option to check origin (to implement CORS)
+- hide error message for 500 from client
+
+- fix ws: limit frame size to sth reasonable
+- fixes in unix vfs
+- fix parsing of query fragments
+- check that headers do not contain invalid chars
+- fix: check for negative content-length
+
+# 0.20
 
 - eio backend, second try (#95)
 - hardening bugfixes
@@ -7,14 +19,14 @@
 - feat route: add `to_url`, to produce a URL path from a route
 - fix some warnings
 
-## 0.19
+# 0.19
 
 - feat(headers): `set` will not reallocate whole list if not needed
 - feat(headers): use case insensitive comparison
 - fix(response): do not override "content-length" in raw response
 - feat pool: expose `acquire/release` for advanced uses
 
-## 0.18
+# 0.18
 
 - feat: add ?head_middlewares to `create`
 - add content-type header for prometheus endpoint
@@ -26,7 +38,7 @@
 - Processing to fix incompatible -O and gcc flags
 - fix: make check for 'Connection: Upgrade' header case-insensitive
 
-## 0.17
+# 0.17
 
 - add optional middlewares to tiny_httpd_ws
 - add `Head_middleware.trivial`
@@ -54,20 +66,20 @@
 - add optional dependency on `logs`
 - logs is a testdep for tiny_httpd_camlzip
 
-## 0.16
+# 0.16
 
 - feat: add `Request.client_addr` accessor
 - feat: add `tiny_httpd.prometheus`, a simple sub-library
     to expose [prometheus](https://prometheus.io) metrics over HTTP.
 - feat: add optional dependency on `logs`
 
-## 0.15
+# 0.15
 
 - fix: do not block in `accept`, enabling more graceful shutdown
 - improve help message for tiny-httpd-vfs-pack
 - security: zero out buffers from pool before reusing them
 
-## 0.14
+# 0.14
 
 - breaking: `set_top_handler` takes a stream request, for more generality
 
@@ -85,7 +97,7 @@
 - perf: use TCP_NODELAY for client sockets
 - perf: use a resource pool to recycle buffers, improves memory consumption and GC pressure
 
-## 0.13
+# 0.13
 
 - feat: `Server.run` takes `?after_init` parameter
 - remove dep on ounit2 and qtest
@@ -100,7 +112,7 @@
 - fix: close stream after Response.output
 - fix(tiny-httpd-vfs-pack): allow redirections when fetching resources
 
-## 0.12
+# 0.12
 
 - add dep on `seq`
 - add a `Html` module with combinators to produce html
@@ -109,7 +121,7 @@
   (local or behind a URL) into a OCaml module using `VFS`
 - show small example of socket activation
 
-## 0.11
+# 0.11
 
 - breaking: remove deprecated path handlers based on scanf
 - breaking: more getter/setters for request/response, change signatures,
@@ -130,18 +142,18 @@
 - perf: pass `buf_size` in many places, set default `buf_size` to 16kb
 - example: update `echo` to provide a /stats/ endpoint using a middleware
 
-## 0.10
+# 0.10
 
 - feat: allow socket activation by passing a raw unix socket to `create`
 - fix: `Unix.accept` may raise an exception
   (typicall Unix.EINTR, even with sigpipe blocked ?),
   prevent the server from stopping
 
-## 0.9
+# 0.9
 
 - support handlers that stream server-sent events to client
 
-## 0.8
+# 0.8
 
 - bump to ocaml 4.04
 - Validate header key's character set (#15)
@@ -150,7 +162,7 @@
 - fix: workaround for css/js in `http_of_dir` (#16)
 - fix(urlencode): encode non ascii chars
 
-## 0.7
+# 0.7
 
 - feat: add `rest_of_path_urlencoded` and rename `rest` to `rest_of_path`
 - feat: `http_of_dir`: redirect to index.html if present
@@ -158,7 +170,7 @@
 - feat: add `Route.rest` to match the rest of the path
 - feat: printing routes
 
-## 0.6
+# 0.6
 
 - feat: add `Route.t` construct, deprecate scanf, add more structured path
 - feat: use chunked encoding for large string responses, in addition to streams
@@ -171,21 +183,21 @@
 - feat(zip): also compress string responses if they're big
 - add more debug msg
 
-## 0.5
+# 0.5
 
 - new `tiny_httpd_camlzip` library for handling `deflate` compression
 - feat: expose `Headers.empty`
 - fix: use the non-query path for routing
 - feat(util): add some query related utils
 
-## 0.4
+# 0.4
 
 - easy accessor to the query parameters in path
 - fix: header field names are case insensitive
 - doc: add note on jemalloc in the readme
 - log error when closing client socket
 
-## 0.3
+# 0.3
 
 - feat(http_of_dir): use `file` to guess mime type of file
 - feat: allow handlers to take streams
@@ -200,7 +212,7 @@
 - fix: proper amortized O(1) push in Buf.push
 - fix: `%X` for percent_encode; use `percent_decode` in `parse_query`
 
-## 0.2
+# 0.2
 
 - feat(bin): count number of hidden files
 - feat(bin): use `details` for hiding hidden files by default
