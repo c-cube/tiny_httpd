@@ -187,7 +187,8 @@ val add_route_handler :
       its content is too big, or for some permission error). See the
       {!http_of_dir} program for an example of how to use [accept] to filter
       uploads that are too large before the upload even starts. The default
-      always returns [Ok()], i.e. it accepts all requests.
+      always returns [Ok()], i.e. it accepts all requests. Beware that
+      {!Request.path} is the full URL path and needs decoding.
 
     @since 0.6 *)
 
