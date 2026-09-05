@@ -81,12 +81,13 @@ let default_pp_body_ out = function
 let pp_with ?(mask_header = fun _ -> false)
     ?(headers_to_mask = [ "set-cookie" ]) ?(pp_body = default_pp_body_) () out
     self : unit =
-  let headers_to_mask = List.rev_map String.lowercase_ascii headers_to_mask in
   (* hide some headers *)
   let headers =
     List.map
       (fun (k, v) ->
-        let hidden = List.mem k headers_to_mask || mask_header k in
+        let hidden =
+          Headers.list_contains_nocase_ k headers_to_mask || mask_header k
+        in
         if hidden then
           k, "<hidden>"
         else

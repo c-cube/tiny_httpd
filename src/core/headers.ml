@@ -25,6 +25,8 @@ let equal_name_ (s1 : string) (s2 : string) : bool =
 let contains name headers =
   List.exists (fun (n, _) -> equal_name_ name n) headers
 
+let list_contains_nocase_ name l = List.exists (equal_name_ name) l
+
 let rec get_exn ?(f = fun x -> x) x h =
   match h with
   | [] -> raise Not_found
@@ -83,6 +85,11 @@ let parse_line_ (line : string) : _ result =
     Ok (k, v)
   with Failure msg -> Error msg
 
+open struct
+  let nodup_ = [ "content-length"; "host"; "transfer-encoding" ]
+  let is_nodup_ k = list_contains_nocase_ k nodup_
+end
+
 let parse_ ~(buf : Buf.t) ?(max_headers = 100) ?(max_header_size = 16 * 1024)
     ?(max_total_size = 256 * 1024) (bs : IO.Input.t) : t =
   let rec loop acc count total_size =
@@ -106,6 +113,18 @@ let parse_ ~(buf : Buf.t) ?(max_headers = 100) ?(max_header_size = 16 * 1024)
         | Error msg ->
           bad_reqf 400 "invalid header line: %s\nline is: %S" msg line
       in
+
+      if is_nodup_ k && contains k acc then
+        bad_reqf 400 "header %S is duplicated" k;
+
       loop ((k, v) :: acc) (count + 1) (total_size + line_len)
   in
-  loop [] 0 0
+
+  let headers = loop [] 0 0 in
+  if
+    contains "content-length" headers
+    && get "transfer-encoding" headers = Some "chunked"
+  then
+    bad_reqf 400 "cannot specify both chunked encoding and content-length";
+
+  headers
