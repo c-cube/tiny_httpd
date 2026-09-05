@@ -43,5 +43,6 @@ val parse_ :
   t
 
 val parse_line_ : string -> (string * string, string) result
+val list_contains_nocase_ : string -> string list -> bool
 
 (**/*)
