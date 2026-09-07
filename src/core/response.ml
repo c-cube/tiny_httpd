@@ -79,8 +79,8 @@ let default_pp_body_ out = function
   | `Void -> ()
 
 let pp_with ?(mask_header = fun _ -> false)
-    ?(headers_to_mask = [ "set-cookie" ]) ?(pp_body = default_pp_body_) () out
-    self : unit =
+    ?(headers_to_mask = [ "set-cookie"; "authorization" ])
+    ?(pp_body = default_pp_body_) () out self : unit =
   (* hide some headers *)
   let headers =
     List.map

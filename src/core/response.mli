@@ -122,7 +122,8 @@ val pp_with :
       header's value is masked. The presence of the header is still printed.
       Default [fun _ -> false].
     @param headers_to_mask
-      a list of headers masked by default. Default is ["set-cookie"].
+      a list of headers masked by default. Default is
+      ["set-cookie"; "authorization"].
     @param pp_body
       body printer (default fully prints String bodies, but omits stream bodies)
     @since 0.18 *)
