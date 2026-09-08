@@ -59,8 +59,7 @@ val add_route_handler :
       Cross-Site WebSocket Hijacking (CSWSH).
     @param with_lock
       if provided, use this to synchronize writes between the frame reader
-      (replies "pong" to "ping") and the handler emitting writes. since
-      0.21. *)
+      (replies "pong" to "ping") and the handler emitting writes. since 0.21. *)
 
 (**/**)
 
