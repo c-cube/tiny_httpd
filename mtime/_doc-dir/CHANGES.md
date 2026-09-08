@@ -1,3 +1,16 @@
+v2.2.0 2026-08-05 Zagreb
+------------------------
+
+- Add `Mtime.Span.( + )`.
+- `Mtime_clock`. Restore compatiblity with MacOS < 10.12. Before 10.12
+  we use `mach_absolute_time` instead of `mach_continuous_time` which
+  means that sleep time is not taken into account. Thanks to
+  Sergey Fedorov for the report and help (#51, #52).
+- In 2.0.0, `Mtime_clock` was advertised to use `CLOCK_BOOTTIME` on Linux,
+  except it seems that only `Mtime_clock.elapsed[_ns]` was updated to
+  do so. This is now also used for `Mtime_clock.{now,period}[_ns]`
+  (#10).
+
 v2.1.0 2024-09-10 Zagreb
 ------------------------
 

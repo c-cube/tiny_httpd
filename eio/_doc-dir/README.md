@@ -7,8 +7,8 @@ For example, you can use Eio to read and write files, make network connections,
 or perform CPU-intensive calculations, running multiple operations at the same time.
 It aims to be easy to use, secure, well documented, and fast.
 A generic cross-platform API is implemented by optimised backends for different platforms.
-Eio replaces existing concurrency libraries such as Lwt
-(Eio and Lwt libraries can also be used together).
+Eio implements similar functionality to Lwt or Async, but using effects rather than monadic concurrency
+(though it is possible to [use Eio and Lwt libraries together][Lwt_eio]).
 
 ## Contents
 
@@ -93,7 +93,7 @@ See [Awesome Multicore OCaml][] for links to other projects using Eio.
 
 ## Getting OCaml
 
-You'll need OCaml 5.1.0 or later.
+You'll need OCaml 5.2.0 or later.
 You can either install it yourself or build the included [Dockerfile](./Dockerfile).
 
 To install it yourself:
@@ -103,7 +103,7 @@ To install it yourself:
 2. Use opam to install OCaml:
 
    ```
-   opam switch create 5.2.0
+   opam switch create 5.5.0
    ```
 
 ## Getting Eio
@@ -809,12 +809,12 @@ The checks also apply to following symlinks:
 - : unit = ()
 ```
 
-You can use `open_dir` (or `with_open_dir`) to create a restricted capability to a subdirectory:
+You can use `open_subtree` (or `with_subtree`) to create a restricted capability to a subdirectory:
 
 ```ocaml
 # Eio_main.run @@ fun env ->
   let cwd = Eio.Stdenv.cwd env in
-  Eio.Path.with_open_dir (cwd / "dir1") @@ fun dir1 ->
+  Eio.Path.with_subtree (cwd / "dir1") @@ fun dir1 ->
   try_save (dir1 / "file4") "D";
   try_save (dir1 / "../file5") "E";;
 +save <dir1:file4> : ok
@@ -822,13 +822,13 @@ You can use `open_dir` (or `with_open_dir`) to create a restricted capability to
 - : unit = ()
 ```
 
-You only need to use `open_dir` if you want to create a new sandboxed environment.
+You only need to use `subtree` if you want to create a new sandboxed environment.
 You can use a single base directory object to access all paths beneath it,
 and this allows following symlinks within that subtree.
 
 A program that operates on the current directory will probably want to use `cwd`,
 whereas a program that accepts a path from the user will probably want to use `fs`,
-perhaps with `open_dir` to constrain all access to be within that directory.
+perhaps with `open_subtree` to constrain all access to be within that directory.
 
 On systems that provide the [cap_enter][] system call, you can ask the OS to reject accesses
 that don't use capabilities.
@@ -1840,7 +1840,7 @@ module Status : sig
     net : _ Eio.Net.t;             (** To connect to the servers *)
     clock : _ Eio.Time.clock;      (** Needed for timeouts *)
     ..
-  > as 'a
+  >
 
   val check : _ env -> bool
 end
