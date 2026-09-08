@@ -29,7 +29,7 @@ jobs:
       - name: Build tiny_httpd_eio (OCaml 5.x only)
         if: ${{ !contains(matrix.container, 'ci-4.') }}
         run: |
-          opam install ./tiny_httpd_eio.opam --deps-only --with-test
+          opam install eio -y
           opam exec -- dune build @install -p tiny_httpd,tiny_httpd_camlzip,tiny_httpd_eio
 
       - run: opam exec -- dune build @src/runtest @examples/runtest @tests/runtest -p tiny_httpd
