@@ -1,4 +1,11 @@
 
+# 0.22
+
+- mask authorization header by default in responses, too
+- fix header bugs related to casing
+- forbid duplicates for some sensitive headers
+- in dir serving, check paths even for chunked uploads
+
 # 0.21
 
 - add QUERY method
